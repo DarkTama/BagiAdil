@@ -12,7 +12,8 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "decimal.js": "^10.4.3"
+    "decimal.js": "^10.4.3",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "eslint": "^9.0.0",

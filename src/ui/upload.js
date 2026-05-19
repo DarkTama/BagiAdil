@@ -1,0 +1,115 @@
+/**
+ * Upload UI component for receipt images.
+ * Provides file input, camera capture, drag-and-drop, and progress indicator.
+ */
+
+/**
+ * Initialize the upload component.
+ * @param {HTMLElement} containerEl - Container element to render into
+ * @param {function} onComplete - Callback receiving {text, confidence} from OCR
+ */
+export function initUpload(containerEl, onComplete) {
+  containerEl.innerHTML = `
+    <div class="upload-zone" id="upload-zone">
+      <div class="upload-zone-content">
+        <p class="upload-icon">📷</p>
+        <p class="upload-text">Drag & drop receipt image here</p>
+        <p class="upload-subtext">or</p>
+        <label class="btn btn-primary upload-btn">
+          Choose Image
+          <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp" capture="environment" hidden />
+        </label>
+      </div>
+    </div>
+    <div class="upload-preview" id="upload-preview" hidden>
+      <img id="preview-image" alt="Receipt preview" />
+      <button type="button" class="btn btn-danger upload-remove" id="upload-remove">Remove</button>
+    </div>
+    <div class="upload-progress" id="upload-progress" hidden>
+      <p class="progress-status" id="progress-status">Initializing OCR...</p>
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+    </div>
+  `;
+
+  const zone = containerEl.querySelector('#upload-zone');
+  const fileInput = containerEl.querySelector('#receipt-file-input');
+  const previewSection = containerEl.querySelector('#upload-preview');
+  const previewImage = containerEl.querySelector('#preview-image');
+  const removeBtn = containerEl.querySelector('#upload-remove');
+  const progressSection = containerEl.querySelector('#upload-progress');
+  const progressStatus = containerEl.querySelector('#progress-status');
+  const progressBar = containerEl.querySelector('#progress-bar');
+
+  // File input change
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleFile(file);
+  });
+
+  // Drag-and-drop
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('upload-zone-hover');
+  });
+
+  zone.addEventListener('dragleave', () => {
+    zone.classList.remove('upload-zone-hover');
+  });
+
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('upload-zone-hover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      handleFile(file);
+    }
+  });
+
+  // Remove button
+  removeBtn.addEventListener('click', () => {
+    resetUpload();
+  });
+
+  function handleFile(file) {
+    const url = URL.createObjectURL(file);
+    previewImage.src = url;
+    zone.hidden = true;
+    previewSection.hidden = false;
+    progressSection.hidden = false;
+    processFile(file);
+  }
+
+  async function processFile(file) {
+    progressStatus.textContent = 'Initializing OCR...';
+    progressBar.style.width = '0%';
+
+    try {
+      const { processImage } = await import('../ocr/ocr-engine.js');
+      const result = await processImage(file, (info) => {
+        progressStatus.textContent = info.status || 'Processing...';
+        progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
+      });
+
+      progressBar.style.width = '100%';
+      progressStatus.textContent = 'Complete!';
+
+      if (onComplete) {
+        onComplete(result);
+      }
+    } catch (err) {
+      progressStatus.textContent = 'Error: ' + (err.message || 'OCR failed');
+      progressBar.style.width = '0%';
+    }
+  }
+
+  function resetUpload() {
+    fileInput.value = '';
+    previewImage.src = '';
+    zone.hidden = false;
+    previewSection.hidden = true;
+    progressSection.hidden = true;
+    progressBar.style.width = '0%';
+  }
+}

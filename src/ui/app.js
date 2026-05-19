@@ -8,6 +8,10 @@ import { initItems, getItems, updateParticipantOptions } from './items.js';
 import { initBillParams, getParams } from './bill-params.js';
 import { renderResults } from './results.js';
 import { splitBill } from '../engine/calculator.js';
+import { initUpload } from './upload.js';
+import { renderOCRResults } from './ocr-results.js';
+import { parseReceipt } from '../ocr/parsers/index.js';
+import { scoreConfidence } from '../ocr/confidence.js';
 
 /**
  * Initialize the entire app UI.
@@ -19,6 +23,9 @@ export function initApp() {
   const resultsEl = document.querySelector('#results .section-content');
   const calculateBtn = document.querySelector('#calculate');
 
+  // Initialize mode tabs
+  initModeTabs();
+
   // Initialize components
   initParticipants(participantsEl, {
     onChange: (participants) => {
@@ -29,10 +36,73 @@ export function initApp() {
   initItems(itemsEl);
   initBillParams(billParamsEl);
 
+  // Initialize OCR upload
+  const ocrUploadEl = document.querySelector('#ocr-upload .section-content');
+  initUpload(ocrUploadEl, (ocrResult) => {
+    handleOCRResult(ocrResult);
+  });
+
   // Wire up calculate button
   calculateBtn.addEventListener('click', () => {
     handleCalculate(resultsEl);
   });
+}
+
+function initModeTabs() {
+  const tabs = document.querySelectorAll('.mode-tab');
+  const manualSection = document.querySelector('#manual-section');
+  const ocrSection = document.querySelector('#ocr-section');
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const mode = tab.dataset.mode;
+      if (mode === 'manual') {
+        manualSection.hidden = false;
+        ocrSection.hidden = true;
+      } else {
+        manualSection.hidden = true;
+        ocrSection.hidden = false;
+      }
+    });
+  });
+}
+
+function handleOCRResult(ocrResult) {
+  const ocrResultsSection = document.querySelector('#ocr-results-section');
+  const ocrResultsEl = ocrResultsSection.querySelector('.section-content');
+
+  if (ocrResult.error) {
+    ocrResultsSection.hidden = false;
+    ocrResultsEl.innerHTML = `<p class="validation-error">${ocrResult.error}</p>`;
+    return;
+  }
+
+  const parsedData = parseReceipt(ocrResult.text);
+  const confidence = scoreConfidence(ocrResult.confidence, parsedData);
+
+  ocrResultsSection.hidden = false;
+  renderOCRResults(parsedData, confidence, ocrResultsEl, (confirmedData) => {
+    populateManualFromOCR(confirmedData);
+  });
+}
+
+function populateManualFromOCR(data) {
+  // Switch to manual mode
+  const tabs = document.querySelectorAll('.mode-tab');
+  const manualSection = document.querySelector('#manual-section');
+  const ocrSection = document.querySelector('#ocr-section');
+
+  tabs.forEach((t) => t.classList.remove('active'));
+  tabs[0].classList.add('active');
+  manualSection.hidden = false;
+  ocrSection.hidden = true;
+
+  // Populate items - dispatch a custom event for the items component to handle
+  const event = new CustomEvent('ocr-items-confirmed', { detail: data });
+  document.dispatchEvent(event);
 }
 
 function handleCalculate(resultsEl) {

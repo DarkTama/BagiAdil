@@ -15,20 +15,38 @@
     </header>
 
     <main>
-      <section id="participants">
-        <h2>Participants</h2>
-        <div class="section-content"></div>
-      </section>
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" data-mode="manual">Manual Entry</button>
+        <button type="button" class="mode-tab" data-mode="ocr">Scan Receipt</button>
+      </div>
 
-      <section id="items">
-        <h2>Food Items</h2>
-        <div class="section-content"></div>
-      </section>
+      <div id="ocr-section" class="mode-section" hidden>
+        <section id="ocr-upload">
+          <h2>Upload Receipt</h2>
+          <div class="section-content"></div>
+        </section>
+        <section id="ocr-results-section" hidden>
+          <h2>Scan Results</h2>
+          <div class="section-content"></div>
+        </section>
+      </div>
 
-      <section id="bill-params">
-        <h2>Discount &amp; Shipping</h2>
-        <div class="section-content"></div>
-      </section>
+      <div id="manual-section" class="mode-section">
+        <section id="participants">
+          <h2>Participants</h2>
+          <div class="section-content"></div>
+        </section>
+
+        <section id="items">
+          <h2>Food Items</h2>
+          <div class="section-content"></div>
+        </section>
+
+        <section id="bill-params">
+          <h2>Discount &amp; Shipping</h2>
+          <div class="section-content"></div>
+        </section>
+      </div>
 
       <div id="validation-errors"></div>
 
