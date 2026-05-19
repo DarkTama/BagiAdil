@@ -21,11 +21,27 @@ export default [
         Request: 'readonly',
         Event: 'readonly',
         CustomEvent: 'readonly',
+        localStorage: 'readonly',
+        alert: 'readonly',
+        setTimeout: 'readonly',
       },
     },
     rules: {
       'no-unused-vars': 'warn',
       'no-undef': 'error',
+    },
+  },
+  {
+    files: ['tests/**/*.js'],
+    languageOptions: {
+      globals: {
+        localStorage: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+      },
     },
   },
   eslintConfigPrettier,

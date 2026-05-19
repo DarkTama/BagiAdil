@@ -12,6 +12,11 @@ import { initUpload } from './upload.js';
 import { renderOCRResults } from './ocr-results.js';
 import { parseReceipt } from '../ocr/parsers/index.js';
 import { scoreConfidence } from '../ocr/confidence.js';
+import { initAssigner } from './assigner.js';
+import { initExport } from './export.js';
+import { initStorage, saveParticipants } from './storage.js';
+
+let currentResult = null;
 
 /**
  * Initialize the entire app UI.
@@ -23,6 +28,9 @@ export function initApp() {
   const resultsEl = document.querySelector('#results .section-content');
   const calculateBtn = document.querySelector('#calculate');
 
+  // Initialize storage
+  initStorage();
+
   // Initialize mode tabs
   initModeTabs();
 
@@ -30,6 +38,7 @@ export function initApp() {
   initParticipants(participantsEl, {
     onChange: (participants) => {
       updateParticipantOptions(participants);
+      saveParticipants(participants);
     },
   });
 
@@ -42,10 +51,24 @@ export function initApp() {
     handleOCRResult(ocrResult);
   });
 
+  // Initialize export
+  const exportEl = document.querySelector('#export-section .section-content');
+  if (exportEl) {
+    initExport(exportEl, () => currentResult);
+  }
+
   // Wire up calculate button
   calculateBtn.addEventListener('click', () => {
     handleCalculate(resultsEl);
   });
+
+  // Wire up assigner section
+  const assignerBtn = document.querySelector('#show-assigner');
+  if (assignerBtn) {
+    assignerBtn.addEventListener('click', () => {
+      showAssigner();
+    });
+  }
 }
 
 function initModeTabs() {
@@ -105,6 +128,80 @@ function populateManualFromOCR(data) {
   document.dispatchEvent(event);
 }
 
+function showAssigner() {
+  const assignerSection = document.querySelector('#assigner-section');
+  const assignerEl = document.querySelector('#assigner-section .section-content');
+  const resultsEl = document.querySelector('#results .section-content');
+
+  if (!assignerSection || !assignerEl) return;
+
+  const participants = getParticipants();
+  const rawItems = getItems();
+
+  if (participants.length === 0 || rawItems.length === 0) {
+    return;
+  }
+
+  // Map items for assigner (only need name and price)
+  const assignerItems = rawItems.map((item) => ({
+    name: item.name,
+    price: item.price,
+  }));
+
+  assignerSection.hidden = false;
+
+  initAssigner(assignerEl, {
+    items: assignerItems,
+    participants,
+    onAssignmentChange: (assignmentData) => {
+      handleAssignmentChange(assignmentData, resultsEl);
+    },
+  });
+
+  assignerSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+function handleAssignmentChange(assignmentData, resultsEl) {
+  const params = getParams();
+  const participants = getParticipants();
+
+  // Build orders from assignments
+  const orders = [];
+  participants.forEach((name) => {
+    const data = assignmentData[name];
+    if (data && data.subtotal > 0) {
+      orders.push({ name, amount: data.subtotal });
+    }
+  });
+
+  if (orders.length === 0) {
+    resultsEl.innerHTML = '';
+    currentResult = null;
+    updateExportVisibility(false);
+    return;
+  }
+
+  // Call engine
+  const result = splitBill({
+    orders,
+    totalDiscount: params.totalDiscount,
+    totalShipping: params.totalShipping,
+  });
+
+  currentResult = result;
+
+  // Render results
+  renderResults(result, resultsEl);
+  updateExportVisibility(true);
+}
+
+function updateExportVisibility(show) {
+  const exportSection = document.querySelector('#export-section');
+  if (exportSection) {
+    exportSection.hidden = !show;
+  }
+}
+
 function handleCalculate(resultsEl) {
   // Clear previous errors
   clearAllErrors();
@@ -144,8 +241,14 @@ function handleCalculate(resultsEl) {
     totalShipping: params.totalShipping,
   });
 
+  currentResult = result;
+
   // Render results
   renderResults(result, resultsEl);
+  updateExportVisibility(true);
+
+  // Save participants
+  saveParticipants(participants);
 
   // Scroll to results
   const resultsSection = document.querySelector('#results');
