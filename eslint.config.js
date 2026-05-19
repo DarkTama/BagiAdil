@@ -19,6 +19,7 @@ export default [
         Response: 'readonly',
         URL: 'readonly',
         Request: 'readonly',
+        Event: 'readonly',
       },
     },
     rules: {

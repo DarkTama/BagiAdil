@@ -1,4 +1,5 @@
 import './styles/main.css';
+import { initApp } from './ui/app.js';
 
 // Register service worker
 if ('serviceWorker' in navigator) {
@@ -10,8 +11,6 @@ if ('serviceWorker' in navigator) {
 }
 
 // App initialization
-function init() {
-  console.log('BagiAdil initialized');
-}
-
-init();
+document.addEventListener('DOMContentLoaded', () => {
+  initApp();
+});
