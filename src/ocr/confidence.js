@@ -37,13 +37,13 @@ export function scoreConfidence(ocrConfidence, parsedResult) {
   // Price reasonableness contributes 15%
   if (parsedResult.items && parsedResult.items.length > 0) {
     const allReasonable = parsedResult.items.every((item) => {
-      return item.price > 0 && item.price >= 1000 && item.price <= 500000;
+      return item.price > 0 && item.price >= 1000 && item.price <= 2000000;
     });
     if (allReasonable) {
       score += 15;
     } else {
       const unreasonableItems = parsedResult.items.filter(
-        (item) => item.price <= 0 || item.price < 1000 || item.price > 500000,
+        (item) => item.price <= 0 || item.price < 1000 || item.price > 2000000,
       );
       if (unreasonableItems.length > 0) {
         issues.push(`${unreasonableItems.length} item(s) have unusual prices`);

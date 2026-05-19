@@ -74,11 +74,11 @@ describe('Confidence scoring', () => {
     expect(result.issues.some((i) => i.includes('unusual prices'))).toBe(true);
   });
 
-  it('flags items with price exceeding 500000', () => {
+  it('flags items with price exceeding 2000000', () => {
     const ocrConfidence = 90;
     const parsedResult = {
-      items: [{ name: 'Expensive', quantity: 1, price: 600000, total: 600000 }],
-      subtotal: 600000,
+      items: [{ name: 'Expensive', quantity: 1, price: 2500000, total: 2500000 }],
+      subtotal: 2500000,
       discount: 0,
       deliveryFee: 0,
     };
@@ -86,6 +86,20 @@ describe('Confidence scoring', () => {
     const result = scoreConfidence(ocrConfidence, parsedResult);
 
     expect(result.issues.some((i) => i.includes('unusual prices'))).toBe(true);
+  });
+
+  it('accepts items priced up to 2000000 as reasonable', () => {
+    const ocrConfidence = 90;
+    const parsedResult = {
+      items: [{ name: 'Party order', quantity: 1, price: 1500000, total: 1500000 }],
+      subtotal: 1500000,
+      discount: 0,
+      deliveryFee: 0,
+    };
+
+    const result = scoreConfidence(ocrConfidence, parsedResult);
+
+    expect(result.issues.some((i) => i.includes('unusual prices'))).toBe(false);
   });
 
   it('handles zero OCR confidence', () => {

@@ -3,6 +3,7 @@
  * Supports tap-to-assign and drag-and-drop (desktop + mobile touch).
  */
 
+import Decimal from 'decimal.js';
 import { formatCurrency } from '../engine/formatter.js';
 
 let containerEl = null;
@@ -322,13 +323,13 @@ function assignItem(itemIndex, participantName) {
 }
 
 function calculateSubtotal(participantName) {
-  let total = 0;
+  let total = new Decimal(0);
   items.forEach((item, index) => {
     if (assignments[index] === participantName) {
-      total += item.price;
+      total = total.plus(new Decimal(item.price));
     }
   });
-  return total;
+  return total.toNumber();
 }
 
 function notifyChange() {
@@ -345,7 +346,9 @@ function notifyChange() {
       const idx = parseInt(indexStr, 10);
       if (result[name]) {
         result[name].items.push(idx);
-        result[name].subtotal += items[idx].price;
+        result[name].subtotal = new Decimal(result[name].subtotal)
+          .plus(new Decimal(items[idx].price))
+          .toNumber();
       }
     });
     onAssignmentChange(result);

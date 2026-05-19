@@ -86,11 +86,14 @@ export function initUpload(containerEl, onComplete) {
     progressBar.style.width = '0%';
 
     try {
-      const { processImage } = await import('../ocr/ocr-engine.js');
+      const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
       const result = await processImage(file, (info) => {
         progressStatus.textContent = info.status || 'Processing...';
         progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
       });
+
+      // Terminate the worker after processing to free resources
+      await terminateOCR();
 
       progressBar.style.width = '100%';
       progressStatus.textContent = 'Complete!';
@@ -101,6 +104,13 @@ export function initUpload(containerEl, onComplete) {
     } catch (err) {
       progressStatus.textContent = 'Error: ' + (err.message || 'OCR failed');
       progressBar.style.width = '0%';
+      // Attempt to terminate worker even on error
+      try {
+        const { terminateOCR } = await import('../ocr/ocr-engine.js');
+        await terminateOCR();
+      } catch {
+        // Ignore termination errors
+      }
     }
   }
 

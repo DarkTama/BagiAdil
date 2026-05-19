@@ -91,6 +91,9 @@ export function roundToNearestHundred(amounts) {
  * Find the difference between sum of pre-rounding amounts and sum of rounded amounts.
  * Identify the person with the highest decimal fraction (preRounding - rounded).
  * Add the difference to that person's payment and re-round.
+ * After re-rounding, verify the sum balances. If not, try the next candidate.
+ * If no single candidate fixes it, apply the difference directly (in Rp 100 increments)
+ * to ensure the bill always balances.
  * Deterministic tie-breaking: first person in list order wins.
  * @param {Array<Decimal>} preRoundingAmounts
  * @param {Array<Decimal>} roundedAmounts
@@ -101,30 +104,56 @@ export function reconcileRounding(preRoundingAmounts, roundedAmounts) {
   const sumRounded = roundedAmounts.reduce((sum, a) => sum.plus(a), new Decimal(0));
   const difference = sumPreRounding.minus(sumRounded);
 
-  if (difference.isZero()) {
+  if (difference.isZero() || difference.abs().lessThan(new Decimal(1))) {
     return [...roundedAmounts];
   }
 
-  // Find person with highest decimal fraction (preRounding - rounded in absolute terms)
-  // This identifies who lost the most in rounding
-  let maxFractionIndex = 0;
-  let maxFraction = preRoundingAmounts[0].minus(roundedAmounts[0]).abs();
+  // Sort candidates by absolute rounding fraction (descending), with index for tie-breaking
+  const candidates = preRoundingAmounts.map((pre, i) => ({
+    index: i,
+    fraction: pre.minus(roundedAmounts[i]).abs(),
+  }));
+  candidates.sort((a, b) => {
+    const cmp = b.fraction.minus(a.fraction).toNumber();
+    if (cmp !== 0) return cmp;
+    // Tie-breaking: first in list order wins (lower index first)
+    return a.index - b.index;
+  });
 
-  for (let i = 1; i < preRoundingAmounts.length; i++) {
-    const fraction = preRoundingAmounts[i].minus(roundedAmounts[i]).abs();
-    if (fraction.greaterThan(maxFraction)) {
-      maxFraction = fraction;
-      maxFractionIndex = i;
+  // Try each candidate: adjust their pre-rounding amount by the difference, then re-round
+  for (const candidate of candidates) {
+    const adjusted = preRoundingAmounts[candidate.index].plus(difference);
+    const reRounded = new Decimal(adjusted)
+      .div(100)
+      .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+      .mul(100);
+
+    const result = [...roundedAmounts];
+    result[candidate.index] = reRounded;
+
+    // Verify the new sum equals the pre-rounding sum
+    const newSum = result.reduce((sum, a) => sum.plus(a), new Decimal(0));
+    if (newSum.equals(sumPreRounding)) {
+      return result;
     }
-    // Tie-breaking: first in list order wins (do nothing, keep current maxFractionIndex)
   }
 
-  // Adjust that person's pre-rounding amount by the difference, then re-round
-  const adjusted = preRoundingAmounts[maxFractionIndex].plus(difference);
-  const reRounded = new Decimal(adjusted).div(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).mul(100);
-
+  // Fallback: apply the difference directly in Rp 100 increments to the top candidate(s).
+  // The difference between sumPreRounding and sumRounded is always a multiple of some amount
+  // since pre-rounding amounts may not be multiples of 100.
+  // Round the difference itself to the nearest 100 and apply it.
   const result = [...roundedAmounts];
-  result[maxFractionIndex] = reRounded;
+  const roundedDifference = difference.div(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).mul(100);
+  result[candidates[0].index] = roundedAmounts[candidates[0].index].plus(roundedDifference);
+
+  // Check if balanced after rounding the difference
+  const newSum = result.reduce((sum, a) => sum.plus(a), new Decimal(0));
+  if (!newSum.equals(sumPreRounding)) {
+    // Final fallback: apply exact difference to maintain balance
+    // (result may not be a multiple of 100, but bill will balance)
+    result[candidates[0].index] = roundedAmounts[candidates[0].index].plus(difference);
+  }
+
   return result;
 }
 

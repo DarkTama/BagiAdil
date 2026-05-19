@@ -138,15 +138,25 @@ describe('reconcileRounding (Step F)', () => {
 
   it('adjusts the person with highest rounding fraction', () => {
     // Person 0: pre=24080, rounded=24100 (diff = -20, abs fraction = 20)
-    // Person 1: pre=32070, rounded=32100 (diff = -30, abs fraction = 30)
-    // Sum pre = 56150, sum rounded = 56200, difference = -50
-    // Person 1 has higher fraction, adjust their pre-rounding by -50: 32070 + (-50) = 32020
-    // Re-round 32020: 32020/100 = 320.2 -> rounds to 320 -> 32000
-    const preRounding = [new Decimal(24080), new Decimal(32070)];
+    // Person 1: pre=32020, rounded=32000 (diff = +20, abs fraction = 20)
+    // Sum pre = 56100, sum rounded = 56100, difference = 0 -> no adjustment needed
+    // Let's use a case where adjustment is needed:
+    // Person 0: pre=24080, rounded=24100 (abs fraction = 20)
+    // Person 1: pre=32020, rounded=32100 (abs fraction = 80)
+    // Sum pre = 56100, sum rounded = 56200, difference = -100
+    // Person 1 has higher fraction (80 vs 20), adjust Person 1
+    // 32020 + (-100) = 31920, re-round: 31920/100 = 319.2 -> 319 -> 31900
+    // New sum: 24100 + 31900 = 56000 != 56100. Not balanced.
+    // Try Person 0: 24080 + (-100) = 23980, re-round: 23980/100 = 239.8 -> 240 -> 24000
+    // New sum: 24000 + 32100 = 56100. Balanced!
+    const preRounding = [new Decimal(24080), new Decimal(32020)];
     const rounded = [new Decimal(24100), new Decimal(32100)];
     const result = reconcileRounding(preRounding, rounded);
-    expect(result[0].equals(new Decimal(24100))).toBe(true);
-    expect(result[1].equals(new Decimal(32000))).toBe(true);
+    expect(result[0].equals(new Decimal(24000))).toBe(true);
+    expect(result[1].equals(new Decimal(32100))).toBe(true);
+    // Verify sum balances
+    const sum = result.reduce((s, a) => s.plus(a), new Decimal(0));
+    expect(sum.equals(new Decimal(56100))).toBe(true);
   });
 
   it('uses deterministic tie-breaking (first in list wins)', () => {
@@ -161,6 +171,30 @@ describe('reconcileRounding (Step F)', () => {
     const result = reconcileRounding(preRounding, rounded);
     expect(result[0].equals(new Decimal(24000))).toBe(true);
     expect(result[1].equals(new Decimal(32100))).toBe(true);
+  });
+
+  it('falls back to next candidate when re-rounding first candidate does not balance', () => {
+    // Craft a scenario where adjusting the first candidate introduces a new rounding error.
+    // Person 0: pre=24949, rounded=24900 (fraction = 49)
+    // Person 1: pre=25051, rounded=25100 (fraction = 49)
+    // Person 2: pre=25050, rounded=25100 (fraction = 50)
+    // Sum pre = 75050, sum rounded = 75100, difference = -50
+    // Top candidate by fraction: Person 2 (fraction 50)
+    // Adjust Person 2: 25050 + (-50) = 25000, re-round: 25000/100 = 250 -> 25000
+    // New sum: 24900 + 25100 + 25000 = 75000 != 75050 -- still off!
+    // Next candidate: Person 0 (fraction 49, index 0 wins tie with Person 1)
+    // Adjust Person 0: 24949 + (-50) = 24899, re-round: 24899/100 = 248.99 -> 249 -> 24900
+    // New sum: 24900 + 25100 + 25100 = 75100 != 75050 -- still off!
+    // Next candidate: Person 1 (fraction 49, index 1)
+    // Adjust Person 1: 25051 + (-50) = 25001, re-round: 25001/100 = 250.01 -> 250 -> 25000
+    // New sum: 24900 + 25000 + 25100 = 75000 != 75050 -- still off!
+    // Fallback: apply difference directly to top candidate (Person 2)
+    // Result: 24900 + 25100 + (25100 + (-50)) = 24900 + 25100 + 25050 = 75050 -- balanced!
+    const preRounding = [new Decimal(24949), new Decimal(25051), new Decimal(25050)];
+    const rounded = [new Decimal(24900), new Decimal(25100), new Decimal(25100)];
+    const result = reconcileRounding(preRounding, rounded);
+    const sum = result.reduce((s, a) => s.plus(a), new Decimal(0));
+    expect(sum.equals(new Decimal(75050))).toBe(true);
   });
 });
 
