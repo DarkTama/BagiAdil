@@ -1,0 +1,11 @@
+{
+  "name": "BagiAdil",
+  "short_name": "BagiAdil",
+  "description": "Split bills fairly and accurately",
+  "lang": "id",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#4a90d9",
+  "background_color": "#f8f9fa",
+  "icons": []
+}
