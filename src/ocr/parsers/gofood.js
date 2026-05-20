@@ -81,7 +81,7 @@ export function parseGoFoodReceipt(text) {
     }
 
     // Check for delivery/service fees - accumulate ALL "Biaya" lines
-    if (/biaya/i.test(line)) {
+    if (/biaya/i.test(line) && !/total/i.test(line) && !/pembayaran/i.test(line)) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         deliveryFee += parsePrice(priceMatch[1]);

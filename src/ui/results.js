@@ -48,7 +48,11 @@ export function renderResults(result, containerEl, itemsMap = null) {
       itemsList.className = 'result-card-items';
       itemsMap[p.name].forEach((item) => {
         const li = document.createElement('li');
-        li.textContent = `${item.name} - ${formatCurrency(item.price)}`;
+        if (item.qty && item.qty > 1) {
+          li.textContent = `${item.qty}x ${item.name} @ ${formatCurrency(item.unitPrice)} - ${formatCurrency(item.price)}`;
+        } else {
+          li.textContent = `${item.name} - ${formatCurrency(item.price)}`;
+        }
         itemsList.appendChild(li);
       });
       card.appendChild(itemsList);

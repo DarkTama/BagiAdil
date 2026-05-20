@@ -53,7 +53,7 @@ export async function processPDF(file, onProgress) {
         // Find existing line group within tolerance
         let found = false;
         for (const group of lineGroups) {
-          if (Math.abs(group.y - y) <= Y_TOLERANCE) {
+          if (Math.abs(group.y - y) < Y_TOLERANCE) {
             group.items.push({ str: item.str, x });
             found = true;
             break;

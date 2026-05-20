@@ -105,14 +105,21 @@ export function initUpload(containerEl, onComplete) {
 
     if (file.type === 'application/pdf') {
       previewImage.hidden = true;
-      previewSection.querySelector('.pdf-preview-label')?.remove();
-      const label = document.createElement('p');
-      label.className = 'pdf-preview-label';
-      label.textContent = `PDF Document: ${file.name}`;
-      previewSection.insertBefore(label, removeBtn);
+      previewSection.querySelector('.pdf-preview-info')?.remove();
+      const pdfPreview = document.createElement('div');
+      pdfPreview.className = 'pdf-preview-info';
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'pdf-icon';
+      iconSpan.textContent = '\u{1F4C4}';
+      pdfPreview.appendChild(iconSpan);
+      const filenameSpan = document.createElement('span');
+      filenameSpan.className = 'pdf-filename';
+      filenameSpan.textContent = file.name;
+      pdfPreview.appendChild(filenameSpan);
+      previewSection.insertBefore(pdfPreview, removeBtn);
     } else {
       previewImage.hidden = false;
-      previewSection.querySelector('.pdf-preview-label')?.remove();
+      previewSection.querySelector('.pdf-preview-info')?.remove();
       currentObjectURL = URL.createObjectURL(file);
       previewImage.src = currentObjectURL;
     }

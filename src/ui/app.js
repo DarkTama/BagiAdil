@@ -78,7 +78,7 @@ export function initApp() {
   // Initialize export
   const exportEl = document.querySelector('#export-section .section-content');
   if (exportEl) {
-    initExport(exportEl, () => currentResult, () => getParams());
+    initExport(exportEl, () => currentResult, () => getParams(), () => currentItemsMap);
   }
 
   // Wire up calculate button
@@ -273,6 +273,8 @@ function handleCalculate(resultsEl) {
     if (data.items.length > 0) {
       itemsMap[person] = data.items.map((item) => ({
         name: item.name,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
         price: item.qty * item.unitPrice,
       }));
     }
