@@ -38,10 +38,17 @@ export function parseGoFoodReceipt(text) {
   let discount = 0;
   let deliveryFee = 0;
 
-  // Primary pattern for real receipts: "4  L Original Pot Besar  @Rp20.300  Rp81.200"
-  // Captures qty, name, and the LAST Rp value (total price)
-  const realItemPattern =
-    /^(\d+)\s+(.+?)\s+@\s*[Rr]p[\d.,]+\s+([Rr]p[\d.,]+)\s*$/;
+  // Pattern 1: @ or similar prefix before unit price (@ misread as a or ©)
+  // e.g. "4  L Original Pot Besar  @Rp20.300  Rp81.200"
+  const patternAtPrefix =
+    /^(\d+)\s+(.+?)\s+[@a©]\s*[Rr]p[\d.,]+\s+([Rr]p[\d.,]+)\s*$/;
+  // Pattern 2: Two Rp values on the line (no @ at all)
+  // e.g. "4  L Original Pot Besar  Rp20.300  Rp81.200"
+  const patternTwoRp =
+    /^(\d+)\s+(.+?)\s+[Rr]p[\d.,]+\s+([Rr]p[\d.,]+)\s*$/;
+  // Pattern 3: QTY and one Rp value (total only, no unit price)
+  // e.g. "4  L Original Pot Besar  Rp81.200"
+  const patternSingleRp = /^(\d+)\s+(.+?)\s+([Rr]p[\d.,]+)\s*$/;
   // Legacy pattern 1: "1x Item Name  Price" or "2x Item Name  Rp 25.000"
   const legacyPatternA =
     /^(\d+)\s*x\s+(.+?)\s{2,}((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
@@ -95,15 +102,40 @@ export function parseGoFoodReceipt(text) {
       continue;
     }
 
-    // Try primary real receipt pattern: "4  L Original Pot Besar  @Rp20.300  Rp81.200"
-    const realMatch = realItemPattern.exec(line);
-    if (realMatch) {
-      const qty = parseInt(realMatch[1], 10);
-      const name = realMatch[2].trim();
-      const total = parsePrice(realMatch[3]);
+    // Try pattern 1: @ or similar prefix before unit price
+    const matchAt = patternAtPrefix.exec(line);
+    if (matchAt) {
+      const qty = parseInt(matchAt[1], 10);
+      const name = matchAt[2].trim();
+      const total = parsePrice(matchAt[3]);
       const price = Math.round(total / qty);
       items.push({ name, quantity: qty, price, total });
       continue;
+    }
+
+    // Try pattern 2: Two Rp values (no @ symbol)
+    const matchTwoRp = patternTwoRp.exec(line);
+    if (matchTwoRp) {
+      const qty = parseInt(matchTwoRp[1], 10);
+      const name = matchTwoRp[2].trim();
+      const total = parsePrice(matchTwoRp[3]);
+      const price = Math.round(total / qty);
+      items.push({ name, quantity: qty, price, total });
+      continue;
+    }
+
+    // Try pattern 3: Single Rp value (total only)
+    const matchSingleRp = patternSingleRp.exec(line);
+    if (matchSingleRp) {
+      const qty = parseInt(matchSingleRp[1], 10);
+      const name = matchSingleRp[2].trim();
+      const total = parsePrice(matchSingleRp[3]);
+      // Guard: item name must be at least 3 chars, not a known label, and price >= 1000
+      if (name.length >= 3 && !isKnownLabel(name) && total >= 1000) {
+        const price = Math.round(total / qty);
+        items.push({ name, quantity: qty, price, total });
+        continue;
+      }
     }
 
     // Check for "Qty x Price" line (previous line is item name) - must check before pattern A
@@ -140,7 +172,7 @@ export function parseGoFoodReceipt(text) {
 }
 
 function isKnownLabel(text) {
-  return /^(subtotal|total\s*harga|diskon|promo|potongan|ongkos\s*kirim|biaya|delivery\s*fee)/i.test(
+  return /^(subtotal|total|diskon|promo|potongan|ongkos\s*kirim|biaya|delivery\s*fee)/i.test(
     text,
   );
 }
