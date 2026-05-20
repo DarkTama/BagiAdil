@@ -149,6 +149,57 @@ Biaya Kirim  Rp 6.000`;
   });
 });
 
+describe('ShopeeFood real receipt parser', () => {
+  it('extracts items from real ShopeeFood receipt', () => {
+    const text = `Rincian Pesanan
+1 x  Nikmat Crispy Raos  Rp47.600
+[ ] Ayam Crispy, [ ] Sambal Raos, [ ] Nasi Ala Carte
+1 x  Nikmat Crisbar Mozzarella  Rp38.180
+[ ] Ayam Crispy, [ ] Sambal Raos
+Subtotal Pesanan (2 menu)  Rp85.780
+Voucher Diskon  -Rp38.601
+Biaya Pengiriman  Rp13.000
+Biaya Layanan  Rp4.000
+Biaya Pengemasan  Rp3.000`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('Nikmat Crispy Raos');
+    expect(result.items[0].quantity).toBe(1);
+    expect(result.items[0].price).toBe(47600);
+    expect(result.items[1].name).toBe('Nikmat Crisbar Mozzarella');
+    expect(result.items[1].price).toBe(38180);
+    expect(result.subtotal).toBe(85780);
+    expect(result.discount).toBe(38601);
+    expect(result.deliveryFee).toBe(20000); // 13000 + 4000 + 3000
+  });
+});
+
+describe('GoFood real receipt parser', () => {
+  it('extracts items from real GoFood receipt', () => {
+    const text = `gofood
+4  L Original Pot Besar  @Rp20.300  Rp81.200
+4  Original Pot Kecil  @Rp16.100  Rp64.400
+Total harga  Rp145.600
+Biaya penanganan dan pengiriman  Rp15.500
+Biaya lainnya  Rp4.000
+Diskon  -Rp42.400`;
+
+    const result = parseGoFoodReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('L Original Pot Besar');
+    expect(result.items[0].quantity).toBe(4);
+    expect(result.items[0].total).toBe(81200);
+    expect(result.items[0].price).toBe(20300);
+    expect(result.items[1].name).toBe('Original Pot Kecil');
+    expect(result.items[1].quantity).toBe(4);
+    expect(result.items[1].total).toBe(64400);
+    expect(result.subtotal).toBe(145600);
+    expect(result.discount).toBe(42400);
+    expect(result.deliveryFee).toBe(19500); // 15500 + 4000
+  });
+});
+
 describe('GrabFood receipt parser', () => {
   it('extracts items with "Qty x Item Name  Price" format', () => {
     const text = `GrabFood
@@ -224,6 +275,14 @@ describe('Platform auto-detection', () => {
     expect(detectPlatform('ShopeeFood delivery')).toBe('shopeefood');
     expect(detectPlatform('Ordered via Shopee Food')).toBe('shopeefood');
     expect(detectPlatform('Thanks for using Shopee')).toBe('shopeefood');
+  });
+
+  it('detects ShopeeFood from Rincian Pesanan', () => {
+    expect(detectPlatform('Rincian Pesanan')).toBe('shopeefood');
+  });
+
+  it('detects ShopeeFood from Subtotal Pesanan', () => {
+    expect(detectPlatform('Subtotal Pesanan (2 menu)')).toBe('shopeefood');
   });
 
   it('detects GrabFood from text', () => {
