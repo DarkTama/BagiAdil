@@ -3,6 +3,8 @@
  * Manages adding/removing participants with validation.
  */
 
+import { t } from '../i18n/index.js';
+
 let participants = [];
 let containerEl = null;
 let onChangeCallback = null;
@@ -36,7 +38,7 @@ function render() {
 
   const label = document.createElement('label');
   label.setAttribute('for', 'participant-name');
-  label.textContent = 'Participant Name';
+  label.textContent = t('section.participants');
   inputGroup.appendChild(label);
 
   const row = document.createElement('div');
@@ -45,14 +47,14 @@ function render() {
   const input = document.createElement('input');
   input.type = 'text';
   input.id = 'participant-name';
-  input.placeholder = 'Enter name';
+  input.placeholder = t('placeholder.addParticipant');
   input.autocomplete = 'off';
   row.appendChild(input);
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn btn-primary';
-  addBtn.textContent = 'Add';
+  addBtn.textContent = t('btn.add');
   addBtn.addEventListener('click', () => addParticipant(input));
   row.appendChild(addBtn);
 
@@ -148,4 +150,17 @@ function showError(errorEl, inputEl, message) {
 function clearError(errorEl, inputEl) {
   errorEl.textContent = '';
   inputEl.classList.remove('input-error');
+}
+
+/**
+ * Update translated text in the participants component without resetting state.
+ */
+export function updateTranslations() {
+  if (!containerEl) return;
+  const label = containerEl.querySelector('label[for="participant-name"]');
+  if (label) label.textContent = t('section.participants');
+  const input = containerEl.querySelector('#participant-name');
+  if (input) input.placeholder = t('placeholder.addParticipant');
+  const addBtn = containerEl.querySelector('.btn.btn-primary');
+  if (addBtn) addBtn.textContent = t('btn.add');
 }

@@ -3,6 +3,7 @@
  */
 
 import { formatCurrency } from '../engine/formatter.js';
+import { t } from '../i18n/index.js';
 
 let containerEl = null;
 let getResultsFn = null;
@@ -28,7 +29,7 @@ function render() {
   const pdfBtn = document.createElement('button');
   pdfBtn.type = 'button';
   pdfBtn.className = 'btn btn-primary export-btn export-pdf-btn';
-  pdfBtn.innerHTML = '\u{1F4C4} Export PDF';
+  pdfBtn.innerHTML = `\u{1F4C4} ${t('export.pdf')}`;
   pdfBtn.addEventListener('click', handlePdfExport);
   wrapper.appendChild(pdfBtn);
 
@@ -36,7 +37,7 @@ function render() {
   const waBtn = document.createElement('button');
   waBtn.type = 'button';
   waBtn.className = 'btn btn-primary export-btn export-wa-btn';
-  waBtn.innerHTML = '\u{1F4CB} Copy for WhatsApp';
+  waBtn.innerHTML = `\u{1F4CB} ${t('export.whatsapp')}`;
   waBtn.addEventListener('click', handleWhatsAppCopy);
   wrapper.appendChild(waBtn);
 
@@ -116,6 +117,17 @@ function showCopySuccess(btn) {
 }
 
 /**
+ * Update translated text in the export component without resetting state.
+ */
+export function updateTranslations() {
+  if (!containerEl) return;
+  const pdfBtn = containerEl.querySelector('.export-pdf-btn');
+  if (pdfBtn) pdfBtn.innerHTML = `\u{1F4C4} ${t('export.pdf')}`;
+  const waBtn = containerEl.querySelector('.export-wa-btn');
+  if (waBtn) waBtn.innerHTML = `\u{1F4CB} ${t('export.whatsapp')}`;
+}
+
+/**
  * Generate a WhatsApp-formatted text summary from results.
  * @param {object} results - Result from splitBill()
  * @param {object} [params] - Optional params (discount, shipping)
@@ -130,17 +142,18 @@ export function generateWhatsAppText(results, params = {}) {
   // Calculate total tagihan (original total before discount/shipping adjustments)
   const totalTagihan = participants.reduce((sum, p) => sum + Number(p.originalOrder), 0);
 
-  let text = '*BagiAdil - Bill Split*\n\n';
-  text += `Total Tagihan: ${formatCurrency(totalTagihan)}\n`;
-  text += `Diskon: ${formatCurrency(totalDiscount)}\n`;
-  text += `Ongkir: ${formatCurrency(totalShipping)}\n\n`;
-  text += '*Pembagian:*\n';
+  let text = `*${t('export.wa.title')}*\n\n`;
+  text += `${t('export.wa.totalBill')}: ${formatCurrency(totalTagihan)}\n`;
+  text += `${t('export.wa.discount')}: ${formatCurrency(totalDiscount)}\n`;
+  text += `${t('export.wa.shipping')}: ${formatCurrency(totalShipping)}\n\n`;
+  text += `*${t('export.wa.split')}:*\n`;
 
   participants.forEach((p) => {
     text += `- ${p.name}: ${formatCurrency(p.finalPayment)}\n`;
   });
 
-  text += `\n_Total: ${formatCurrency(grandTotal)} (${verification.balanced ? 'balanced' : 'unbalanced'})_`;
+  const balancedText = verification.balanced ? t('results.balanced') : t('results.unbalanced');
+  text += `\n_Total: ${formatCurrency(grandTotal)} (${balancedText})_`;
 
   return text;
 }

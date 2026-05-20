@@ -3,18 +3,40 @@
  * Provides file input, camera capture, drag-and-drop, and progress indicator.
  */
 
+import { t } from '../i18n/index.js';
+
+let uploadContainerEl = null;
+
+/**
+ * Update translated text in the upload component without resetting state.
+ */
+export function updateTranslations() {
+  if (!uploadContainerEl) return;
+  const uploadText = uploadContainerEl.querySelector('.upload-text');
+  if (uploadText) uploadText.textContent = t('upload.dragDrop');
+  const uploadSubtext = uploadContainerEl.querySelector('.upload-subtext');
+  if (uploadSubtext) uploadSubtext.textContent = t('upload.or');
+  const uploadBtn = uploadContainerEl.querySelector('.upload-btn');
+  if (uploadBtn) {
+    const input = uploadBtn.querySelector('input');
+    uploadBtn.textContent = t('upload.chooseImage');
+    if (input) uploadBtn.appendChild(input);
+  }
+}
+
 /**
  * Initialize the upload component.
  * @param {HTMLElement} containerEl - Container element to render into
  * @param {function} onComplete - Callback receiving {text, confidence} from OCR
  */
 export function initUpload(containerEl, onComplete) {
+  uploadContainerEl = containerEl;
   containerEl.innerHTML = `
     <div class="upload-zone" id="upload-zone">
       <div class="upload-zone-content">
-        <p class="upload-icon">📷</p>
-        <p class="upload-text">Drag & drop receipt image here</p>
-        <p class="upload-subtext">or</p>
+        <p class="upload-icon">\u{1F4F7}</p>
+        <p class="upload-text">${t('upload.dragDrop')}</p>
+        <p class="upload-subtext">${t('upload.or')}</p>
         <label class="btn btn-primary upload-btn">
           Choose Image
           <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" capture="environment" hidden />
