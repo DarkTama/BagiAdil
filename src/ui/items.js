@@ -58,7 +58,11 @@ export function updateParticipantOptions(participants) {
  */
 export function addItemsFromOCR(ocrItems) {
   ocrItems.forEach((item) => {
-    items.push({ name: item.name, price: item.total, participant: '' });
+    const qty = item.quantity || 1;
+    const unitPrice = Math.round(item.total / qty);
+    for (let i = 0; i < qty; i++) {
+      items.push({ name: item.name, price: unitPrice, participant: '' });
+    }
   });
   render();
 }

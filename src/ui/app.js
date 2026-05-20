@@ -3,9 +3,9 @@
  * Initializes and coordinates all UI components.
  */
 
-import { initParticipants, getParticipants } from './participants.js';
-import { initItems, getItems, updateParticipantOptions, setItems } from './items.js';
-import { initBillParams, getParams, setParams } from './bill-params.js';
+import { initParticipants, getParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
+import { initItems, getItems, updateParticipantOptions, setItems, updateTranslations as updateItemsTranslations } from './items.js';
+import { initBillParams, getParams, setParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
 import { renderResults } from './results.js';
 import { splitBill } from '../engine/calculator.js';
 import { initUpload, updateTranslations as updateUploadTranslations } from './upload.js';
@@ -18,6 +18,7 @@ import { initStorage, saveParticipants } from './storage.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
 
 let currentResult = null;
+let currentItemsMap = null;
 
 /**
  * Initialize the entire app UI.
@@ -58,7 +59,7 @@ export function initApp() {
   // Initialize export
   const exportEl = document.querySelector('#export-section .section-content');
   if (exportEl) {
-    initExport(exportEl, () => currentResult);
+    initExport(exportEl, () => currentResult, () => getParams());
   }
 
   // Wire up calculate button
@@ -110,6 +111,14 @@ function updateAllTranslations() {
   updateBillParamsTranslations();
   updateUploadTranslations();
   updateExportTranslations();
+
+  // Re-render results if they exist
+  if (currentResult) {
+    const resultsEl = document.querySelector('#results .section-content');
+    if (resultsEl) {
+      renderResults(currentResult, resultsEl, currentItemsMap);
+    }
+  }
 }
 
 function initModeTabs() {
@@ -233,8 +242,18 @@ function handleAssignmentChange(assignmentData, resultsEl) {
 
   currentResult = result;
 
+  // Build items map from assignment data
+  const itemsMap = {};
+  participants.forEach((name) => {
+    const data = assignmentData[name];
+    if (data && data.items && data.items.length > 0) {
+      itemsMap[name] = data.items.map((item) => ({ name: item.name, price: item.price }));
+    }
+  });
+  currentItemsMap = itemsMap;
+
   // Render results
-  renderResults(result, resultsEl);
+  renderResults(result, resultsEl, itemsMap);
   updateExportVisibility(true);
 }
 
@@ -286,8 +305,18 @@ function handleCalculate(resultsEl) {
 
   currentResult = result;
 
+  // Build items map for results display
+  const itemsMap = {};
+  items.forEach((item) => {
+    if (item.participant) {
+      if (!itemsMap[item.participant]) itemsMap[item.participant] = [];
+      itemsMap[item.participant].push({ name: item.name, price: item.price });
+    }
+  });
+  currentItemsMap = itemsMap;
+
   // Render results
-  renderResults(result, resultsEl);
+  renderResults(result, resultsEl, itemsMap);
   updateExportVisibility(true);
 
   // Save participants

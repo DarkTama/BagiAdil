@@ -58,6 +58,7 @@ const en = {
   'validation.itemNameRequired': 'Item {n}: name is required',
   'validation.itemPriceNegative': 'Item {n}: price cannot be negative',
   'validation.itemNoParticipant': 'Item {n}: must be assigned to a participant',
+  'results.itemsOrdered': 'Items ordered',
 };
 
 export default en;
