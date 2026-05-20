@@ -265,6 +265,26 @@ Biaya Pengemasan  Rp2.000`;
 
     expect(result.deliveryFee).toBe(15000);
   });
+
+  it('handles quantity > 1 in new format and computes correct total', () => {
+    const text = `Rincian Pesanan
+3 x  Nasi Goreng  Rp15.000
+1 x  Es Teh  Rp5.000
+Subtotal Pesanan  Rp50.000`;
+
+    const result = parseShopeeReceipt(text);
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('Nasi Goreng');
+    expect(result.items[0].quantity).toBe(3);
+    expect(result.items[0].price).toBe(15000);
+    expect(result.items[0].total).toBe(45000);
+    expect(result.items[1].name).toBe('Es Teh');
+    expect(result.items[1].quantity).toBe(1);
+    expect(result.items[1].price).toBe(5000);
+    expect(result.items[1].total).toBe(5000);
+    expect(result.subtotal).toBe(50000);
+  });
 });
 
 describe('GoFood real receipt parser', () => {
@@ -315,6 +335,24 @@ Diskon  -Rp5.000`;
     const result = parseGoFoodReceipt(text);
 
     expect(result.discount).toBe(5000);
+  });
+
+  it('handles non-divisible total correctly (rounding edge case)', () => {
+    const text = `gofood
+3  Ayam Spesial  @Rp5.167  Rp15.500
+Total harga  Rp15.500`;
+
+    const result = parseGoFoodReceipt(text);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Ayam Spesial');
+    expect(result.items[0].quantity).toBe(3);
+    // total is always the raw receipt value
+    expect(result.items[0].total).toBe(15500);
+    // price is derived via Math.round(total / qty), informational only
+    expect(result.items[0].price).toBe(Math.round(15500 / 3));
+    // The key invariant: total comes from the receipt, not from price * qty
+    expect(result.items[0].total).not.toBe(result.items[0].price * result.items[0].quantity);
   });
 });
 

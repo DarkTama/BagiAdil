@@ -36,7 +36,7 @@ export function parseShopeeReceipt(text) {
   let deliveryFee = 0;
 
   // Real ShopeeFood format: "1 x  Item Name  Rp47.600"
-  const itemPatternNew = /^(\d+)\s*x\s+(.+?)\s+(Rp[\d.,]+)/;
+  const itemPatternNew = /^(\d+)\s*x\s+(.+?)\s+(Rp[\d.,]+)\s*$/;
   // Legacy format: "Item Name  xQty  Price"
   const itemPatternA = /^(.+?)\s+x(\d+)\s+((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
   // Legacy format: "Item Name  Rp XX.XXX" (qty=1 implied)
