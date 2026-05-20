@@ -58,6 +58,7 @@ const id = {
   'validation.itemNameRequired': 'Item {n}: nama wajib diisi',
   'validation.itemPriceNegative': 'Item {n}: harga tidak boleh negatif',
   'validation.itemNoParticipant': 'Item {n}: harus ditetapkan ke peserta',
+  'results.itemsOrdered': 'Item yang dipesan',
 };
 
 export default id;

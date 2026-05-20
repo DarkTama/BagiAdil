@@ -11,7 +11,7 @@ import { t } from '../i18n/index.js';
  * @param {object} result - Result from splitBill()
  * @param {HTMLElement} containerEl
  */
-export function renderResults(result, containerEl) {
+export function renderResults(result, containerEl, itemsMap = null) {
   containerEl.innerHTML = '';
 
   if (!result) return;
@@ -42,6 +42,17 @@ export function renderResults(result, containerEl) {
     nameEl.className = 'result-card-name';
     nameEl.textContent = p.name;
     card.appendChild(nameEl);
+
+    if (itemsMap && itemsMap[p.name] && itemsMap[p.name].length > 0) {
+      const itemsList = document.createElement('ul');
+      itemsList.className = 'result-card-items';
+      itemsMap[p.name].forEach((item) => {
+        const li = document.createElement('li');
+        li.textContent = `${item.name} - ${formatCurrency(item.price)}`;
+        itemsList.appendChild(li);
+      });
+      card.appendChild(itemsList);
+    }
 
     const details = document.createElement('div');
     details.className = 'result-card-details';

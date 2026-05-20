@@ -7,15 +7,17 @@ import { t } from '../i18n/index.js';
 
 let containerEl = null;
 let getResultsFn = null;
+let getParamsFn = null;
 
 /**
  * Initialize the export component.
  * @param {HTMLElement} el - Container element
  * @param {function} resultsFn - Function that returns current results object
  */
-export function initExport(el, resultsFn) {
+export function initExport(el, resultsFn, paramsFn) {
   containerEl = el;
   getResultsFn = resultsFn;
+  getParamsFn = paramsFn || null;
   render();
 }
 
@@ -52,11 +54,43 @@ async function handlePdfExport() {
     const html2pdf = await import('html2pdf.js');
     const lib = html2pdf.default || html2pdf;
 
-    const resultsSection = document.querySelector('#results');
-    if (!resultsSection) return;
-
     const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+
+    // Create temporary light-themed container for PDF
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
+
+    // Title and date
+    const header = document.createElement('div');
+    header.style.cssText = 'text-align:center;margin-bottom:20px;';
+    header.innerHTML = `<h1 style="margin:0;font-size:24px;color:#1a1a2e;">BagiAdil</h1><p style="margin:5px 0;color:#555;">${now.toLocaleDateString()}</p>`;
+    pdfContainer.appendChild(header);
+
+    // Grand total
+    const totalDiv = document.createElement('div');
+    totalDiv.style.cssText = 'text-align:center;margin-bottom:20px;padding:10px;background:#f0f0f5;border-radius:8px;';
+    totalDiv.innerHTML = `<strong>${t('results.grandTotal')}</strong> ${formatCurrency(results.grandTotal)}`;
+    pdfContainer.appendChild(totalDiv);
+
+    // Participant cards
+    results.participants.forEach((p) => {
+      const card = document.createElement('div');
+      card.style.cssText = 'border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:12px;';
+
+      let cardHTML = `<h3 style="margin:0 0 8px 0;color:#1a1a2e;">${p.name}</h3>`;
+      cardHTML += `<div style="font-size:13px;color:#444;">`;
+      cardHTML += `<div>${t('results.originalOrder')}: ${formatCurrency(p.originalOrder)}</div>`;
+      cardHTML += `<div>${t('results.discount')}: -${formatCurrency(p.discount)}</div>`;
+      cardHTML += `<div>${t('results.shippingShare')}: ${formatCurrency(p.shippingShare)}</div>`;
+      cardHTML += `</div>`;
+      cardHTML += `<div style="margin-top:8px;font-weight:bold;font-size:15px;">${t('results.finalPayment')}: ${formatCurrency(p.finalPayment)}</div>`;
+
+      card.innerHTML = cardHTML;
+      pdfContainer.appendChild(card);
+    });
+
+    document.body.appendChild(pdfContainer);
 
     const opt = {
       margin: [10, 10, 10, 10],
@@ -66,9 +100,9 @@ async function handlePdfExport() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     };
 
-    lib(resultsSection).set(opt).save();
+    await lib(pdfContainer).set(opt).save();
+    document.body.removeChild(pdfContainer);
   } catch {
-    // html2pdf may fail in some environments
     alert('PDF export is not available in this environment.');
   }
 }
@@ -77,7 +111,8 @@ async function handleWhatsAppCopy() {
   const results = getResultsFn ? getResultsFn() : null;
   if (!results) return;
 
-  const text = generateWhatsAppText(results);
+  const params = getParamsFn ? getParamsFn() : {};
+  const text = generateWhatsAppText(results, params);
   const btn = containerEl.querySelector('.export-wa-btn');
 
   try {

@@ -42,7 +42,18 @@ export async function processPDF(file, onProgress) {
 
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item) => item.str).join(' ');
+
+      // Group items by Y coordinate to reconstruct lines
+      const lines = {};
+      textContent.items.forEach((item) => {
+        const y = Math.round(item.transform[5]); // Y position
+        if (!lines[y]) lines[y] = [];
+        lines[y].push(item.str);
+      });
+
+      // Sort by Y coordinate (descending since PDF Y is bottom-up) and join
+      const sortedYs = Object.keys(lines).sort((a, b) => Number(b) - Number(a));
+      const pageText = sortedYs.map((y) => lines[y].join(' ')).join('\n');
       textParts.push(pageText);
     }
 

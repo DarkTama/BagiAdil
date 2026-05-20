@@ -27,9 +27,10 @@ describe('OCR Populate', () => {
       ]);
 
       const items = getItems();
-      expect(items.length).toBe(2);
-      expect(items[0]).toEqual({ name: 'Nasi Goreng', price: 30000, participant: '' });
-      expect(items[1]).toEqual({ name: 'Es Teh', price: 5000, participant: '' });
+      expect(items.length).toBe(3);
+      expect(items[0]).toEqual({ name: 'Nasi Goreng', price: 15000, participant: '' });
+      expect(items[1]).toEqual({ name: 'Nasi Goreng', price: 15000, participant: '' });
+      expect(items[2]).toEqual({ name: 'Es Teh', price: 5000, participant: '' });
     });
 
     it('should render item rows in the DOM', () => {
@@ -43,6 +44,20 @@ describe('OCR Populate', () => {
       expect(rows[0].querySelector('.item-price').value).toBe('20000');
     });
 
+    it('should split items by quantity with correct unit price', () => {
+      initItems(itemsEl);
+
+      addItemsFromOCR([{ name: 'Ayam Geprek', quantity: 4, price: 20300, total: 81200 }]);
+
+      const items = getItems();
+      expect(items.length).toBe(4);
+      items.forEach((item) => {
+        expect(item.name).toBe('Ayam Geprek');
+        expect(item.price).toBe(20300);
+        expect(item.participant).toBe('');
+      });
+    });
+
     it('should append to existing items', () => {
       initItems(itemsEl);
 
@@ -50,9 +65,12 @@ describe('OCR Populate', () => {
       addItemsFromOCR([{ name: 'Item B', quantity: 2, price: 5000, total: 10000 }]);
 
       const items = getItems();
-      expect(items.length).toBe(2);
+      expect(items.length).toBe(3);
       expect(items[0].name).toBe('Item A');
       expect(items[1].name).toBe('Item B');
+      expect(items[1].price).toBe(5000);
+      expect(items[2].name).toBe('Item B');
+      expect(items[2].price).toBe(5000);
     });
   });
 

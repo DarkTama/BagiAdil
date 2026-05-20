@@ -4,12 +4,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('pdfjs-dist', () => {
   const mockTextContent = {
     items: [
-      { str: 'Nasi Goreng' },
-      { str: '2x' },
-      { str: '15000' },
-      { str: 'Es Teh' },
-      { str: '1x' },
-      { str: '5000' },
+      { str: 'Nasi Goreng', transform: [1, 0, 0, 1, 50, 700] },
+      { str: '2x', transform: [1, 0, 0, 1, 200, 700] },
+      { str: '15000', transform: [1, 0, 0, 1, 300, 700] },
+      { str: 'Es Teh', transform: [1, 0, 0, 1, 50, 680] },
+      { str: '1x', transform: [1, 0, 0, 1, 200, 680] },
+      { str: '5000', transform: [1, 0, 0, 1, 300, 680] },
     ],
   };
 
@@ -52,8 +52,10 @@ describe('processPDF', () => {
 
     expect(result).toHaveProperty('text');
     expect(result.confidence).toBe(100);
-    expect(result.text).toContain('Nasi Goreng');
-    expect(result.text).toContain('Es Teh');
+    expect(result.text).toContain('Nasi Goreng 2x 15000');
+    expect(result.text).toContain('Es Teh 1x 5000');
+    // Lines should be separated by newlines
+    expect(result.text).toContain('Nasi Goreng 2x 15000\nEs Teh 1x 5000');
   });
 
   it('should call onProgress during processing', async () => {
