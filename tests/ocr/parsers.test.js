@@ -198,6 +198,55 @@ Diskon  -Rp42.400`;
     expect(result.discount).toBe(42400);
     expect(result.deliveryFee).toBe(19500); // 15500 + 4000
   });
+
+  it('handles OCR noise where @ is missing (two Rp values)', () => {
+    const text = `gofood
+4 L Original Pot Besar Rp20.300 Rp81.200
+4 Original Pot Kecil Rp16.100 Rp64.400
+Total harga Rp145.600
+Biaya penanganan dan pengiriman Rp15.500
+Biaya lainnya Rp4.000
+Diskon -Rp42.400`;
+
+    const result = parseGoFoodReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('L Original Pot Besar');
+    expect(result.items[0].quantity).toBe(4);
+    expect(result.items[0].total).toBe(81200);
+    expect(result.items[1].name).toBe('Original Pot Kecil');
+    expect(result.items[1].total).toBe(64400);
+    expect(result.discount).toBe(42400);
+    expect(result.deliveryFee).toBe(19500);
+  });
+
+  it('handles OCR noise where @ is read as "a"', () => {
+    const text = `gofood
+4 L Original Pot Besar aRp20.300 Rp81.200
+4 Original Pot Kecil aRp16.100 Rp64.400
+Total harga Rp145.600`;
+
+    const result = parseGoFoodReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].total).toBe(81200);
+    expect(result.items[1].total).toBe(64400);
+  });
+
+  it('handles single Rp value per line (total only)', () => {
+    const text = `gofood
+4 L Original Pot Besar Rp81.200
+4 Original Pot Kecil Rp64.400
+Total harga Rp145.600
+Diskon -Rp42.400`;
+
+    const result = parseGoFoodReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('L Original Pot Besar');
+    expect(result.items[0].quantity).toBe(4);
+    expect(result.items[0].total).toBe(81200);
+    expect(result.items[0].price).toBe(20300);
+    expect(result.items[1].total).toBe(64400);
+    expect(result.discount).toBe(42400);
+  });
 });
 
 describe('GrabFood receipt parser', () => {
