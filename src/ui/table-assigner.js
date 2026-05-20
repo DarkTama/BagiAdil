@@ -140,6 +140,7 @@ function notifyChange() {
   onStateChange({
     allAssigned: state.allAssigned,
     remainingCount: state.remainingCount,
+    itemCount: state.items.length,
     assignments: state.assignments,
   });
 }
@@ -200,6 +201,7 @@ function renderUnassignedTable() {
     // Item name
     const tdName = document.createElement('td');
     tdName.className = 'td-item-name';
+    tdName.dataset.label = t('label.item');
     tdName.textContent = item.name;
     if (remaining === 0) {
       tdName.innerHTML = '\u2713 ' + item.name;
@@ -208,16 +210,19 @@ function renderUnassignedTable() {
 
     // Remaining
     const tdRemaining = document.createElement('td');
+    tdRemaining.dataset.label = t('table.remaining');
     tdRemaining.textContent = remaining + '/' + item.totalQty;
     tr.appendChild(tdRemaining);
 
     // Unit price
     const tdPrice = document.createElement('td');
+    tdPrice.dataset.label = t('table.unitPrice');
     tdPrice.textContent = formatCurrency(item.unitPrice);
     tr.appendChild(tdPrice);
 
     // Action
     const tdAction = document.createElement('td');
+    tdAction.dataset.label = t('table.action');
     if (remaining > 0) {
       const assignBtn = document.createElement('button');
       assignBtn.type = 'button';

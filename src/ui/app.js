@@ -161,9 +161,7 @@ function handleTableStateChange(state) {
 
   if (!calculateBtn || !statusEl) return;
 
-  const tableState = getTableState();
-
-  if (tableState.items.length === 0) {
+  if (state.itemCount === 0) {
     calculateBtn.disabled = true;
     statusEl.textContent = '';
     statusEl.className = '';
@@ -203,6 +201,9 @@ function handleOCRResult(ocrResult) {
 }
 
 function populateFromOCR(data) {
+  // Clear existing items before adding OCR items (prevents duplicates on re-confirm)
+  tableClearItems();
+
   // Add items to table assigner from OCR
   tableAddItemsFromOCR(data.items);
 

@@ -91,6 +91,28 @@ describe('OCR Populate', () => {
       expect(state.items.length).toBe(0);
       expect(tableEl.querySelector('.table-hint')).not.toBeNull();
     });
+
+    it('should prevent duplicates when clearing before re-confirm (OCR re-scan)', () => {
+      initTableAssigner(tableEl, { participants: ['Alice'], onStateChange: () => {} });
+
+      const ocrItems = [
+        { name: 'Nasi Goreng', quantity: 2, price: 15000, total: 30000 },
+        { name: 'Es Teh', quantity: 1, price: 5000, total: 5000 },
+      ];
+
+      // First OCR confirm
+      addItemsFromOCR(ocrItems);
+      expect(getTableState().items.length).toBe(2);
+
+      // Simulate re-confirm: clear then add (as app.js populateFromOCR does)
+      clearItems();
+      addItemsFromOCR(ocrItems);
+
+      const state = getTableState();
+      expect(state.items.length).toBe(2);
+      expect(state.items[0].name).toBe('Nasi Goreng');
+      expect(state.items[1].name).toBe('Es Teh');
+    });
   });
 
   describe('setParams', () => {
