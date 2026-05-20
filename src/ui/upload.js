@@ -108,7 +108,14 @@ export function initUpload(containerEl, onComplete) {
       previewSection.querySelector('.pdf-preview-info')?.remove();
       const pdfPreview = document.createElement('div');
       pdfPreview.className = 'pdf-preview-info';
-      pdfPreview.innerHTML = `<span class="pdf-icon">&#x1F4C4;</span><span class="pdf-filename">${file.name}</span>`;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'pdf-icon';
+      iconSpan.textContent = '\u{1F4C4}';
+      pdfPreview.appendChild(iconSpan);
+      const filenameSpan = document.createElement('span');
+      filenameSpan.className = 'pdf-filename';
+      filenameSpan.textContent = file.name;
+      pdfPreview.appendChild(filenameSpan);
       previewSection.insertBefore(pdfPreview, removeBtn);
     } else {
       previewImage.hidden = false;
