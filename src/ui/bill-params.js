@@ -29,6 +29,17 @@ export function getParams() {
   };
 }
 
+/**
+ * Programmatically set bill parameters.
+ * @param {{totalDiscount: number, totalShipping: number}} params
+ */
+export function setParams({ totalDiscount, totalShipping }) {
+  const discountInput = containerEl.querySelector('#total-discount');
+  const shippingInput = containerEl.querySelector('#total-shipping');
+  if (discountInput) discountInput.value = totalDiscount || 0;
+  if (shippingInput) shippingInput.value = totalShipping || 0;
+}
+
 function render() {
   containerEl.innerHTML = '';
 

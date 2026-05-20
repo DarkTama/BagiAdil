@@ -38,8 +38,8 @@ export function initUpload(containerEl, onComplete) {
         <p class="upload-text">${t('upload.dragDrop')}</p>
         <p class="upload-subtext">${t('upload.or')}</p>
         <label class="btn btn-primary upload-btn">
-          ${t('upload.chooseImage')}
-          <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp" capture="environment" hidden />
+          Choose Image
+          <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" capture="environment" hidden />
         </label>
       </div>
     </div>
@@ -64,6 +64,8 @@ export function initUpload(containerEl, onComplete) {
   const progressStatus = containerEl.querySelector('#progress-status');
   const progressBar = containerEl.querySelector('#progress-bar');
 
+  let currentObjectURL = null;
+
   // File input change
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -84,7 +86,7 @@ export function initUpload(containerEl, onComplete) {
     e.preventDefault();
     zone.classList.remove('upload-zone-hover');
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
       handleFile(file);
     }
   });
@@ -95,8 +97,25 @@ export function initUpload(containerEl, onComplete) {
   });
 
   function handleFile(file) {
-    const url = URL.createObjectURL(file);
-    previewImage.src = url;
+    // Revoke previous object URL to prevent memory leak
+    if (currentObjectURL) {
+      URL.revokeObjectURL(currentObjectURL);
+      currentObjectURL = null;
+    }
+
+    if (file.type === 'application/pdf') {
+      previewImage.hidden = true;
+      previewSection.querySelector('.pdf-preview-label')?.remove();
+      const label = document.createElement('p');
+      label.className = 'pdf-preview-label';
+      label.textContent = `PDF Document: ${file.name}`;
+      previewSection.insertBefore(label, removeBtn);
+    } else {
+      previewImage.hidden = false;
+      previewSection.querySelector('.pdf-preview-label')?.remove();
+      currentObjectURL = URL.createObjectURL(file);
+      previewImage.src = currentObjectURL;
+    }
     zone.hidden = true;
     previewSection.hidden = false;
     progressSection.hidden = false;
@@ -104,18 +123,28 @@ export function initUpload(containerEl, onComplete) {
   }
 
   async function processFile(file) {
-    progressStatus.textContent = 'Initializing OCR...';
+    progressStatus.textContent = 'Initializing...';
     progressBar.style.width = '0%';
 
     try {
-      const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
-      const result = await processImage(file, (info) => {
-        progressStatus.textContent = info.status || 'Processing...';
-        progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
-      });
+      let result;
 
-      // Terminate the worker after processing to free resources
-      await terminateOCR();
+      if (file.type === 'application/pdf') {
+        const { processPDF } = await import('../ocr/pdf-engine.js');
+        result = await processPDF(file, (info) => {
+          progressStatus.textContent = info.status || 'Processing...';
+          progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
+        });
+      } else {
+        const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
+        result = await processImage(file, (info) => {
+          progressStatus.textContent = info.status || 'Processing...';
+          progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
+        });
+
+        // Terminate the worker after processing to free resources
+        await terminateOCR();
+      }
 
       progressBar.style.width = '100%';
       progressStatus.textContent = 'Complete!';
@@ -124,19 +153,25 @@ export function initUpload(containerEl, onComplete) {
         onComplete(result);
       }
     } catch (err) {
-      progressStatus.textContent = 'Error: ' + (err.message || 'OCR failed');
+      progressStatus.textContent = 'Error: ' + (err.message || 'Processing failed');
       progressBar.style.width = '0%';
-      // Attempt to terminate worker even on error
-      try {
-        const { terminateOCR } = await import('../ocr/ocr-engine.js');
-        await terminateOCR();
-      } catch {
-        // Ignore termination errors
+      // Attempt to terminate OCR worker even on error
+      if (file.type !== 'application/pdf') {
+        try {
+          const { terminateOCR } = await import('../ocr/ocr-engine.js');
+          await terminateOCR();
+        } catch {
+          // Ignore termination errors
+        }
       }
     }
   }
 
   function resetUpload() {
+    if (currentObjectURL) {
+      URL.revokeObjectURL(currentObjectURL);
+      currentObjectURL = null;
+    }
     fileInput.value = '';
     previewImage.src = '';
     zone.hidden = false;

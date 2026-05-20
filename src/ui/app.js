@@ -3,9 +3,9 @@
  * Initializes and coordinates all UI components.
  */
 
-import { initParticipants, getParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
-import { initItems, getItems, updateParticipantOptions, updateTranslations as updateItemsTranslations } from './items.js';
-import { initBillParams, getParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
+import { initParticipants, getParticipants } from './participants.js';
+import { initItems, getItems, updateParticipantOptions, setItems } from './items.js';
+import { initBillParams, getParams, setParams } from './bill-params.js';
 import { renderResults } from './results.js';
 import { splitBill } from '../engine/calculator.js';
 import { initUpload, updateTranslations as updateUploadTranslations } from './upload.js';
@@ -164,9 +164,11 @@ function populateManualFromOCR(data) {
   manualSection.hidden = false;
   ocrSection.hidden = true;
 
-  // Populate items - dispatch a custom event for the items component to handle
-  const event = new CustomEvent('ocr-items-confirmed', { detail: data });
-  document.dispatchEvent(event);
+  // Populate items from OCR data (replace, not append, to avoid duplicates on re-confirm)
+  setItems(data.items.map((item) => ({ name: item.name, price: item.total, participant: '' })));
+
+  // Set bill parameters
+  setParams({ totalDiscount: data.discount, totalShipping: data.deliveryFee });
 }
 
 function showAssigner() {

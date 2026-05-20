@@ -52,6 +52,26 @@ export function updateParticipantOptions(participants) {
   });
 }
 
+/**
+ * Add items from OCR data.
+ * @param {Array<{name: string, quantity: number, price: number, total: number}>} ocrItems
+ */
+export function addItemsFromOCR(ocrItems) {
+  ocrItems.forEach((item) => {
+    items.push({ name: item.name, price: item.total, participant: '' });
+  });
+  render();
+}
+
+/**
+ * Replace the internal items array and re-render.
+ * @param {Array<{name: string, price: number, participant: string}>} newItems
+ */
+export function setItems(newItems) {
+  items = newItems.map((item) => ({ ...item }));
+  render();
+}
+
 function render() {
   containerEl.innerHTML = '';
 
