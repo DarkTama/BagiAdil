@@ -5,12 +5,19 @@
 
 /**
  * Parse a price string in Indonesian format.
+ * Handles: "Rp47.600", "Rp 47.600", "Rp47,600", "47600", "47.600",
+ *          "-Rp38.601", "-Rp 38.601" (strip minus, return positive number)
  * @param {string} str
  * @returns {number}
  */
 function parsePrice(str) {
   if (!str) return 0;
-  const cleaned = str.replace(/[Rr]p\.?\s*/g, '').replace(/[.,]/g, '').trim();
+  // Strip minus sign, Rp prefix, spaces, dots and commas
+  const cleaned = str
+    .replace(/^-/, '')
+    .replace(/[Rr]p\.?\s*/g, '')
+    .replace(/[.,]/g, '')
+    .trim();
   const num = parseInt(cleaned, 10);
   return isNaN(num) ? 0 : num;
 }
@@ -28,43 +35,87 @@ export function parseShopeeReceipt(text) {
   let discount = 0;
   let deliveryFee = 0;
 
-  // Pattern: "Item Name  xQty  Price" or "Item Name  x2  Rp 25.000"
+  // Real ShopeeFood format: "1 x  Item Name  Rp47.600"
+  const itemPatternNew = /^(\d+)\s*x\s+(.+?)\s+(Rp[\d.,]+)/;
+  // Legacy format: "Item Name  xQty  Price"
   const itemPatternA = /^(.+?)\s+x(\d+)\s+((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
-  // Pattern: "Item Name  Rp XX.XXX" (qty=1 implied)
+  // Legacy format: "Item Name  Rp XX.XXX" (qty=1 implied)
   const itemPatternB = /^(.+?)\s+((?:[Rr]p\.?\s*)[\d.,]+)\s*$/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Skip known labels before trying item patterns
-    if (isKnownLabel(line)) {
-      // Extract value from the label line
-      if (/^(subtotal|total\s*harga)/i.test(line)) {
-        const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
-        if (priceMatch) {
-          subtotal = parsePrice(priceMatch[1]);
-        } else if (i + 1 < lines.length) {
-          subtotal = parsePrice(lines[i + 1]);
-        }
-      } else if (/^(voucher|diskon\s*shopeefood|diskon)/i.test(line)) {
-        const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
-        if (priceMatch) {
-          discount = parsePrice(priceMatch[1]);
-        } else if (i + 1 < lines.length) {
-          discount = parsePrice(lines[i + 1]);
-        }
-      } else if (/^(ongkir|biaya\s*kirim|delivery)/i.test(line)) {
-        const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
-        if (priceMatch) {
-          deliveryFee = parsePrice(priceMatch[1]);
-        } else if (i + 1 < lines.length) {
-          deliveryFee = parsePrice(lines[i + 1]);
-        }
+    // Skip topping lines (lines starting with "[ ]" or containing bracket patterns)
+    if (/^\[/.test(line) || /\[\s*\]/.test(line)) {
+      continue;
+    }
+
+    // Check for subtotal
+    if (/subtotal\s*pesanan/i.test(line) || /^subtotal/i.test(line)) {
+      const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        subtotal = parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        subtotal = parsePrice(lines[i + 1]);
       }
       continue;
     }
 
-    // Try item pattern with quantity: "Item Name  x2  Rp 25.000"
+    // Check for discount (Voucher Diskon or Diskon)
+    if (/voucher\s*diskon|diskon/i.test(line)) {
+      const priceMatch = line.match(/(-?\s*(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        discount = parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        discount = parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Check for delivery fee - accumulate ALL "biaya" lines
+    if (/biaya/i.test(line)) {
+      const priceMatch = line.match(/(-?\s*(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        deliveryFee += parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        deliveryFee += parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Check for legacy delivery fee labels
+    if (/^(ongkir|delivery)/i.test(line)) {
+      const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        deliveryFee += parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        deliveryFee += parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Check for legacy discount labels (voucher without "diskon")
+    if (/^voucher/i.test(line) && !/diskon/i.test(line)) {
+      const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        discount = parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        discount = parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Try new real format: "1 x  Item Name  Rp47.600"
+    const matchNew = itemPatternNew.exec(line);
+    if (matchNew) {
+      const qty = parseInt(matchNew[1], 10);
+      const name = matchNew[2].trim();
+      const price = parsePrice(matchNew[3]);
+      items.push({ name, quantity: qty, price, total: qty * price });
+      continue;
+    }
+
+    // Try legacy pattern with quantity: "Item Name  x2  Rp 25.000"
     const matchA = itemPatternA.exec(line);
     if (matchA) {
       const name = matchA[1].trim();
@@ -74,7 +125,7 @@ export function parseShopeeReceipt(text) {
       continue;
     }
 
-    // Try item pattern with Rp prefix (qty=1): "Item Name  Rp 25.000"
+    // Try legacy pattern with Rp prefix (qty=1): "Item Name  Rp 25.000"
     const matchB = itemPatternB.exec(line);
     if (matchB) {
       const name = matchB[1].trim();
@@ -93,8 +144,4 @@ export function parseShopeeReceipt(text) {
     deliveryFee,
     platform: 'shopeefood',
   };
-}
-
-function isKnownLabel(text) {
-  return /^(subtotal|total\s*harga|voucher|diskon\s*shopeefood|diskon|ongkir|biaya\s*kirim|delivery)/i.test(text);
 }

@@ -5,14 +5,19 @@
 
 /**
  * Parse a price string in Indonesian format.
- * Handles: "Rp 25.000", "Rp25.000", "25000", "25,000", "Rp 25000"
+ * Handles: "Rp 25.000", "Rp25.000", "25000", "25,000", "Rp 25000",
+ *          "-Rp42.400", "-Rp 42.400" (strip minus, return positive number)
  * @param {string} str
  * @returns {number}
  */
 function parsePrice(str) {
   if (!str) return 0;
-  // Remove "Rp" prefix, spaces, dots (thousands separator), and commas
-  const cleaned = str.replace(/[Rr]p\.?\s*/g, '').replace(/[.,]/g, '').trim();
+  // Strip minus sign, Rp prefix, spaces, dots and commas
+  const cleaned = str
+    .replace(/^-/, '')
+    .replace(/[Rr]p\.?\s*/g, '')
+    .replace(/[.,]/g, '')
+    .trim();
   const num = parseInt(cleaned, 10);
   return isNaN(num) ? 0 : num;
 }
@@ -30,17 +35,72 @@ export function parseGoFoodReceipt(text) {
   let discount = 0;
   let deliveryFee = 0;
 
-  // Pattern 1: "1x Item Name  Price" or "2x Item Name  Rp 25.000"
-  // Name must not start with "Rp" to avoid false matches with "Qty x Rp Price" format
+  // Real GoFood format: "4  L Original Pot Besar  @Rp20.300  Rp81.200"
+  const itemPatternReal = /^(\d+)\s+(.+?)\s+@\s*Rp[\d.,]+\s+(Rp[\d.,]+)\s*$/;
+  // Fallback: "1x Item Name  Price" or "2x Item Name  Rp 25.000"
   const itemPatternA = /^(\d+)\s*x\s+(.+?)\s{2,}((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
-  // Pattern 2: "Qty x Price" (with optional Rp) - item name is on previous line
+  // Pattern: "Qty x Price" (item name on previous line)
   const itemPatternB = /^(\d+)\s*x\s+((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    // Check for subtotal
+    if (/^(subtotal|total\s*harga)/i.test(line)) {
+      const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        subtotal = parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        subtotal = parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Check for discount
+    if (/^(diskon|promo|potongan)/i.test(line)) {
+      const priceMatch = line.match(/(-?\s*(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        discount = parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        discount = parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Check for delivery fee - accumulate ALL "biaya" lines (but NOT diskon lines)
+    if (/biaya/i.test(line) && !/diskon/i.test(line)) {
+      const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        deliveryFee += parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        deliveryFee += parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Check for legacy delivery fee labels
+    if (/^(ongkos\s*kirim|delivery\s*fee)/i.test(line)) {
+      const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+      if (priceMatch) {
+        deliveryFee += parsePrice(priceMatch[1]);
+      } else if (i + 1 < lines.length) {
+        deliveryFee += parsePrice(lines[i + 1]);
+      }
+      continue;
+    }
+
+    // Try real GoFood format: "4  L Original Pot Besar  @Rp20.300  Rp81.200"
+    const matchReal = itemPatternReal.exec(line);
+    if (matchReal) {
+      const qty = parseInt(matchReal[1], 10);
+      const name = matchReal[2].trim();
+      const total = parsePrice(matchReal[3]);
+      const price = Math.round(total / qty);
+      items.push({ name, quantity: qty, price, total });
+      continue;
+    }
+
     // Check for "Qty x Price" line first (previous line is item name)
-    // This must be checked before pattern A to avoid false matches
     const matchB = line.match(itemPatternB);
     if (matchB && i > 0) {
       const qty = parseInt(matchB[1], 10);
@@ -62,39 +122,6 @@ export function parseGoFoodReceipt(text) {
       items.push({ name, quantity: qty, price, total: qty * price });
       continue;
     }
-
-    // Check for subtotal
-    if (/^(subtotal|total\s*harga)/i.test(line)) {
-      const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
-      if (priceMatch) {
-        subtotal = parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
-        subtotal = parsePrice(lines[i + 1]);
-      }
-      continue;
-    }
-
-    // Check for discount
-    if (/^(diskon|promo|potongan)/i.test(line)) {
-      const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
-      if (priceMatch) {
-        discount = parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
-        discount = parsePrice(lines[i + 1]);
-      }
-      continue;
-    }
-
-    // Check for delivery fee
-    if (/^(ongkos\s*kirim|biaya\s*pengiriman|delivery\s*fee)/i.test(line)) {
-      const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
-      if (priceMatch) {
-        deliveryFee = parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
-        deliveryFee = parsePrice(lines[i + 1]);
-      }
-      continue;
-    }
   }
 
   return {
@@ -107,5 +134,5 @@ export function parseGoFoodReceipt(text) {
 }
 
 function isKnownLabel(text) {
-  return /^(subtotal|total\s*harga|diskon|promo|potongan|ongkos\s*kirim|biaya\s*pengiriman|delivery\s*fee)/i.test(text);
+  return /^(subtotal|total\s*harga|diskon|promo|potongan|ongkos\s*kirim|biaya|delivery\s*fee)/i.test(text);
 }

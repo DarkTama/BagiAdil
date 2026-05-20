@@ -213,6 +213,111 @@ Biaya Antar  Rp 11.000`;
   });
 });
 
+describe('ShopeeFood real receipt parser', () => {
+  it('extracts items from real ShopeeFood receipt with "1 x  Item  RpXX.XXX" format', () => {
+    const text = `Rincian Pesanan
+1 x  Nikmat Crispy Raos  Rp47.600
+[ ] Ayam Crispy, [ ] Sambal Raos, [ ] Nasi Ala Carte
+1 x  Nikmat Crisbar Mozzarella  Rp38.180
+[ ] Ayam Crispy, [ ] Sambal Raos
+Subtotal Pesanan (2 menu)  Rp85.780
+Voucher Diskon  -Rp38.601
+Biaya Pengiriman  Rp13.000
+Biaya Layanan  Rp4.000
+Biaya Pengemasan  Rp3.000`;
+
+    const result = parseShopeeReceipt(text);
+
+    expect(result.platform).toBe('shopeefood');
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('Nikmat Crispy Raos');
+    expect(result.items[0].quantity).toBe(1);
+    expect(result.items[0].price).toBe(47600);
+    expect(result.items[0].total).toBe(47600);
+    expect(result.items[1].name).toBe('Nikmat Crisbar Mozzarella');
+    expect(result.items[1].quantity).toBe(1);
+    expect(result.items[1].price).toBe(38180);
+    expect(result.items[1].total).toBe(38180);
+    expect(result.subtotal).toBe(85780);
+    expect(result.discount).toBe(38601);
+    expect(result.deliveryFee).toBe(20000);
+  });
+
+  it('skips topping lines starting with [ ]', () => {
+    const text = `1 x  Burger Special  Rp25.000
+[ ] Extra Cheese, [ ] No Onion
+Subtotal Pesanan  Rp25.000`;
+
+    const result = parseShopeeReceipt(text);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Burger Special');
+  });
+
+  it('handles multiple biaya lines and sums them', () => {
+    const text = `1 x  Nasi Goreng  Rp20.000
+Subtotal Pesanan  Rp20.000
+Biaya Pengiriman  Rp10.000
+Biaya Layanan  Rp3.000
+Biaya Pengemasan  Rp2.000`;
+
+    const result = parseShopeeReceipt(text);
+
+    expect(result.deliveryFee).toBe(15000);
+  });
+});
+
+describe('GoFood real receipt parser', () => {
+  it('extracts items from real GoFood receipt with "@RpUNIT  RpTOTAL" format', () => {
+    const text = `gofood
+4  L Original Pot Besar  @Rp20.300  Rp81.200
+4  Original Pot Kecil  @Rp16.100  Rp64.400
+Total harga  Rp145.600
+Biaya penanganan dan pengiriman  Rp15.500
+Biaya lainnya  Rp4.000
+Diskon  -Rp42.400`;
+
+    const result = parseGoFoodReceipt(text);
+
+    expect(result.platform).toBe('gofood');
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('L Original Pot Besar');
+    expect(result.items[0].quantity).toBe(4);
+    expect(result.items[0].total).toBe(81200);
+    expect(result.items[0].price).toBe(20300);
+    expect(result.items[1].name).toBe('Original Pot Kecil');
+    expect(result.items[1].quantity).toBe(4);
+    expect(result.items[1].total).toBe(64400);
+    expect(result.items[1].price).toBe(16100);
+    expect(result.subtotal).toBe(145600);
+    expect(result.discount).toBe(42400);
+    expect(result.deliveryFee).toBe(19500);
+  });
+
+  it('sums multiple biaya lines for delivery fee', () => {
+    const text = `gofood
+1  Nasi Ayam  @Rp15.000  Rp15.000
+Total harga  Rp15.000
+Biaya pengiriman  Rp8.000
+Biaya layanan  Rp3.000`;
+
+    const result = parseGoFoodReceipt(text);
+
+    expect(result.deliveryFee).toBe(11000);
+  });
+
+  it('handles discount with minus sign', () => {
+    const text = `gofood
+1  Bakso  @Rp20.000  Rp20.000
+Total harga  Rp20.000
+Diskon  -Rp5.000`;
+
+    const result = parseGoFoodReceipt(text);
+
+    expect(result.discount).toBe(5000);
+  });
+});
+
 describe('Platform auto-detection', () => {
   it('detects GoFood from text', () => {
     expect(detectPlatform('Your GoFood order is ready')).toBe('gofood');
@@ -224,6 +329,11 @@ describe('Platform auto-detection', () => {
     expect(detectPlatform('ShopeeFood delivery')).toBe('shopeefood');
     expect(detectPlatform('Ordered via Shopee Food')).toBe('shopeefood');
     expect(detectPlatform('Thanks for using Shopee')).toBe('shopeefood');
+  });
+
+  it('detects ShopeeFood from Rincian Pesanan and Subtotal Pesanan', () => {
+    expect(detectPlatform('Rincian Pesanan')).toBe('shopeefood');
+    expect(detectPlatform('Subtotal Pesanan (2 menu)  Rp85.780')).toBe('shopeefood');
   });
 
   it('detects GrabFood from text', () => {
