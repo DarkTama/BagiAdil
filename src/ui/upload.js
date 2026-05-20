@@ -105,14 +105,14 @@ export function initUpload(containerEl, onComplete) {
 
     if (file.type === 'application/pdf') {
       previewImage.hidden = true;
-      previewSection.querySelector('.pdf-preview-label')?.remove();
-      const label = document.createElement('p');
-      label.className = 'pdf-preview-label';
-      label.textContent = `PDF Document: ${file.name}`;
-      previewSection.insertBefore(label, removeBtn);
+      previewSection.querySelector('.pdf-preview-info')?.remove();
+      const pdfPreview = document.createElement('div');
+      pdfPreview.className = 'pdf-preview-info';
+      pdfPreview.innerHTML = `<span class="pdf-icon">&#x1F4C4;</span><span class="pdf-filename">${file.name}</span>`;
+      previewSection.insertBefore(pdfPreview, removeBtn);
     } else {
       previewImage.hidden = false;
-      previewSection.querySelector('.pdf-preview-label')?.remove();
+      previewSection.querySelector('.pdf-preview-info')?.remove();
       currentObjectURL = URL.createObjectURL(file);
       previewImage.src = currentObjectURL;
     }

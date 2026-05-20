@@ -8,16 +8,20 @@ import { t } from '../i18n/index.js';
 let containerEl = null;
 let getResultsFn = null;
 let getParamsFn = null;
+let getItemsMapFn = null;
 
 /**
  * Initialize the export component.
  * @param {HTMLElement} el - Container element
  * @param {function} resultsFn - Function that returns current results object
+ * @param {function} [paramsFn] - Function that returns current params
+ * @param {function} [itemsMapFn] - Function that returns current items map
  */
-export function initExport(el, resultsFn, paramsFn) {
+export function initExport(el, resultsFn, paramsFn, itemsMapFn) {
   containerEl = el;
   getResultsFn = resultsFn;
   getParamsFn = paramsFn || null;
+  getItemsMapFn = itemsMapFn || null;
   render();
 }
 
@@ -50,6 +54,10 @@ async function handlePdfExport() {
   const results = getResultsFn ? getResultsFn() : null;
   if (!results) return;
 
+  const pdfBtn = containerEl.querySelector('.export-pdf-btn');
+  if (pdfBtn.disabled) return;
+  pdfBtn.disabled = true;
+
   try {
     const html2pdf = await import('html2pdf.js');
     const lib = html2pdf.default || html2pdf;
@@ -59,7 +67,7 @@ async function handlePdfExport() {
 
     // Create temporary light-themed container for PDF
     const pdfContainer = document.createElement('div');
-    pdfContainer.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
+    pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:210mm;z-index:-1;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
 
     // Title and date
     const header = document.createElement('div');
@@ -74,11 +82,25 @@ async function handlePdfExport() {
     pdfContainer.appendChild(totalDiv);
 
     // Participant cards
+    const itemsMap = getItemsMapFn ? getItemsMapFn() : null;
     results.participants.forEach((p) => {
       const card = document.createElement('div');
       card.style.cssText = 'border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:12px;';
 
       let cardHTML = `<h3 style="margin:0 0 8px 0;color:#1a1a2e;">${p.name}</h3>`;
+
+      if (itemsMap && itemsMap[p.name] && itemsMap[p.name].length > 0) {
+        cardHTML += `<ul style="list-style:none;padding:0;margin:0 0 8px 0;font-size:12px;color:#555;">`;
+        itemsMap[p.name].forEach((item) => {
+          if (item.qty && item.qty > 1) {
+            cardHTML += `<li style="padding:2px 0;">${item.qty}x ${item.name} @ ${formatCurrency(item.unitPrice)} - ${formatCurrency(item.price)}</li>`;
+          } else {
+            cardHTML += `<li style="padding:2px 0;">${item.name} - ${formatCurrency(item.price)}</li>`;
+          }
+        });
+        cardHTML += `</ul>`;
+      }
+
       cardHTML += `<div style="font-size:13px;color:#444;">`;
       cardHTML += `<div>${t('results.originalOrder')}: ${formatCurrency(p.originalOrder)}</div>`;
       cardHTML += `<div>${t('results.discount')}: -${formatCurrency(p.discount)}</div>`;
@@ -92,6 +114,9 @@ async function handlePdfExport() {
 
     document.body.appendChild(pdfContainer);
 
+    // Allow browser to render the container before capturing
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     const opt = {
       margin: [10, 10, 10, 10],
       filename: `BagiAdil-${dateStr}.pdf`,
@@ -100,10 +125,13 @@ async function handlePdfExport() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     };
 
-    await lib(pdfContainer).set(opt).save();
+    await lib().from(pdfContainer).set(opt).save();
     document.body.removeChild(pdfContainer);
   } catch {
     alert('PDF export is not available in this environment.');
+  } finally {
+    const btn = containerEl.querySelector('.export-pdf-btn');
+    if (btn) btn.disabled = false;
   }
 }
 

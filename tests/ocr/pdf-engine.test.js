@@ -180,6 +180,30 @@ describe('processPDF', () => {
     expect(result.text).toBe('Line 1\nLine 2\nLine 3');
   });
 
+  it('should separate items exactly 3 units apart into different lines', async () => {
+    const pdfjsLib = await import('pdfjs-dist');
+    const textContent = {
+      items: [
+        { str: 'Biaya pengiriman', transform: [1, 0, 0, 1, 50, 700] },
+        { str: 'Rp15.500', transform: [1, 0, 0, 1, 300, 700] },
+        { str: 'Biaya lainnya', transform: [1, 0, 0, 1, 50, 697] },
+        { str: 'Rp4.000', transform: [1, 0, 0, 1, 300, 697] },
+      ],
+    };
+    const page = { getTextContent: vi.fn().mockResolvedValue(textContent) };
+    const pdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(page) };
+    pdfjsLib.getDocument.mockReturnValueOnce({ promise: Promise.resolve(pdf) });
+
+    const mockFile = {
+      type: 'application/pdf',
+      name: 'receipt.pdf',
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10)),
+    };
+
+    const result = await processPDF(mockFile);
+    expect(result.text).toBe('Biaya pengiriman Rp15.500\nBiaya lainnya Rp4.000');
+  });
+
   it('should return an error when PDF contains no extractable text', async () => {
     // Override the mock to return empty text items
     const pdfjsLib = await import('pdfjs-dist');

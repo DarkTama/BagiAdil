@@ -247,6 +247,19 @@ Diskon -Rp42.400`;
     expect(result.items[1].total).toBe(64400);
     expect(result.discount).toBe(42400);
   });
+
+  it('does not count lines with both biaya and total as delivery fee', () => {
+    const text = `gofood
+4  L Original Pot Besar  @Rp20.300  Rp81.200
+Total biaya pengiriman dan layanan  Rp50.500
+Biaya penanganan dan pengiriman  Rp15.500
+Biaya lainnya  Rp4.000
+Diskon  -Rp42.400`;
+
+    const result = parseGoFoodReceipt(text);
+    // "Total biaya..." should NOT be counted - only the individual Biaya lines
+    expect(result.deliveryFee).toBe(19500);
+  });
 });
 
 describe('GrabFood receipt parser', () => {
