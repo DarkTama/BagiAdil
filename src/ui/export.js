@@ -92,6 +92,9 @@ async function handlePdfExport() {
 
     document.body.appendChild(pdfContainer);
 
+    // Wait for DOM render before capturing
+    await new Promise(r => setTimeout(r, 100));
+
     const opt = {
       margin: [10, 10, 10, 10],
       filename: `BagiAdil-${dateStr}.pdf`,

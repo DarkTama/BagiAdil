@@ -115,4 +115,38 @@ describe('processPDF', () => {
     expect(result.error).toContain('No text found in PDF');
     expect(result).not.toHaveProperty('text');
   });
+
+  it('should group items with Y-values within 3 units on the same line', async () => {
+    const pdfjsLib = await import('pdfjs-dist');
+    // Items with Y=699 and Y=698 should group (both bucket to 699)
+    // Items with Y=680 and Y=682 should group (both bucket to 681)
+    const closeYTextContent = {
+      items: [
+        { str: 'Item A', transform: [1, 0, 0, 1, 50, 699] },
+        { str: '10000', transform: [1, 0, 0, 1, 200, 698] },
+        { str: 'Item B', transform: [1, 0, 0, 1, 50, 680] },
+        { str: '20000', transform: [1, 0, 0, 1, 200, 682] },
+      ],
+    };
+    const closePage = { getTextContent: vi.fn().mockResolvedValue(closeYTextContent) };
+    const closePdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(closePage) };
+    pdfjsLib.getDocument.mockReturnValueOnce({ promise: Promise.resolve(closePdf) });
+
+    const mockFile = {
+      type: 'application/pdf',
+      name: 'receipt.pdf',
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10)),
+    };
+
+    const result = await processPDF(mockFile);
+
+    expect(result).toHaveProperty('text');
+    // Y=699 and Y=698 group together (both round to bucket 699)
+    // Y=680 and Y=682 group together (both round to bucket 681)
+    expect(result.text).toContain('Item A 10000');
+    expect(result.text).toContain('Item B 20000');
+    // They should be on separate lines since the two groups are far apart
+    const lines = result.text.trim().split('\n');
+    expect(lines.length).toBe(2);
+  });
 });
