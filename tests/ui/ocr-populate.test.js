@@ -122,8 +122,10 @@ describe('OCR Populate', () => {
         platform: 'grabfood',
       };
 
-      // This is what populateManualFromOCR does (minus tab switching)
-      addItemsFromOCR(confirmedData.items);
+      // This is what populateManualFromOCR does (uses setItems to replace, not append)
+      setItems(
+        confirmedData.items.map((item) => ({ name: item.name, price: item.total, participant: '' })),
+      );
       setParams({ totalDiscount: confirmedData.discount, totalShipping: confirmedData.deliveryFee });
 
       // Verify items
@@ -136,6 +138,29 @@ describe('OCR Populate', () => {
       const params = getParams();
       expect(params.totalDiscount).toBe(5000);
       expect(params.totalShipping).toBe(8000);
+    });
+
+    it('should replace items on re-confirm instead of appending', () => {
+      initItems(itemsEl);
+
+      // First confirm
+      const firstData = [
+        { name: 'Item A', quantity: 1, price: 10000, total: 10000 },
+      ];
+      setItems(firstData.map((item) => ({ name: item.name, price: item.total, participant: '' })));
+
+      // Second confirm (simulates re-scan and re-confirm)
+      const secondData = [
+        { name: 'Item B', quantity: 2, price: 5000, total: 10000 },
+      ];
+      setItems(
+        secondData.map((item) => ({ name: item.name, price: item.total, participant: '' })),
+      );
+
+      // Should only have the second set of items, not both
+      const items = getItems();
+      expect(items.length).toBe(1);
+      expect(items[0]).toEqual({ name: 'Item B', price: 10000, participant: '' });
     });
   });
 });

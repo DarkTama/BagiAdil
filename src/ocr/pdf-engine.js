@@ -48,6 +48,13 @@ export async function processPDF(file, onProgress) {
 
     const text = textParts.join('\n');
 
+    if (!text.trim()) {
+      return {
+        error:
+          'No text found in PDF. The file may be a scanned image - try uploading as an image for OCR processing.',
+      };
+    }
+
     if (onProgress) {
       onProgress({ status: 'Complete!', progress: 1 });
     }

@@ -92,4 +92,25 @@ describe('processPDF', () => {
     expect(result.error).toBe('Corrupted PDF');
     expect(result).not.toHaveProperty('text');
   });
+
+  it('should return an error when PDF contains no extractable text', async () => {
+    // Override the mock to return empty text items
+    const pdfjsLib = await import('pdfjs-dist');
+    const emptyTextContent = { items: [] };
+    const emptyPage = { getTextContent: vi.fn().mockResolvedValue(emptyTextContent) };
+    const emptyPdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(emptyPage) };
+    pdfjsLib.getDocument.mockReturnValueOnce({ promise: Promise.resolve(emptyPdf) });
+
+    const mockFile = {
+      type: 'application/pdf',
+      name: 'scanned.pdf',
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10)),
+    };
+
+    const result = await processPDF(mockFile);
+
+    expect(result).toHaveProperty('error');
+    expect(result.error).toContain('No text found in PDF');
+    expect(result).not.toHaveProperty('text');
+  });
 });

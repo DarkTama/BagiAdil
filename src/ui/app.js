@@ -4,7 +4,7 @@
  */
 
 import { initParticipants, getParticipants } from './participants.js';
-import { initItems, getItems, updateParticipantOptions, addItemsFromOCR } from './items.js';
+import { initItems, getItems, updateParticipantOptions, setItems } from './items.js';
 import { initBillParams, getParams, setParams } from './bill-params.js';
 import { renderResults } from './results.js';
 import { splitBill } from '../engine/calculator.js';
@@ -123,8 +123,8 @@ function populateManualFromOCR(data) {
   manualSection.hidden = false;
   ocrSection.hidden = true;
 
-  // Populate items from OCR data
-  addItemsFromOCR(data.items);
+  // Populate items from OCR data (replace, not append, to avoid duplicates on re-confirm)
+  setItems(data.items.map((item) => ({ name: item.name, price: item.total, participant: '' })));
 
   // Set bill parameters
   setParams({ totalDiscount: data.discount, totalShipping: data.deliveryFee });

@@ -42,6 +42,8 @@ export function initUpload(containerEl, onComplete) {
   const progressStatus = containerEl.querySelector('#progress-status');
   const progressBar = containerEl.querySelector('#progress-bar');
 
+  let currentObjectURL = null;
+
   // File input change
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -73,6 +75,12 @@ export function initUpload(containerEl, onComplete) {
   });
 
   function handleFile(file) {
+    // Revoke previous object URL to prevent memory leak
+    if (currentObjectURL) {
+      URL.revokeObjectURL(currentObjectURL);
+      currentObjectURL = null;
+    }
+
     if (file.type === 'application/pdf') {
       previewImage.hidden = true;
       previewSection.querySelector('.pdf-preview-label')?.remove();
@@ -83,8 +91,8 @@ export function initUpload(containerEl, onComplete) {
     } else {
       previewImage.hidden = false;
       previewSection.querySelector('.pdf-preview-label')?.remove();
-      const url = URL.createObjectURL(file);
-      previewImage.src = url;
+      currentObjectURL = URL.createObjectURL(file);
+      previewImage.src = currentObjectURL;
     }
     zone.hidden = true;
     previewSection.hidden = false;
@@ -138,6 +146,10 @@ export function initUpload(containerEl, onComplete) {
   }
 
   function resetUpload() {
+    if (currentObjectURL) {
+      URL.revokeObjectURL(currentObjectURL);
+      currentObjectURL = null;
+    }
     fileInput.value = '';
     previewImage.src = '';
     zone.hidden = false;
