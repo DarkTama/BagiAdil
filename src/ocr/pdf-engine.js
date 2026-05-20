@@ -43,19 +43,30 @@ export async function processPDF(file, onProgress) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
 
-      // Group items by Y coordinate (with tolerance of 3 units) to reconstruct lines
-      const lines = {};
-      textContent.items.forEach((item) => {
-        const y = Math.round(item.transform[5] / 3) * 3;
-        const x = item.transform[4];
-        if (!lines[y]) lines[y] = [];
-        lines[y].push({ str: item.str, x });
+      // Collect all items with their Y and X positions
+      const rawItems = textContent.items.map((item) => ({
+        str: item.str,
+        y: item.transform[5],
+        x: item.transform[4],
+      }));
+
+      // Sort by Y descending (PDF Y is bottom-up)
+      rawItems.sort((a, b) => b.y - a.y);
+
+      // Group by proximity: items within 3 units of the group's Y are same line
+      const lines = [];
+      rawItems.forEach((item) => {
+        const lastLine = lines[lines.length - 1];
+        if (lastLine && Math.abs(lastLine.y - item.y) <= 3) {
+          lastLine.items.push(item);
+        } else {
+          lines.push({ y: item.y, items: [item] });
+        }
       });
 
-      // Sort by Y coordinate (descending since PDF Y is bottom-up) and join
-      const sortedYs = Object.keys(lines).sort((a, b) => Number(b) - Number(a));
-      const pageText = sortedYs.map((y) => {
-        return lines[y].sort((a, b) => a.x - b.x).map(i => i.str).join(' ');
+      // Sort items within each line by X position, then join
+      const pageText = lines.map((line) => {
+        return line.items.sort((a, b) => a.x - b.x).map(i => i.str).join(' ');
       }).join('\n');
       textParts.push(pageText);
     }

@@ -118,8 +118,8 @@ describe('processPDF', () => {
 
   it('should group items with Y-values within 3 units on the same line', async () => {
     const pdfjsLib = await import('pdfjs-dist');
-    // Items with Y=699 and Y=698 should group (both bucket to 699)
-    // Items with Y=680 and Y=682 should group (both bucket to 681)
+    // Items with Y=699 and Y=698 should group (within 3 units)
+    // Items with Y=680 and Y=682 should group (within 3 units)
     const closeYTextContent = {
       items: [
         { str: 'Item A', transform: [1, 0, 0, 1, 50, 699] },
@@ -141,12 +141,44 @@ describe('processPDF', () => {
     const result = await processPDF(mockFile);
 
     expect(result).toHaveProperty('text');
-    // Y=699 and Y=698 group together (both round to bucket 699)
-    // Y=680 and Y=682 group together (both round to bucket 681)
+    // Y=699 and Y=698 group together (within 3 units proximity)
+    // Y=680 and Y=682 group together (within 3 units proximity)
     expect(result.text).toContain('Item A 10000');
     expect(result.text).toContain('Item B 20000');
     // They should be on separate lines since the two groups are far apart
     const lines = result.text.trim().split('\n');
     expect(lines.length).toBe(2);
+  });
+
+  it('should group items at Y=700 and Y=701 on the same line (boundary case)', async () => {
+    const pdfjsLib = await import('pdfjs-dist');
+    // Y=700 and Y=701 are 1 unit apart - must end up on the same line
+    // This was broken with the old bucket-based approach
+    const boundaryTextContent = {
+      items: [
+        { str: 'Boundary A', transform: [1, 0, 0, 1, 50, 701] },
+        { str: '25000', transform: [1, 0, 0, 1, 200, 700] },
+        { str: 'Other Line', transform: [1, 0, 0, 1, 50, 650] },
+      ],
+    };
+    const boundaryPage = { getTextContent: vi.fn().mockResolvedValue(boundaryTextContent) };
+    const boundaryPdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(boundaryPage) };
+    pdfjsLib.getDocument.mockReturnValueOnce({ promise: Promise.resolve(boundaryPdf) });
+
+    const mockFile = {
+      type: 'application/pdf',
+      name: 'receipt.pdf',
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(10)),
+    };
+
+    const result = await processPDF(mockFile);
+
+    expect(result).toHaveProperty('text');
+    // Y=700 and Y=701 should be on the same line
+    expect(result.text).toContain('Boundary A 25000');
+    const lines = result.text.trim().split('\n');
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toBe('Boundary A 25000');
+    expect(lines[1]).toBe('Other Line');
   });
 });

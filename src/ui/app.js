@@ -232,7 +232,7 @@ function updateCalculateButton() {
       statusEl.textContent = t('table.itemsRemaining').replace('{n}', String(state.totalRemaining));
       statusEl.className = 'calculate-status warning';
     } else {
-      statusEl.textContent = '';
+      statusEl.textContent = t('table.addItemsHint');
       statusEl.className = 'calculate-status warning';
     }
   }

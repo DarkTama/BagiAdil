@@ -76,6 +76,7 @@ const id = {
   'table.addItem': 'Tambah Item',
   'table.itemName': 'Nama item',
   'table.itemCount': '{n} item tersisa',
+  'table.addItemsHint': 'Tambah item untuk memulai',
 };
 
 export default id;

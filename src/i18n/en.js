@@ -76,6 +76,7 @@ const en = {
   'table.addItem': 'Add Item',
   'table.itemName': 'Item name',
   'table.itemCount': '{n} items remaining',
+  'table.addItemsHint': 'Add items to get started',
 };
 
 export default en;

@@ -316,6 +316,18 @@ function renderAssignPopup(cell, item, index) {
   });
   popup.appendChild(assignBtn);
 
+  // Focus the select when popup opens
+  setTimeout(() => select.focus(), 0);
+
+  // Close on Escape key
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      openPopupIndex = null;
+      render();
+    }
+  };
+  popup.addEventListener('keydown', handleEscape);
+
   cell.appendChild(popup);
 }
 
