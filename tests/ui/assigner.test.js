@@ -1,216 +1,285 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { initAssigner, getAssignments } from '../../src/ui/assigner.js';
+import {
+  initTableAssigner,
+  getTableState,
+  addItems,
+  addItemsFromOCR,
+  updateParticipants,
+  clearItems,
+} from '../../src/ui/table-assigner.js';
 
-describe('Assigner UI', () => {
+describe('Table Assigner UI', () => {
   let containerEl;
-  let assignmentChanges;
-
-  const sampleItems = [
-    { name: 'Nasi Goreng', price: 25000 },
-    { name: 'Mie Ayam', price: 20000 },
-    { name: 'Es Teh', price: 5000 },
-  ];
-
+  let stateChanges;
   const sampleParticipants = ['Alice', 'Bob'];
 
   beforeEach(() => {
-    document.body.innerHTML = '<div id="assigner-container"></div>';
-    containerEl = document.getElementById('assigner-container');
-    assignmentChanges = [];
+    document.body.innerHTML = '<div id="table-container"></div>';
+    containerEl = document.getElementById('table-container');
+    stateChanges = [];
   });
 
-  function setup(items = sampleItems, participants = sampleParticipants) {
-    initAssigner(containerEl, {
-      items,
+  function setup(participants = sampleParticipants) {
+    initTableAssigner(containerEl, {
       participants,
-      onAssignmentChange: (data) => assignmentChanges.push(data),
+      onStateChange: (state) => stateChanges.push(state),
     });
   }
 
-  describe('assign item to participant', () => {
-    it('should assign item via tap-to-assign (tap item then tap zone)', () => {
+  describe('initTableAssigner', () => {
+    it('should render empty state with hint message', () => {
       setup();
-
-      // Tap on first item card to select it
-      const itemCards = containerEl.querySelectorAll('.assigner-item-card');
-      expect(itemCards.length).toBe(3);
-
-      itemCards[0].click(); // Select Nasi Goreng
-
-      // Item should be highlighted as selected
-      const selectedCard = containerEl.querySelector('.assigner-item-selected');
-      expect(selectedCard).not.toBeNull();
-
-      // Tap on Alice's zone
-      const zones = containerEl.querySelectorAll('.assigner-zone');
-      expect(zones.length).toBe(2);
-      zones[0].click(); // Assign to Alice
-
-      // Check assignment
-      const assignments = getAssignments();
-      expect(assignments[0]).toBe('Alice');
-
-      // Callback should have fired
-      expect(assignmentChanges.length).toBe(1);
-      expect(assignmentChanges[0]['Alice'].items).toContain(0);
-      expect(assignmentChanges[0]['Alice'].subtotal).toBe(25000);
-    });
-
-    it('should show item in participant zone after assignment', () => {
-      setup();
-
-      // Assign Nasi Goreng to Alice
-      const itemCards = containerEl.querySelectorAll('.assigner-item-card');
-      itemCards[0].click();
-      const zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[0].click();
-
-      // Check that Alice's zone now contains the item
-      const aliceZone = containerEl.querySelector('[data-zone="Alice"]');
-      const zoneItems = aliceZone.querySelectorAll('.assigner-item-card');
-      expect(zoneItems.length).toBe(1);
-      expect(zoneItems[0].querySelector('.assigner-item-name').textContent).toBe('Nasi Goreng');
+      const hint = containerEl.querySelector('.table-hint');
+      expect(hint).not.toBeNull();
+      expect(hint.textContent).toContain('item');
     });
   });
 
-  describe('unassign item', () => {
-    it('should unassign an item by tapping it again when assigned', () => {
+  describe('addItems', () => {
+    it('should add rows to the unassigned table', () => {
       setup();
+      addItems([
+        { name: 'Nasi Goreng', unitPrice: 25000, qty: 2 },
+        { name: 'Es Teh', unitPrice: 5000, qty: 1 },
+      ]);
 
-      // Assign item 0 to Alice
-      let itemCards = containerEl.querySelectorAll('.assigner-item-card');
-      itemCards[0].click();
-      let zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[0].click();
+      const table = containerEl.querySelector('.assignment-table');
+      expect(table).not.toBeNull();
 
-      // Now the item is in Alice's zone - tap it to select, tap again to unassign
-      const aliceZone = containerEl.querySelector('[data-zone="Alice"]');
-      let assignedItem = aliceZone.querySelector('.assigner-item-card');
-      assignedItem.click(); // Select
-      // After click, item is selected, click again to deselect/unassign
-      const selectedItem = containerEl.querySelector('.assigner-item-selected');
-      if (selectedItem) selectedItem.click(); // Unassign
+      const rows = containerEl.querySelectorAll('.assignment-table tbody tr:not(.popup-row)');
+      expect(rows.length).toBe(2);
+    });
 
-      // Check assignment is removed
-      const assignments = getAssignments();
-      expect(assignments[0]).toBeUndefined();
+    it('should display item name, remaining qty, and unit price', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 3 }]);
+
+      const row = containerEl.querySelector('.assignment-table tbody tr');
+      expect(row.textContent).toContain('Nasi Goreng');
+      expect(row.textContent).toContain('3/3');
+      expect(row.textContent).toContain('25.000');
     });
   });
 
-  describe('reassign item', () => {
-    it('should reassign item from one participant to another', () => {
+  describe('assignment popup', () => {
+    it('should show inline popup when assign button is clicked', () => {
       setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
 
-      // Assign item 0 to Alice
-      let itemCards = containerEl.querySelectorAll('.assigner-item-card');
-      itemCards[0].click();
-      let zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[0].click(); // Alice
+      const assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
 
-      expect(getAssignments()[0]).toBe('Alice');
+      const popup = containerEl.querySelector('.assign-popup');
+      expect(popup).not.toBeNull();
 
-      // Now select item from Alice's zone and assign to Bob
-      const aliceZone = containerEl.querySelector('[data-zone="Alice"]');
-      const assignedItem = aliceZone.querySelector('.assigner-item-card');
-      assignedItem.click(); // Select
+      const select = popup.querySelector('.popup-person-select');
+      expect(select).not.toBeNull();
+      expect(select.options.length).toBe(3); // default + Alice + Bob
 
-      // The item is now selected in Alice's zone, tap Bob's zone to reassign
-      zones = containerEl.querySelectorAll('.assigner-zone');
-      // Find Bob's zone
-      const bobZone = containerEl.querySelector('[data-zone="Bob"]');
-      bobZone.click(); // Assign to Bob
+      const qtyInput = popup.querySelector('.popup-qty-input');
+      expect(qtyInput).not.toBeNull();
+      expect(qtyInput.value).toBe('2'); // max = remaining
+    });
 
-      expect(getAssignments()[0]).toBe('Bob');
+    it('should close popup on cancel', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+
+      const assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
+
+      const cancelBtn = containerEl.querySelector('.btn-popup-cancel');
+      cancelBtn.click();
+
+      const popup = containerEl.querySelector('.assign-popup');
+      expect(popup).toBeNull();
     });
   });
 
-  describe('subtotals', () => {
-    it('should update subtotals correctly after assignments', () => {
+  describe('confirming assignment', () => {
+    it('should update remaining qty and trigger onStateChange', () => {
       setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 3 }]);
 
-      // Assign Nasi Goreng (25000) to Alice
-      let itemCards = containerEl.querySelectorAll('.assigner-item-card');
-      itemCards[0].click();
-      let zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[0].click(); // Alice
+      // Open popup
+      const assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
 
-      // Assign Mie Ayam (20000) to Alice
-      itemCards = containerEl.querySelectorAll(
-        '.assigner-unassigned .assigner-item-card'
-      );
-      itemCards[0].click(); // First unassigned item (Mie Ayam now)
-      zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[0].click(); // Alice
+      // Select person and set qty
+      const select = containerEl.querySelector('.popup-person-select');
+      select.value = 'Alice';
 
-      // Check subtotal for Alice via callback
-      const lastChange = assignmentChanges[assignmentChanges.length - 1];
-      expect(lastChange['Alice'].subtotal).toBe(45000);
-      expect(lastChange['Bob'].subtotal).toBe(0);
+      const qtyInput = containerEl.querySelector('.popup-qty-input');
+      qtyInput.value = '2';
 
-      // Assign Es Teh (5000) to Bob
-      itemCards = containerEl.querySelectorAll(
-        '.assigner-unassigned .assigner-item-card'
-      );
-      itemCards[0].click(); // Es Teh
-      zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[1].click(); // Bob
+      // Confirm
+      const confirmBtn = containerEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
 
-      const finalChange = assignmentChanges[assignmentChanges.length - 1];
-      expect(finalChange['Alice'].subtotal).toBe(45000);
-      expect(finalChange['Bob'].subtotal).toBe(5000);
+      // Check remaining display
+      const row = containerEl.querySelector('.assignment-table tbody tr:not(.popup-row)');
+      expect(row.textContent).toContain('1/3');
+
+      // Check state change callback
+      const lastChange = stateChanges[stateChanges.length - 1];
+      expect(lastChange.allAssigned).toBe(false);
+      expect(lastChange.remainingCount).toBe(1);
+      expect(lastChange.assignments['Alice'].items[0].name).toBe('Nasi Goreng');
+      expect(lastChange.assignments['Alice'].items[0].qty).toBe(2);
+      expect(lastChange.assignments['Alice'].subtotal).toBe(50000);
     });
 
-    it('should display subtotal in participant zone header', () => {
+    it('should grey out row when fully assigned', () => {
       setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 1 }]);
 
-      // Assign Nasi Goreng (25000) to Alice
-      let itemCards = containerEl.querySelectorAll('.assigner-item-card');
-      itemCards[0].click();
-      let zones = containerEl.querySelectorAll('.assigner-zone');
-      zones[0].click();
+      // Open popup
+      const assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
 
-      // Check rendered subtotal
-      const aliceZone = containerEl.querySelector('[data-zone="Alice"]');
-      const subtotal = aliceZone.querySelector('.assigner-zone-subtotal');
-      expect(subtotal.textContent).toContain('25.000');
+      // Select person
+      const select = containerEl.querySelector('.popup-person-select');
+      select.value = 'Alice';
+
+      // Confirm (qty defaults to max = 1)
+      const confirmBtn = containerEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
+
+      const row = containerEl.querySelector('.assignment-table tbody tr');
+      expect(row.classList.contains('row-completed')).toBe(true);
     });
   });
 
-  describe('drag-and-drop events', () => {
-    it('should handle dragover and drop events on participant zones', () => {
+  describe('undo', () => {
+    it('should return qty to unassigned on undo', () => {
       setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
 
-      const zone = containerEl.querySelector('[data-zone="Alice"]');
+      // Assign
+      let assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
+      const select = containerEl.querySelector('.popup-person-select');
+      select.value = 'Alice';
+      const confirmBtn = containerEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
 
-      // Simulate dragover
-      const dragoverEvent = new Event('dragover', { bubbles: true });
-      dragoverEvent.preventDefault = () => {};
-      dragoverEvent.dataTransfer = { dropEffect: '' };
-      zone.dispatchEvent(dragoverEvent);
+      // Verify assigned
+      expect(containerEl.querySelector('.row-completed')).not.toBeNull();
 
-      expect(zone.classList.contains('assigner-zone-dragover')).toBe(true);
+      // Undo
+      const undoBtn = containerEl.querySelector('.undo-btn');
+      expect(undoBtn).not.toBeNull();
+      undoBtn.click();
 
-      // Simulate dragleave
-      zone.dispatchEvent(new Event('dragleave', { bubbles: true }));
-      expect(zone.classList.contains('assigner-zone-dragover')).toBe(false);
+      // Should be back to unassigned
+      expect(containerEl.querySelector('.row-completed')).toBeNull();
+      const row = containerEl.querySelector('.assignment-table tbody tr:not(.popup-row)');
+      expect(row.textContent).toContain('2/2');
+    });
+  });
+
+  describe('addItemsFromOCR', () => {
+    it('should convert OCR format correctly (unitPrice = total/qty)', () => {
+      setup();
+      addItemsFromOCR([
+        { name: 'Ayam Geprek', quantity: 4, price: 20300, total: 81200 },
+      ]);
+
+      const state = getTableState();
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].name).toBe('Ayam Geprek');
+      expect(state.items[0].unitPrice).toBe(20300);
+      expect(state.items[0].totalQty).toBe(4);
     });
 
-    it('should assign item on drop', () => {
+    it('should handle single quantity items', () => {
       setup();
+      addItemsFromOCR([
+        { name: 'Es Teh', quantity: 1, price: 5000, total: 5000 },
+      ]);
 
-      const zone = containerEl.querySelector('[data-zone="Bob"]');
+      const state = getTableState();
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].unitPrice).toBe(5000);
+      expect(state.items[0].totalQty).toBe(1);
+    });
+  });
 
-      // Simulate drop
-      const dropEvent = new Event('drop', { bubbles: true });
-      dropEvent.preventDefault = () => {};
-      dropEvent.dataTransfer = {
-        getData: () => '1', // item index 1 (Mie Ayam)
-      };
-      zone.dispatchEvent(dropEvent);
+  describe('getTableState', () => {
+    it('should return correct structure', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
 
-      expect(getAssignments()[1]).toBe('Bob');
+      const state = getTableState();
+      expect(state.items).toHaveLength(1);
+      expect(state.allAssigned).toBe(false);
+      expect(state.remainingCount).toBe(1);
+      expect(state.assignments).toHaveProperty('Alice');
+      expect(state.assignments).toHaveProperty('Bob');
+    });
+
+    it('should report allAssigned true only when all items have remaining = 0', () => {
+      setup();
+      addItems([
+        { name: 'Nasi Goreng', unitPrice: 25000, qty: 1 },
+        { name: 'Es Teh', unitPrice: 5000, qty: 1 },
+      ]);
+
+      // Assign first item
+      let assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
+      let select = containerEl.querySelector('.popup-person-select');
+      select.value = 'Alice';
+      let confirmBtn = containerEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
+
+      let state = getTableState();
+      expect(state.allAssigned).toBe(false);
+
+      // Assign second item
+      assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
+      select = containerEl.querySelector('.popup-person-select');
+      select.value = 'Bob';
+      confirmBtn = containerEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
+
+      state = getTableState();
+      expect(state.allAssigned).toBe(true);
+      expect(state.remainingCount).toBe(0);
+    });
+  });
+
+  describe('updateParticipants', () => {
+    it('should update dropdown options', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 1 }]);
+
+      updateParticipants(['Charlie', 'Dave']);
+
+      // Open popup
+      const assignBtn = containerEl.querySelector('.btn-assign');
+      assignBtn.click();
+
+      const select = containerEl.querySelector('.popup-person-select');
+      const options = Array.from(select.options).map((o) => o.value);
+      expect(options).toContain('Charlie');
+      expect(options).toContain('Dave');
+      expect(options).not.toContain('Alice');
+    });
+  });
+
+  describe('clearItems', () => {
+    it('should reset to empty state', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 1 }]);
+      clearItems();
+
+      const hint = containerEl.querySelector('.table-hint');
+      expect(hint).not.toBeNull();
+      expect(containerEl.querySelector('.assignment-table')).toBeNull();
     });
   });
 });

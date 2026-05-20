@@ -1,94 +1,95 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { initItems, getItems, addItemsFromOCR, setItems } from '../../src/ui/items.js';
+import {
+  initTableAssigner,
+  getTableState,
+  addItemsFromOCR,
+  clearItems,
+} from '../../src/ui/table-assigner.js';
 import { initBillParams, getParams, setParams } from '../../src/ui/bill-params.js';
 
 describe('OCR Populate', () => {
-  let itemsEl;
+  let tableEl;
   let billParamsEl;
 
   beforeEach(() => {
     document.body.innerHTML = `
-      <div id="items-container"></div>
+      <div id="table-container"></div>
       <div id="bill-params-container"></div>
     `;
-    itemsEl = document.getElementById('items-container');
+    tableEl = document.getElementById('table-container');
     billParamsEl = document.getElementById('bill-params-container');
   });
 
   describe('addItemsFromOCR', () => {
-    it('should populate items from OCR data and render them', () => {
-      initItems(itemsEl);
+    it('should populate items from OCR data with correct unit price and qty', () => {
+      initTableAssigner(tableEl, { participants: ['Alice'], onStateChange: () => {} });
 
       addItemsFromOCR([
         { name: 'Nasi Goreng', quantity: 2, price: 15000, total: 30000 },
         { name: 'Es Teh', quantity: 1, price: 5000, total: 5000 },
       ]);
 
-      const items = getItems();
-      expect(items.length).toBe(3);
-      expect(items[0]).toEqual({ name: 'Nasi Goreng', price: 15000, participant: '' });
-      expect(items[1]).toEqual({ name: 'Nasi Goreng', price: 15000, participant: '' });
-      expect(items[2]).toEqual({ name: 'Es Teh', price: 5000, participant: '' });
+      const state = getTableState();
+      expect(state.items.length).toBe(2);
+      expect(state.items[0].name).toBe('Nasi Goreng');
+      expect(state.items[0].unitPrice).toBe(15000);
+      expect(state.items[0].totalQty).toBe(2);
+      expect(state.items[1].name).toBe('Es Teh');
+      expect(state.items[1].unitPrice).toBe(5000);
+      expect(state.items[1].totalQty).toBe(1);
     });
 
-    it('should render item rows in the DOM', () => {
-      initItems(itemsEl);
+    it('should render item rows in the table', () => {
+      initTableAssigner(tableEl, { participants: ['Alice'], onStateChange: () => {} });
 
       addItemsFromOCR([{ name: 'Mie Ayam', quantity: 1, price: 20000, total: 20000 }]);
 
-      const rows = itemsEl.querySelectorAll('.item-row');
+      const table = tableEl.querySelector('.assignment-table');
+      expect(table).not.toBeNull();
+      const rows = tableEl.querySelectorAll('.assignment-table tbody tr:not(.popup-row)');
       expect(rows.length).toBe(1);
-      expect(rows[0].querySelector('.item-name').value).toBe('Mie Ayam');
-      expect(rows[0].querySelector('.item-price').value).toBe('20000');
+      expect(rows[0].textContent).toContain('Mie Ayam');
     });
 
-    it('should split items by quantity with correct unit price', () => {
-      initItems(itemsEl);
+    it('should use unitPrice = Math.round(total/qty) for items with qty > 1', () => {
+      initTableAssigner(tableEl, { participants: ['Alice'], onStateChange: () => {} });
 
       addItemsFromOCR([{ name: 'Ayam Geprek', quantity: 4, price: 20300, total: 81200 }]);
 
-      const items = getItems();
-      expect(items.length).toBe(4);
-      items.forEach((item) => {
-        expect(item.name).toBe('Ayam Geprek');
-        expect(item.price).toBe(20300);
-        expect(item.participant).toBe('');
-      });
+      const state = getTableState();
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].name).toBe('Ayam Geprek');
+      expect(state.items[0].unitPrice).toBe(20300);
+      expect(state.items[0].totalQty).toBe(4);
     });
 
     it('should append to existing items', () => {
-      initItems(itemsEl);
+      initTableAssigner(tableEl, { participants: ['Alice'], onStateChange: () => {} });
 
       addItemsFromOCR([{ name: 'Item A', quantity: 1, price: 10000, total: 10000 }]);
       addItemsFromOCR([{ name: 'Item B', quantity: 2, price: 5000, total: 10000 }]);
 
-      const items = getItems();
-      expect(items.length).toBe(3);
-      expect(items[0].name).toBe('Item A');
-      expect(items[1].name).toBe('Item B');
-      expect(items[1].price).toBe(5000);
-      expect(items[2].name).toBe('Item B');
-      expect(items[2].price).toBe(5000);
+      const state = getTableState();
+      expect(state.items.length).toBe(2);
+      expect(state.items[0].name).toBe('Item A');
+      expect(state.items[1].name).toBe('Item B');
+      expect(state.items[1].unitPrice).toBe(5000);
+      expect(state.items[1].totalQty).toBe(2);
     });
   });
 
-  describe('setItems', () => {
-    it('should replace items array and render', () => {
-      initItems(itemsEl);
+  describe('clearItems', () => {
+    it('should reset items and show empty state', () => {
+      initTableAssigner(tableEl, { participants: ['Alice'], onStateChange: () => {} });
 
       addItemsFromOCR([{ name: 'Old Item', quantity: 1, price: 5000, total: 5000 }]);
+      clearItems();
 
-      setItems([
-        { name: 'New Item 1', price: 12000, participant: '' },
-        { name: 'New Item 2', price: 8000, participant: '' },
-      ]);
-
-      const items = getItems();
-      expect(items.length).toBe(2);
-      expect(items[0]).toEqual({ name: 'New Item 1', price: 12000, participant: '' });
-      expect(items[1]).toEqual({ name: 'New Item 2', price: 8000, participant: '' });
+      const state = getTableState();
+      expect(state.items.length).toBe(0);
+      expect(tableEl.querySelector('.table-hint')).not.toBeNull();
     });
   });
 
@@ -125,8 +126,8 @@ describe('OCR Populate', () => {
   });
 
   describe('Integration: OCR confirm flow', () => {
-    it('should populate items and params like populateManualFromOCR would', () => {
-      initItems(itemsEl);
+    it('should populate table and params like populateFromOCR would', () => {
+      initTableAssigner(tableEl, { participants: ['Alice', 'Bob'], onStateChange: () => {} });
       initBillParams(billParamsEl);
 
       // Simulate the confirmed data shape from ocr-results.js
@@ -140,45 +141,24 @@ describe('OCR Populate', () => {
         platform: 'grabfood',
       };
 
-      // This is what populateManualFromOCR does (uses setItems to replace, not append)
-      setItems(
-        confirmedData.items.map((item) => ({ name: item.name, price: item.total, participant: '' })),
-      );
+      // This is what populateFromOCR does
+      addItemsFromOCR(confirmedData.items);
       setParams({ totalDiscount: confirmedData.discount, totalShipping: confirmedData.deliveryFee });
 
       // Verify items
-      const items = getItems();
-      expect(items.length).toBe(2);
-      expect(items[0]).toEqual({ name: 'Nasi Goreng', price: 30000, participant: '' });
-      expect(items[1]).toEqual({ name: 'Ayam Bakar', price: 35000, participant: '' });
+      const state = getTableState();
+      expect(state.items.length).toBe(2);
+      expect(state.items[0].name).toBe('Nasi Goreng');
+      expect(state.items[0].unitPrice).toBe(15000);
+      expect(state.items[0].totalQty).toBe(2);
+      expect(state.items[1].name).toBe('Ayam Bakar');
+      expect(state.items[1].unitPrice).toBe(35000);
+      expect(state.items[1].totalQty).toBe(1);
 
       // Verify params
       const params = getParams();
       expect(params.totalDiscount).toBe(5000);
       expect(params.totalShipping).toBe(8000);
-    });
-
-    it('should replace items on re-confirm instead of appending', () => {
-      initItems(itemsEl);
-
-      // First confirm
-      const firstData = [
-        { name: 'Item A', quantity: 1, price: 10000, total: 10000 },
-      ];
-      setItems(firstData.map((item) => ({ name: item.name, price: item.total, participant: '' })));
-
-      // Second confirm (simulates re-scan and re-confirm)
-      const secondData = [
-        { name: 'Item B', quantity: 2, price: 5000, total: 10000 },
-      ];
-      setItems(
-        secondData.map((item) => ({ name: item.name, price: item.total, participant: '' })),
-      );
-
-      // Should only have the second set of items, not both
-      const items = getItems();
-      expect(items.length).toBe(1);
-      expect(items[0]).toEqual({ name: 'Item B', price: 10000, participant: '' });
     });
   });
 });
