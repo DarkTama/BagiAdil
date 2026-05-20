@@ -43,17 +43,37 @@ export async function processPDF(file, onProgress) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
 
-      // Group items by Y coordinate to reconstruct lines
-      const lines = {};
+      // Group items by Y-coordinate with proximity tolerance (~3 units)
+      const Y_TOLERANCE = 3;
+      const lineGroups = []; // [{y: number, items: [{str, x}]}]
+
       textContent.items.forEach((item) => {
-        const y = Math.round(item.transform[5]); // Y position
-        if (!lines[y]) lines[y] = [];
-        lines[y].push(item.str);
+        const y = item.transform[5];
+        const x = item.transform[4];
+        // Find existing line group within tolerance
+        let found = false;
+        for (const group of lineGroups) {
+          if (Math.abs(group.y - y) <= Y_TOLERANCE) {
+            group.items.push({ str: item.str, x });
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          lineGroups.push({ y, items: [{ str: item.str, x }] });
+        }
       });
 
-      // Sort by Y coordinate (descending since PDF Y is bottom-up) and join
-      const sortedYs = Object.keys(lines).sort((a, b) => Number(b) - Number(a));
-      const pageText = sortedYs.map((y) => lines[y].join(' ')).join('\n');
+      // Sort lines by Y descending (PDF Y is bottom-up)
+      lineGroups.sort((a, b) => b.y - a.y);
+
+      // Sort items within each line by X position, then join
+      const pageText = lineGroups
+        .map((group) => {
+          group.items.sort((a, b) => a.x - b.x);
+          return group.items.map((item) => item.str).join(' ');
+        })
+        .join('\n');
       textParts.push(pageText);
     }
 
