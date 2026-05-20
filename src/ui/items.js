@@ -3,6 +3,8 @@
  * Manages adding/removing food items with participant assignment.
  */
 
+import { t } from '../i18n/index.js';
+
 let items = [];
 let containerEl = null;
 let participantsList = [];
@@ -65,7 +67,7 @@ function render() {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn btn-primary btn-add-item';
-  addBtn.textContent = '+ Add Item';
+  addBtn.textContent = t('btn.addItem');
   addBtn.addEventListener('click', () => addItem());
   containerEl.appendChild(addBtn);
 }
@@ -79,12 +81,12 @@ function createItemRow(item, index) {
   const nameGroup = document.createElement('div');
   nameGroup.className = 'item-field';
   const nameLabel = document.createElement('label');
-  nameLabel.textContent = 'Item';
+  nameLabel.textContent = t('label.item');
   nameGroup.appendChild(nameLabel);
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.className = 'item-name';
-  nameInput.placeholder = 'Item name';
+  nameInput.placeholder = t('placeholder.itemName');
   nameInput.value = item.name;
   nameInput.addEventListener('input', () => {
     items[index].name = nameInput.value;
@@ -96,7 +98,7 @@ function createItemRow(item, index) {
   const priceGroup = document.createElement('div');
   priceGroup.className = 'item-field';
   const priceLabel = document.createElement('label');
-  priceLabel.textContent = 'Price';
+  priceLabel.textContent = t('label.price');
   priceGroup.appendChild(priceLabel);
   const priceInput = document.createElement('input');
   priceInput.type = 'number';
@@ -114,7 +116,7 @@ function createItemRow(item, index) {
   const participantGroup = document.createElement('div');
   participantGroup.className = 'item-field';
   const participantLabel = document.createElement('label');
-  participantLabel.textContent = 'For';
+  participantLabel.textContent = t('label.for');
   participantGroup.appendChild(participantLabel);
   const select = document.createElement('select');
   select.className = 'item-participant';
@@ -144,7 +146,7 @@ function populateSelect(select) {
   select.innerHTML = '';
   const defaultOpt = document.createElement('option');
   defaultOpt.value = '';
-  defaultOpt.textContent = '-- Select --';
+  defaultOpt.textContent = t('placeholder.select');
   select.appendChild(defaultOpt);
 
   participantsList.forEach((name) => {
@@ -182,6 +184,29 @@ function syncItemsFromDOM() {
       if (nameInput) items[index].name = nameInput.value;
       if (priceInput) items[index].price = priceInput.value;
       if (select) items[index].participant = select.value;
+    }
+  });
+}
+
+/**
+ * Update translated text in the items component without resetting state.
+ */
+export function updateTranslations() {
+  if (!containerEl) return;
+  const addBtn = containerEl.querySelector('.btn-add-item');
+  if (addBtn) addBtn.textContent = t('btn.addItem');
+  const rows = containerEl.querySelectorAll('.item-row');
+  rows.forEach((row) => {
+    const labels = row.querySelectorAll('.item-field label');
+    if (labels[0]) labels[0].textContent = t('label.item');
+    if (labels[1]) labels[1].textContent = t('label.price');
+    if (labels[2]) labels[2].textContent = t('label.for');
+    const nameInput = row.querySelector('.item-name');
+    if (nameInput) nameInput.placeholder = t('placeholder.itemName');
+    const select = row.querySelector('.item-participant');
+    if (select) {
+      const defaultOpt = select.querySelector('option[value=""]');
+      if (defaultOpt) defaultOpt.textContent = t('placeholder.select');
     }
   });
 }

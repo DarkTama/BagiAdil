@@ -3,18 +3,19 @@
  * Initializes and coordinates all UI components.
  */
 
-import { initParticipants, getParticipants } from './participants.js';
-import { initItems, getItems, updateParticipantOptions } from './items.js';
-import { initBillParams, getParams } from './bill-params.js';
+import { initParticipants, getParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
+import { initItems, getItems, updateParticipantOptions, updateTranslations as updateItemsTranslations } from './items.js';
+import { initBillParams, getParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
 import { renderResults } from './results.js';
 import { splitBill } from '../engine/calculator.js';
-import { initUpload } from './upload.js';
+import { initUpload, updateTranslations as updateUploadTranslations } from './upload.js';
 import { renderOCRResults } from './ocr-results.js';
 import { parseReceipt } from '../ocr/parsers/index.js';
 import { scoreConfidence } from '../ocr/confidence.js';
 import { initAssigner } from './assigner.js';
-import { initExport } from './export.js';
+import { initExport, updateTranslations as updateExportTranslations } from './export.js';
 import { initStorage, saveParticipants } from './storage.js';
+import { t, getLocale, setLocale } from '../i18n/index.js';
 
 let currentResult = null;
 
@@ -33,6 +34,9 @@ export function initApp() {
 
   // Initialize mode tabs
   initModeTabs();
+
+  // Initialize language toggle
+  initLangToggle();
 
   // Initialize components
   initParticipants(participantsEl, {
@@ -69,6 +73,43 @@ export function initApp() {
       showAssigner();
     });
   }
+
+  // Listen for locale changes
+  document.addEventListener('locale-changed', () => {
+    updateAllTranslations();
+  });
+
+  // Apply initial translations
+  updateAllTranslations();
+}
+
+function initLangToggle() {
+  const langBtns = document.querySelectorAll('.lang-btn');
+  const currentLang = getLocale();
+
+  // Set initial active state
+  langBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang;
+      setLocale(lang);
+      langBtns.forEach((b) => b.classList.toggle('active', b.dataset.lang === lang));
+    });
+  });
+}
+
+function updateAllTranslations() {
+  // Update all static [data-i18n] elements
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+
+  // Update dynamic component labels without resetting state
+  updateParticipantsTranslations();
+  updateItemsTranslations();
+  updateBillParamsTranslations();
+  updateUploadTranslations();
+  updateExportTranslations();
 }
 
 function initModeTabs() {
@@ -261,27 +302,30 @@ function validate(participants, items) {
   const errors = [];
 
   if (participants.length === 0) {
-    errors.push({ field: 'participants', message: 'Add at least one participant' });
+    errors.push({ field: 'participants', message: t('validation.noParticipants') });
   }
 
   if (items.length === 0) {
-    errors.push({ field: 'items', message: 'Add at least one item' });
+    errors.push({ field: 'items', message: t('validation.noItems') });
   }
 
   items.forEach((item, index) => {
     if (!item.name.trim()) {
-      errors.push({ field: `item-name-${index}`, message: `Item ${index + 1}: name is required` });
+      errors.push({
+        field: `item-name-${index}`,
+        message: t('validation.itemNameRequired').replace('{n}', index + 1),
+      });
     }
     if (item.price < 0) {
       errors.push({
         field: `item-price-${index}`,
-        message: `Item ${index + 1}: price cannot be negative`,
+        message: t('validation.itemPriceNegative').replace('{n}', index + 1),
       });
     }
     if (!item.participant) {
       errors.push({
         field: `item-participant-${index}`,
-        message: `Item ${index + 1}: must be assigned to a participant`,
+        message: t('validation.itemNoParticipant').replace('{n}', index + 1),
       });
     }
   });

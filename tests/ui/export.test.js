@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { generateWhatsAppText } from '../../src/ui/export.js';
 import { splitBill } from '../../src/engine/calculator.js';
+import { setLocale } from '../../src/i18n/index.js';
 
 describe('Export - WhatsApp Text Generation', () => {
+  beforeAll(() => {
+    setLocale('id');
+  });
+
   const sampleResult = splitBill({
     orders: [
       { name: 'Alice', amount: 25000 },
@@ -21,7 +26,7 @@ describe('Export - WhatsApp Text Generation', () => {
         totalDiscount: 10000,
         totalShipping: 12000,
       });
-      expect(text).toContain('*BagiAdil - Bill Split*');
+      expect(text).toContain('*BagiAdil - Pembagian Tagihan*');
     });
 
     it('should include total tagihan (original total)', () => {
@@ -58,7 +63,7 @@ describe('Export - WhatsApp Text Generation', () => {
         totalDiscount: 10000,
         totalShipping: 12000,
       });
-      expect(text).toMatch(/_(Total: .+ \((balanced|unbalanced)\))_/);
+      expect(text).toMatch(/_(Total: .+ \((Seimbang|Tidak Seimbang)\))_/);
     });
   });
 
@@ -109,7 +114,7 @@ describe('Export - WhatsApp Text Generation', () => {
         totalShipping: 10000,
       });
       expect(text).toContain('- Alice:');
-      expect(text).toContain('*BagiAdil - Bill Split*');
+      expect(text).toContain('*BagiAdil - Pembagian Tagihan*');
     });
 
     it('should handle zero discount and shipping', () => {

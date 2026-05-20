@@ -4,6 +4,7 @@
  */
 
 import { formatCurrency } from '../engine/formatter.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Render calculation results into the container.
@@ -20,13 +21,13 @@ export function renderResults(result, containerEl) {
   // Verification badge
   const badge = document.createElement('div');
   badge.className = verification.balanced ? 'badge badge-success' : 'badge badge-warning';
-  badge.textContent = verification.balanced ? 'Balanced' : 'Unbalanced';
+  badge.textContent = verification.balanced ? t('results.balanced') : t('results.unbalanced');
   containerEl.appendChild(badge);
 
   // Grand total
   const totalEl = document.createElement('div');
   totalEl.className = 'grand-total';
-  totalEl.innerHTML = `<span class="grand-total-label">Grand Total:</span> <span class="grand-total-amount">${formatCurrency(grandTotal)}</span>`;
+  totalEl.innerHTML = `<span class="grand-total-label">${t('results.grandTotal')}</span> <span class="grand-total-amount">${formatCurrency(grandTotal)}</span>`;
   containerEl.appendChild(totalEl);
 
   // Participant cards
@@ -45,17 +46,17 @@ export function renderResults(result, containerEl) {
     const details = document.createElement('div');
     details.className = 'result-card-details';
 
-    details.appendChild(createDetailRow('Original Order', formatCurrency(p.originalOrder)));
-    details.appendChild(createDetailRow('Discount', `- ${formatCurrency(p.discount)}`));
-    details.appendChild(createDetailRow('After Discount', formatCurrency(p.discountedOrder)));
-    details.appendChild(createDetailRow('Shipping Share', formatCurrency(p.shippingShare)));
-    details.appendChild(createDetailRow('Pre-rounding Total', formatCurrency(p.preRoundingTotal)));
+    details.appendChild(createDetailRow(t('results.originalOrder'), formatCurrency(p.originalOrder)));
+    details.appendChild(createDetailRow(t('results.discount'), `- ${formatCurrency(p.discount)}`));
+    details.appendChild(createDetailRow(t('results.afterDiscount'), formatCurrency(p.discountedOrder)));
+    details.appendChild(createDetailRow(t('results.shippingShare'), formatCurrency(p.shippingShare)));
+    details.appendChild(createDetailRow(t('results.preRounding'), formatCurrency(p.preRoundingTotal)));
 
     card.appendChild(details);
 
     const finalEl = document.createElement('div');
     finalEl.className = 'result-card-final';
-    finalEl.innerHTML = `<span>Final Payment</span> <strong>${formatCurrency(p.finalPayment)}</strong>`;
+    finalEl.innerHTML = `<span>${t('results.finalPayment')}</span> <strong>${formatCurrency(p.finalPayment)}</strong>`;
     card.appendChild(finalEl);
 
     cardsContainer.appendChild(card);

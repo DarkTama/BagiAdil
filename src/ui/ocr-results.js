@@ -3,6 +3,8 @@
  * Shows parsed items with confidence indicators and editable fields.
  */
 
+import { t } from '../i18n/index.js';
+
 /**
  * Render OCR results with editable fields and confidence badges.
  * @param {{items: Array<{name: string, quantity: number, price: number, total: number}>, subtotal: number, discount: number, deliveryFee: number, platform: string}} parsedData
@@ -12,6 +14,7 @@
  */
 export function renderOCRResults(parsedData, confidence, containerEl, onConfirm) {
   const badgeClass = confidence.level === 'high' ? 'badge-high' : confidence.level === 'medium' ? 'badge-medium' : 'badge-low';
+  const confidenceLabel = t(`confidence.${confidence.level}`);
 
   let itemsHtml = '';
   if (parsedData.items && parsedData.items.length > 0) {
@@ -19,7 +22,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
       itemsHtml += `
         <div class="ocr-item-row" data-index="${index}">
           <div class="ocr-item-field">
-            <label>Item</label>
+            <label>${t('label.item')}</label>
             <input type="text" class="ocr-item-name" value="${escapeHtml(item.name)}" data-field="name" />
           </div>
           <div class="ocr-item-field ocr-item-qty">
@@ -27,7 +30,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
             <input type="number" class="ocr-item-quantity" value="${item.quantity}" min="1" data-field="quantity" />
           </div>
           <div class="ocr-item-field">
-            <label>Price</label>
+            <label>${t('label.price')}</label>
             <input type="number" class="ocr-item-price" value="${item.price}" min="0" data-field="price" />
           </div>
         </div>
@@ -39,7 +42,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
     <div class="ocr-results">
       <div class="ocr-confidence">
         <span class="confidence-badge ${badgeClass}">
-          Confidence: ${confidence.overall}% (${confidence.level})
+          Confidence: ${confidence.overall}% (${confidenceLabel})
         </span>
         ${confidence.issues.length > 0 ? `<ul class="confidence-issues">${confidence.issues.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
       </div>
@@ -47,21 +50,21 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
         <span>Platform: <strong>${escapeHtml(parsedData.platform)}</strong></span>
       </div>
       <div class="ocr-items-list">
-        <h3>Detected Items</h3>
-        ${itemsHtml || '<p class="ocr-no-items">No items detected. Please enter manually.</p>'}
+        <h3>${t('ocr.detectedItems')}</h3>
+        ${itemsHtml || `<p class="ocr-no-items">${t('ocr.noItems')}</p>`}
       </div>
       <div class="ocr-summary-fields">
         <div class="input-group">
-          <label>Discount</label>
+          <label>${t('label.discount')}</label>
           <input type="number" id="ocr-discount" value="${parsedData.discount}" min="0" />
         </div>
         <div class="input-group">
-          <label>Delivery Fee</label>
+          <label>${t('label.deliveryFee')}</label>
           <input type="number" id="ocr-delivery-fee" value="${parsedData.deliveryFee}" min="0" />
         </div>
       </div>
       <button type="button" class="btn btn-primary ocr-confirm-btn" id="ocr-confirm">
-        Confirm & Use
+        ${t('ocr.confirmUse')}
       </button>
     </div>
   `;

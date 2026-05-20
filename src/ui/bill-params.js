@@ -3,6 +3,8 @@
  * Manages total discount and shipping inputs.
  */
 
+import { t } from '../i18n/index.js';
+
 let containerEl = null;
 
 /**
@@ -35,7 +37,7 @@ function render() {
   discountGroup.className = 'input-group';
   const discountLabel = document.createElement('label');
   discountLabel.setAttribute('for', 'total-discount');
-  discountLabel.textContent = 'Total Discount (Rp)';
+  discountLabel.textContent = `${t('label.discount')} (Rp)`;
   discountGroup.appendChild(discountLabel);
   const discountInput = document.createElement('input');
   discountInput.type = 'number';
@@ -51,7 +53,7 @@ function render() {
   shippingGroup.className = 'input-group';
   const shippingLabel = document.createElement('label');
   shippingLabel.setAttribute('for', 'total-shipping');
-  shippingLabel.textContent = 'Total Shipping (Rp)';
+  shippingLabel.textContent = `${t('label.shipping')} (Rp)`;
   shippingGroup.appendChild(shippingLabel);
   const shippingInput = document.createElement('input');
   shippingInput.type = 'number';
@@ -61,4 +63,15 @@ function render() {
   shippingInput.placeholder = '0';
   shippingGroup.appendChild(shippingInput);
   containerEl.appendChild(shippingGroup);
+}
+
+/**
+ * Update translated text in the bill-params component without resetting state.
+ */
+export function updateTranslations() {
+  if (!containerEl) return;
+  const discountLabel = containerEl.querySelector('label[for="total-discount"]');
+  if (discountLabel) discountLabel.textContent = `${t('label.discount')} (Rp)`;
+  const shippingLabel = containerEl.querySelector('label[for="total-shipping"]');
+  if (shippingLabel) shippingLabel.textContent = `${t('label.shipping')} (Rp)`;
 }
