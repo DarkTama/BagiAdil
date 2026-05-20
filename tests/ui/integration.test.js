@@ -2,29 +2,38 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { initParticipants, getParticipants } from '../../src/ui/participants.js';
-import { initItems, getItems, updateParticipantOptions } from '../../src/ui/items.js';
+import { initAddItemForm } from '../../src/ui/items.js';
 import { initBillParams, getParams } from '../../src/ui/bill-params.js';
 import { renderResults } from '../../src/ui/results.js';
 import { splitBill } from '../../src/engine/calculator.js';
+import {
+  initTableAssigner,
+  getTableState,
+  addItems,
+  updateParticipants,
+} from '../../src/ui/table-assigner.js';
 
 describe('UI Integration', () => {
   let participantsEl;
-  let itemsEl;
+  let addItemFormEl;
   let billParamsEl;
   let resultsEl;
+  let tableEl;
 
   beforeEach(() => {
     document.body.innerHTML = `
       <div id="participants-container"></div>
-      <div id="items-container"></div>
+      <div id="add-item-form-container"></div>
+      <div id="table-container"></div>
       <div id="bill-params-container"></div>
       <div id="results-container"></div>
       <div id="validation-errors"></div>
     `;
     participantsEl = document.getElementById('participants-container');
-    itemsEl = document.getElementById('items-container');
+    addItemFormEl = document.getElementById('add-item-form-container');
     billParamsEl = document.getElementById('bill-params-container');
     resultsEl = document.getElementById('results-container');
+    tableEl = document.getElementById('table-container');
   });
 
   describe('Participants component', () => {
@@ -105,57 +114,59 @@ describe('UI Integration', () => {
     });
   });
 
-  describe('Items component', () => {
-    it('should initialize with empty items list', () => {
-      initItems(itemsEl);
-      expect(getItems()).toEqual([]);
+  describe('Add Item Form component', () => {
+    it('should render with inputs and a button', () => {
+      initAddItemForm(addItemFormEl, { onAddItem: () => {} });
+      expect(addItemFormEl.querySelector('.add-item-name')).not.toBeNull();
+      expect(addItemFormEl.querySelector('.add-item-price')).not.toBeNull();
+      expect(addItemFormEl.querySelector('.add-item-qty')).not.toBeNull();
+      expect(addItemFormEl.querySelector('.btn-add-item')).not.toBeNull();
     });
 
-    it('should add an item', () => {
-      initItems(itemsEl);
-      const addBtn = itemsEl.querySelector('.btn-add-item');
-      addBtn.click();
+    it('should call onAddItem with correct data when submitted', () => {
+      const addedItems = [];
+      initAddItemForm(addItemFormEl, { onAddItem: (item) => addedItems.push(item) });
 
-      const nameInput = itemsEl.querySelector('.item-name');
-      const priceInput = itemsEl.querySelector('.item-price');
+      const nameInput = addItemFormEl.querySelector('.add-item-name');
+      const priceInput = addItemFormEl.querySelector('.add-item-price');
+      const qtyInput = addItemFormEl.querySelector('.add-item-qty');
+      const addBtn = addItemFormEl.querySelector('.btn-add-item');
+
       nameInput.value = 'Nasi Goreng';
       priceInput.value = '25000';
-      nameInput.dispatchEvent(new Event('input'));
-      priceInput.dispatchEvent(new Event('input'));
+      qtyInput.value = '2';
+      addBtn.click();
 
-      const items = getItems();
-      expect(items.length).toBe(1);
-      expect(items[0].name).toBe('Nasi Goreng');
-      expect(items[0].price).toBe(25000);
+      expect(addedItems.length).toBe(1);
+      expect(addedItems[0]).toEqual({ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 });
     });
 
-    it('should update participant options', () => {
-      initItems(itemsEl);
-      updateParticipantOptions(['Alice', 'Bob']);
+    it('should not submit with empty name', () => {
+      const addedItems = [];
+      initAddItemForm(addItemFormEl, { onAddItem: (item) => addedItems.push(item) });
 
-      const addBtn = itemsEl.querySelector('.btn-add-item');
+      const priceInput = addItemFormEl.querySelector('.add-item-price');
+      const addBtn = addItemFormEl.querySelector('.btn-add-item');
+
+      priceInput.value = '25000';
       addBtn.click();
 
-      const select = itemsEl.querySelector('.item-participant');
-      const options = select.querySelectorAll('option');
-      // Default option + 2 participants
-      expect(options.length).toBe(3);
-      expect(options[1].value).toBe('Alice');
-      expect(options[2].value).toBe('Bob');
+      expect(addedItems.length).toBe(0);
     });
 
-    it('should remove an item', () => {
-      initItems(itemsEl);
-      const addBtn = itemsEl.querySelector('.btn-add-item');
+    it('should not submit with zero or negative price', () => {
+      const addedItems = [];
+      initAddItemForm(addItemFormEl, { onAddItem: (item) => addedItems.push(item) });
+
+      const nameInput = addItemFormEl.querySelector('.add-item-name');
+      const priceInput = addItemFormEl.querySelector('.add-item-price');
+      const addBtn = addItemFormEl.querySelector('.btn-add-item');
+
+      nameInput.value = 'Nasi Goreng';
+      priceInput.value = '0';
       addBtn.click();
-      addBtn.click();
 
-      expect(itemsEl.querySelectorAll('.item-row').length).toBe(2);
-
-      const removeBtn = itemsEl.querySelector('.btn-remove-item');
-      removeBtn.click();
-
-      expect(itemsEl.querySelectorAll('.item-row').length).toBe(1);
+      expect(addedItems.length).toBe(0);
     });
   });
 
@@ -217,13 +228,21 @@ describe('UI Integration', () => {
     });
   });
 
-  describe('Full flow integration', () => {
+  describe('Full flow integration with table assigner', () => {
     it('should complete the full bill splitting flow', () => {
-      // Initialize components
+      const stateChanges = [];
+
+      // Initialize participants
       initParticipants(participantsEl, {
-        onChange: (participants) => updateParticipantOptions(participants),
+        onChange: (participants) => updateParticipants(participants),
       });
-      initItems(itemsEl);
+
+      // Initialize table assigner
+      initTableAssigner(tableEl, {
+        participants: [],
+        onStateChange: (state) => stateChanges.push(state),
+      });
+
       initBillParams(billParamsEl);
 
       // Add participants
@@ -239,53 +258,47 @@ describe('UI Integration', () => {
 
       expect(getParticipants()).toEqual(['Alice', 'Bob']);
 
-      // Add items
-      const addItemBtn = itemsEl.querySelector('.btn-add-item');
-      addItemBtn.click();
-      addItemBtn.click();
+      // Add items to table
+      addItems([
+        { name: 'Nasi Goreng', unitPrice: 25000, qty: 1 },
+        { name: 'Mie Ayam', unitPrice: 35000, qty: 1 },
+      ]);
 
-      const nameInputs = itemsEl.querySelectorAll('.item-name');
-      const priceInputs = itemsEl.querySelectorAll('.item-price');
-      const selects = itemsEl.querySelectorAll('.item-participant');
+      // Assign Nasi Goreng to Alice
+      let assignBtn = tableEl.querySelector('.btn-assign');
+      assignBtn.click();
+      let select = tableEl.querySelector('.popup-person-select');
+      select.value = 'Alice';
+      let confirmBtn = tableEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
 
-      nameInputs[0].value = 'Nasi Goreng';
-      priceInputs[0].value = '25000';
-      selects[0].value = 'Alice';
-      nameInputs[0].dispatchEvent(new Event('input'));
-      priceInputs[0].dispatchEvent(new Event('input'));
-      selects[0].dispatchEvent(new Event('change'));
+      // Assign Mie Ayam to Bob
+      assignBtn = tableEl.querySelector('.btn-assign');
+      assignBtn.click();
+      select = tableEl.querySelector('.popup-person-select');
+      select.value = 'Bob';
+      confirmBtn = tableEl.querySelector('.btn-popup-confirm');
+      confirmBtn.click();
 
-      nameInputs[1].value = 'Mie Ayam';
-      priceInputs[1].value = '35000';
-      selects[1].value = 'Bob';
-      nameInputs[1].dispatchEvent(new Event('input'));
-      priceInputs[1].dispatchEvent(new Event('input'));
-      selects[1].dispatchEvent(new Event('change'));
+      // Verify all assigned
+      const state = getTableState();
+      expect(state.allAssigned).toBe(true);
 
       // Set bill params
       billParamsEl.querySelector('#total-discount').value = '15000';
       billParamsEl.querySelector('#total-shipping').value = '12000';
 
-      // Perform calculation
-      const items = getItems();
       const params = getParams();
-      const participants = getParticipants();
-
-      expect(items.length).toBe(2);
       expect(params.totalDiscount).toBe(15000);
       expect(params.totalShipping).toBe(12000);
 
-      // Build orders
-      const orderMap = {};
-      participants.forEach((name) => {
-        orderMap[name] = 0;
+      // Build orders from assignments
+      const orders = [];
+      Object.entries(state.assignments).forEach(([name, data]) => {
+        if (data.subtotal > 0) {
+          orders.push({ name, amount: data.subtotal });
+        }
       });
-      items.forEach((item) => {
-        orderMap[item.participant] += item.price;
-      });
-      const orders = participants
-        .filter((name) => orderMap[name] > 0)
-        .map((name) => ({ name, amount: orderMap[name] }));
 
       const result = splitBill({
         orders,
@@ -304,18 +317,18 @@ describe('UI Integration', () => {
 
     it('should prevent calculation with no participants or items', () => {
       initParticipants(participantsEl);
-      initItems(itemsEl);
+      initTableAssigner(tableEl, { participants: [], onStateChange: () => {} });
       initBillParams(billParamsEl);
 
       const participants = getParticipants();
-      const items = getItems();
+      const state = getTableState();
 
       // Validate
       const errors = [];
       if (participants.length === 0) {
         errors.push({ field: 'participants', message: 'Add at least one participant' });
       }
-      if (items.length === 0) {
+      if (state.items.length === 0) {
         errors.push({ field: 'items', message: 'Add at least one item' });
       }
 

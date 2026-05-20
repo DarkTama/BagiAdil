@@ -108,7 +108,7 @@ header p {
 
 main {
   padding: var(--space-md);
-  max-width: 600px;
+  max-width: 960px;
   margin: 0 auto;
 }
 
@@ -495,6 +495,196 @@ label {
   font-size: var(--font-size-lg);
 }
 
+/* Top row layout */
+.top-row {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.top-row section {
+  flex: 1;
+}
+
+/* Add item form */
+.add-item-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: var(--space-sm);
+  align-items: end;
+}
+
+.add-item-form input {
+  min-height: 44px;
+}
+
+.add-item-form .btn-add-item {
+  white-space: nowrap;
+}
+
+/* Assignment table */
+.table-section-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+}
+
+.table-hint {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-lg);
+}
+
+.assignment-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-md);
+}
+
+.assignment-table thead {
+  background-color: var(--bg-secondary);
+}
+
+.assignment-table th {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.assignment-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.assignment-table .row-completed {
+  opacity: 0.5;
+}
+
+.assignment-table .row-completed .td-item-name {
+  text-decoration: line-through;
+}
+
+.assignment-table .row-completed .btn {
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.btn-assign {
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+/* Assign popup */
+.assign-popup {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-top: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.assign-popup select,
+.assign-popup input {
+  min-height: 36px;
+  font-size: var(--font-size-sm);
+  width: auto;
+  min-width: 100px;
+}
+
+.popup-qty-input {
+  max-width: 80px;
+}
+
+.btn-popup-cancel {
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 32px;
+}
+
+.btn-popup-confirm {
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 32px;
+}
+
+/* Assigned section */
+.assigned-section {
+  margin-top: var(--space-lg);
+}
+
+.assigned-person-card {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.assigned-person-card h4 {
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+}
+
+.assigned-item-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.assigned-item-line .undo-btn {
+  font-size: var(--font-size-sm);
+  color: var(--error);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 28px;
+  border-color: rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.assigned-item-line .undo-btn:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+  border-color: var(--error);
+}
+
+.person-subtotal {
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--space-sm);
+  margin-top: var(--space-sm);
+  font-weight: 600;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* Calculate status */
+#calculate-status {
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+#calculate-status.status-warning {
+  color: var(--warning);
+}
+
+#calculate-status.status-success {
+  color: var(--success);
+}
+
 /* Responsive breakpoints */
 @media (min-width: 768px) {
   header h1 {
@@ -503,6 +693,62 @@ label {
 
   main {
     padding: var(--space-xl);
+  }
+}
+
+@media (max-width: 767px) {
+  .top-row {
+    flex-direction: column;
+  }
+
+  .add-item-form {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-table thead {
+    display: none;
+  }
+
+  .assignment-table,
+  .assignment-table tbody,
+  .assignment-table tr,
+  .assignment-table td {
+    display: block;
+  }
+
+  .assignment-table tr {
+    padding: var(--space-sm);
+    margin-bottom: var(--space-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--bg-tertiary);
+  }
+
+  .assignment-table td {
+    border-bottom: none;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .assignment-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: var(--space-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .assign-popup {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .assign-popup select,
+  .assign-popup input {
+    width: 100%;
+  }
+
+  .popup-qty-input {
+    max-width: none;
   }
 }
 
@@ -791,17 +1037,7 @@ label {
   margin-top: var(--space-md);
 }
 
-/* Assigner button */
-.btn-assigner {
-  width: 100%;
-  padding: var(--space-md) var(--space-lg);
-  font-size: var(--font-size-md);
-  margin-bottom: var(--space-md);
-}
-
-.btn-assigner:hover {
-  background-color: var(--accent-secondary);
-}
+/* Assigner component (legacy - remove after table migration) */
 
 /* Assigner component */
 .assigner {
