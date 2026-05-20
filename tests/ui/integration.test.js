@@ -2,28 +2,37 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { initParticipants, getParticipants } from '../../src/ui/participants.js';
-import { initItems, getItems, updateParticipantOptions } from '../../src/ui/items.js';
+import { initAddItemForm } from '../../src/ui/items.js';
 import { initBillParams, getParams } from '../../src/ui/bill-params.js';
 import { renderResults } from '../../src/ui/results.js';
 import { splitBill } from '../../src/engine/calculator.js';
+import {
+  initAssignmentTable,
+  addItem,
+  updateParticipants,
+  getAssignmentState,
+} from '../../src/ui/assignment-table.js';
 
 describe('UI Integration', () => {
   let participantsEl;
-  let itemsEl;
+  let addItemEl;
   let billParamsEl;
   let resultsEl;
+  let assignmentTableEl;
 
   beforeEach(() => {
     document.body.innerHTML = `
       <div id="participants-container"></div>
-      <div id="items-container"></div>
+      <div id="add-item-container"></div>
       <div id="bill-params-container"></div>
+      <div id="assignment-table-container"></div>
       <div id="results-container"></div>
       <div id="validation-errors"></div>
     `;
     participantsEl = document.getElementById('participants-container');
-    itemsEl = document.getElementById('items-container');
+    addItemEl = document.getElementById('add-item-container');
     billParamsEl = document.getElementById('bill-params-container');
+    assignmentTableEl = document.getElementById('assignment-table-container');
     resultsEl = document.getElementById('results-container');
   });
 
@@ -105,57 +114,84 @@ describe('UI Integration', () => {
     });
   });
 
-  describe('Items component', () => {
-    it('should initialize with empty items list', () => {
-      initItems(itemsEl);
-      expect(getItems()).toEqual([]);
+  describe('Add Item form', () => {
+    it('should render the add item form with inputs', () => {
+      const addedItems = [];
+      initAddItemForm(addItemEl, { onAddItem: (item) => addedItems.push(item) });
+
+      const nameInput = addItemEl.querySelector('.add-item-name');
+      const priceInput = addItemEl.querySelector('.add-item-price');
+      const qtyInput = addItemEl.querySelector('.add-item-qty');
+      const addBtn = addItemEl.querySelector('.btn-add-item');
+
+      expect(nameInput).not.toBeNull();
+      expect(priceInput).not.toBeNull();
+      expect(qtyInput).not.toBeNull();
+      expect(addBtn).not.toBeNull();
     });
 
-    it('should add an item', () => {
-      initItems(itemsEl);
-      const addBtn = itemsEl.querySelector('.btn-add-item');
-      addBtn.click();
+    it('should add an item when form is valid', () => {
+      const addedItems = [];
+      initAddItemForm(addItemEl, { onAddItem: (item) => addedItems.push(item) });
 
-      const nameInput = itemsEl.querySelector('.item-name');
-      const priceInput = itemsEl.querySelector('.item-price');
+      const nameInput = addItemEl.querySelector('.add-item-name');
+      const priceInput = addItemEl.querySelector('.add-item-price');
+      const qtyInput = addItemEl.querySelector('.add-item-qty');
+      const addBtn = addItemEl.querySelector('.btn-add-item');
+
       nameInput.value = 'Nasi Goreng';
       priceInput.value = '25000';
-      nameInput.dispatchEvent(new Event('input'));
-      priceInput.dispatchEvent(new Event('input'));
+      qtyInput.value = '2';
+      addBtn.click();
 
-      const items = getItems();
-      expect(items.length).toBe(1);
-      expect(items[0].name).toBe('Nasi Goreng');
-      expect(items[0].price).toBe(25000);
+      expect(addedItems.length).toBe(1);
+      expect(addedItems[0]).toEqual({ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 });
     });
 
-    it('should update participant options', () => {
-      initItems(itemsEl);
-      updateParticipantOptions(['Alice', 'Bob']);
+    it('should not add item with empty name', () => {
+      const addedItems = [];
+      initAddItemForm(addItemEl, { onAddItem: (item) => addedItems.push(item) });
 
-      const addBtn = itemsEl.querySelector('.btn-add-item');
+      const priceInput = addItemEl.querySelector('.add-item-price');
+      const addBtn = addItemEl.querySelector('.btn-add-item');
+
+      priceInput.value = '25000';
       addBtn.click();
 
-      const select = itemsEl.querySelector('.item-participant');
-      const options = select.querySelectorAll('option');
-      // Default option + 2 participants
-      expect(options.length).toBe(3);
-      expect(options[1].value).toBe('Alice');
-      expect(options[2].value).toBe('Bob');
+      expect(addedItems.length).toBe(0);
     });
 
-    it('should remove an item', () => {
-      initItems(itemsEl);
-      const addBtn = itemsEl.querySelector('.btn-add-item');
+    it('should not add item with zero price', () => {
+      const addedItems = [];
+      initAddItemForm(addItemEl, { onAddItem: (item) => addedItems.push(item) });
+
+      const nameInput = addItemEl.querySelector('.add-item-name');
+      const priceInput = addItemEl.querySelector('.add-item-price');
+      const addBtn = addItemEl.querySelector('.btn-add-item');
+
+      nameInput.value = 'Test';
+      priceInput.value = '0';
       addBtn.click();
+
+      expect(addedItems.length).toBe(0);
+    });
+
+    it('should clear form after successful add', () => {
+      initAddItemForm(addItemEl, { onAddItem: () => {} });
+
+      const nameInput = addItemEl.querySelector('.add-item-name');
+      const priceInput = addItemEl.querySelector('.add-item-price');
+      const qtyInput = addItemEl.querySelector('.add-item-qty');
+      const addBtn = addItemEl.querySelector('.btn-add-item');
+
+      nameInput.value = 'Nasi Goreng';
+      priceInput.value = '25000';
+      qtyInput.value = '3';
       addBtn.click();
 
-      expect(itemsEl.querySelectorAll('.item-row').length).toBe(2);
-
-      const removeBtn = itemsEl.querySelector('.btn-remove-item');
-      removeBtn.click();
-
-      expect(itemsEl.querySelectorAll('.item-row').length).toBe(1);
+      expect(nameInput.value).toBe('');
+      expect(priceInput.value).toBe('');
+      expect(qtyInput.value).toBe('1');
     });
   });
 
@@ -218,13 +254,16 @@ describe('UI Integration', () => {
   });
 
   describe('Full flow integration', () => {
-    it('should complete the full bill splitting flow', () => {
+    it('should complete the full bill splitting flow with assignment table', () => {
       // Initialize components
       initParticipants(participantsEl, {
-        onChange: (participants) => updateParticipantOptions(participants),
+        onChange: (participants) => updateParticipants(participants),
       });
-      initItems(itemsEl);
       initBillParams(billParamsEl);
+      initAssignmentTable(assignmentTableEl, {
+        participants: [],
+        onAssignmentChange: () => {},
+      });
 
       // Add participants
       let input = participantsEl.querySelector('#participant-name');
@@ -239,53 +278,57 @@ describe('UI Integration', () => {
 
       expect(getParticipants()).toEqual(['Alice', 'Bob']);
 
-      // Add items
-      const addItemBtn = itemsEl.querySelector('.btn-add-item');
-      addItemBtn.click();
-      addItemBtn.click();
+      // Add items to assignment table
+      addItem({ name: 'Nasi Goreng', unitPrice: 25000, qty: 1 });
+      addItem({ name: 'Mie Ayam', unitPrice: 35000, qty: 1 });
 
-      const nameInputs = itemsEl.querySelectorAll('.item-name');
-      const priceInputs = itemsEl.querySelectorAll('.item-price');
-      const selects = itemsEl.querySelectorAll('.item-participant');
+      // Verify items appear in table
+      const table = assignmentTableEl.querySelector('.assignment-table');
+      expect(table).not.toBeNull();
+      const rows = table.querySelectorAll('tbody tr');
+      expect(rows.length).toBe(2);
 
-      nameInputs[0].value = 'Nasi Goreng';
-      priceInputs[0].value = '25000';
-      selects[0].value = 'Alice';
-      nameInputs[0].dispatchEvent(new Event('input'));
-      priceInputs[0].dispatchEvent(new Event('input'));
-      selects[0].dispatchEvent(new Event('change'));
+      // Assign Nasi Goreng to Alice via popup
+      const assignBtns = assignmentTableEl.querySelectorAll('.btn-assign');
+      assignBtns[0].click(); // Open popup for first item
 
-      nameInputs[1].value = 'Mie Ayam';
-      priceInputs[1].value = '35000';
-      selects[1].value = 'Bob';
-      nameInputs[1].dispatchEvent(new Event('input'));
-      priceInputs[1].dispatchEvent(new Event('input'));
-      selects[1].dispatchEvent(new Event('change'));
+      const popup = assignmentTableEl.querySelector('.assign-popup');
+      expect(popup).not.toBeNull();
+
+      const select = popup.querySelector('select');
+      select.value = 'Alice';
+      const confirmBtn = popup.querySelector('.btn-confirm-assign');
+      confirmBtn.click();
+
+      // Assign Mie Ayam to Bob
+      const assignBtns2 = assignmentTableEl.querySelectorAll('.btn-assign');
+      // Find the non-disabled button
+      const activeBtns = Array.from(assignBtns2).filter((b) => !b.disabled);
+      activeBtns[0].click();
+
+      const popup2 = assignmentTableEl.querySelector('.assign-popup');
+      const select2 = popup2.querySelector('select');
+      select2.value = 'Bob';
+      const confirmBtn2 = popup2.querySelector('.btn-confirm-assign');
+      confirmBtn2.click();
+
+      // Verify all assigned
+      const state = getAssignmentState();
+      expect(state.allAssigned).toBe(true);
+      expect(state.totalRemaining).toBe(0);
 
       // Set bill params
       billParamsEl.querySelector('#total-discount').value = '15000';
       billParamsEl.querySelector('#total-shipping').value = '12000';
 
-      // Perform calculation
-      const items = getItems();
+      // Build orders from assignments
       const params = getParams();
-      const participants = getParticipants();
-
-      expect(items.length).toBe(2);
-      expect(params.totalDiscount).toBe(15000);
-      expect(params.totalShipping).toBe(12000);
-
-      // Build orders
-      const orderMap = {};
-      participants.forEach((name) => {
-        orderMap[name] = 0;
+      const orders = [];
+      Object.entries(state.assignments).forEach(([name, data]) => {
+        if (data.subtotal > 0) {
+          orders.push({ name, amount: data.subtotal });
+        }
       });
-      items.forEach((item) => {
-        orderMap[item.participant] += item.price;
-      });
-      const orders = participants
-        .filter((name) => orderMap[name] > 0)
-        .map((name) => ({ name, amount: orderMap[name] }));
 
       const result = splitBill({
         orders,
@@ -304,24 +347,22 @@ describe('UI Integration', () => {
 
     it('should prevent calculation with no participants or items', () => {
       initParticipants(participantsEl);
-      initItems(itemsEl);
-      initBillParams(billParamsEl);
+      initAssignmentTable(assignmentTableEl, { participants: [] });
 
       const participants = getParticipants();
-      const items = getItems();
+      const state = getAssignmentState();
 
       // Validate
       const errors = [];
       if (participants.length === 0) {
         errors.push({ field: 'participants', message: 'Add at least one participant' });
       }
-      if (items.length === 0) {
+      if (state.totalRemaining === 0 && !state.allAssigned) {
         errors.push({ field: 'items', message: 'Add at least one item' });
       }
 
       expect(errors.length).toBe(2);
       expect(errors[0].message).toBe('Add at least one participant');
-      expect(errors[1].message).toBe('Add at least one item');
     });
   });
 });

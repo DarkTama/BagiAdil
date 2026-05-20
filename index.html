@@ -38,37 +38,34 @@
         </section>
       </div>
 
-      <div id="manual-section" class="mode-section">
+      <div class="top-row">
         <section id="participants">
           <h2 data-i18n="section.participants">Peserta</h2>
           <div class="section-content"></div>
         </section>
-
-        <section id="items">
-          <h2 data-i18n="section.items">Item Makanan</h2>
-          <div class="section-content"></div>
-        </section>
-
         <section id="bill-params">
           <h2 data-i18n="section.discountShipping">Diskon &amp; Ongkir</h2>
           <div class="section-content"></div>
         </section>
       </div>
 
-      <div id="validation-errors"></div>
-
-      <button id="show-assigner" class="btn btn-primary btn-assigner" type="button" data-i18n="btn.assignItems">
-        Tetapkan Item ke Peserta
-      </button>
-
-      <section id="assigner-section" hidden>
-        <h2>Assign Items</h2>
+      <section id="add-item-section">
+        <h2 data-i18n="table.addItem">Tambah Item</h2>
         <div class="section-content"></div>
       </section>
 
-      <button id="calculate" class="btn btn-primary btn-calculate" type="button" data-i18n="btn.calculate">
-        Hitung Pembagian
-      </button>
+      <section id="assignment-table-section">
+        <div class="section-content"></div>
+      </section>
+
+      <div id="validation-errors"></div>
+
+      <div class="calculate-wrapper">
+        <button id="calculate" class="btn btn-primary btn-calculate" type="button" data-i18n="btn.calculate" disabled>
+          Hitung Pembagian
+        </button>
+        <p id="calculate-status" class="calculate-status warning"></p>
+      </div>
 
       <section id="results">
         <h2 data-i18n="section.results">Hasil</h2>

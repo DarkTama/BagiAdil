@@ -3,16 +3,32 @@
  * Initializes and coordinates all UI components.
  */
 
-import { initParticipants, getParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
-import { initItems, getItems, updateParticipantOptions, setItems, updateTranslations as updateItemsTranslations } from './items.js';
-import { initBillParams, getParams, setParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
+import {
+  initParticipants,
+  getParticipants,
+  updateTranslations as updateParticipantsTranslations,
+} from './participants.js';
+import { initAddItemForm, updateTranslations as updateItemsTranslations } from './items.js';
+import {
+  initBillParams,
+  getParams,
+  setParams,
+  updateTranslations as updateBillParamsTranslations,
+} from './bill-params.js';
+import {
+  initAssignmentTable,
+  addItem,
+  setItems,
+  updateParticipants,
+  getAssignmentState,
+  updateTranslations as updateTableTranslations,
+} from './assignment-table.js';
 import { renderResults } from './results.js';
 import { splitBill } from '../engine/calculator.js';
 import { initUpload, updateTranslations as updateUploadTranslations } from './upload.js';
 import { renderOCRResults } from './ocr-results.js';
 import { parseReceipt } from '../ocr/parsers/index.js';
 import { scoreConfidence } from '../ocr/confidence.js';
-import { initAssigner } from './assigner.js';
 import { initExport, updateTranslations as updateExportTranslations } from './export.js';
 import { initStorage, saveParticipants } from './storage.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
@@ -25,8 +41,9 @@ let currentItemsMap = null;
  */
 export function initApp() {
   const participantsEl = document.querySelector('#participants .section-content');
-  const itemsEl = document.querySelector('#items .section-content');
   const billParamsEl = document.querySelector('#bill-params .section-content');
+  const addItemEl = document.querySelector('#add-item-section .section-content');
+  const assignmentTableEl = document.querySelector('#assignment-table-section .section-content');
   const resultsEl = document.querySelector('#results .section-content');
   const calculateBtn = document.querySelector('#calculate');
 
@@ -39,16 +56,33 @@ export function initApp() {
   // Initialize language toggle
   initLangToggle();
 
-  // Initialize components
+  // Initialize participants
   initParticipants(participantsEl, {
-    onChange: (participants) => {
-      updateParticipantOptions(participants);
-      saveParticipants(participants);
+    onChange: (participantsList) => {
+      updateParticipants(participantsList);
+      saveParticipants(participantsList);
+      updateCalculateButton();
     },
   });
 
-  initItems(itemsEl);
+  // Initialize bill params
   initBillParams(billParamsEl);
+
+  // Initialize add item form
+  initAddItemForm(addItemEl, {
+    onAddItem: (item) => {
+      addItem(item);
+      updateCalculateButton();
+    },
+  });
+
+  // Initialize assignment table
+  initAssignmentTable(assignmentTableEl, {
+    participants: getParticipants(),
+    onAssignmentChange: () => {
+      updateCalculateButton();
+    },
+  });
 
   // Initialize OCR upload
   const ocrUploadEl = document.querySelector('#ocr-upload .section-content');
@@ -67,14 +101,6 @@ export function initApp() {
     handleCalculate(resultsEl);
   });
 
-  // Wire up assigner section
-  const assignerBtn = document.querySelector('#show-assigner');
-  if (assignerBtn) {
-    assignerBtn.addEventListener('click', () => {
-      showAssigner();
-    });
-  }
-
   // Listen for locale changes
   document.addEventListener('locale-changed', () => {
     updateAllTranslations();
@@ -82,6 +108,7 @@ export function initApp() {
 
   // Apply initial translations
   updateAllTranslations();
+  updateCalculateButton();
 }
 
 function initLangToggle() {
@@ -109,6 +136,7 @@ function updateAllTranslations() {
   updateParticipantsTranslations();
   updateItemsTranslations();
   updateBillParamsTranslations();
+  updateTableTranslations();
   updateUploadTranslations();
   updateExportTranslations();
 
@@ -119,11 +147,13 @@ function updateAllTranslations() {
       renderResults(currentResult, resultsEl, currentItemsMap);
     }
   }
+
+  // Update calculate status text
+  updateCalculateButton();
 }
 
 function initModeTabs() {
   const tabs = document.querySelectorAll('.mode-tab');
-  const manualSection = document.querySelector('#manual-section');
   const ocrSection = document.querySelector('#ocr-section');
 
   tabs.forEach((tab) => {
@@ -133,10 +163,8 @@ function initModeTabs() {
 
       const mode = tab.dataset.mode;
       if (mode === 'manual') {
-        manualSection.hidden = false;
         ocrSection.hidden = true;
       } else {
-        manualSection.hidden = true;
         ocrSection.hidden = false;
       }
     });
@@ -163,104 +191,50 @@ function handleOCRResult(ocrResult) {
 }
 
 function populateManualFromOCR(data) {
-  // Switch to manual mode
+  // Switch to manual mode view
   const tabs = document.querySelectorAll('.mode-tab');
-  const manualSection = document.querySelector('#manual-section');
   const ocrSection = document.querySelector('#ocr-section');
 
   tabs.forEach((t) => t.classList.remove('active'));
   tabs[0].classList.add('active');
-  manualSection.hidden = false;
   ocrSection.hidden = true;
 
-  // Populate items from OCR data (replace, not append, to avoid duplicates on re-confirm)
-  setItems(data.items.map((item) => ({ name: item.name, price: item.total, participant: '' })));
+  // Convert OCR items to assignment table format
+  const items = data.items.map((item) => {
+    const qty = item.quantity || 1;
+    const unitPrice = Math.round(item.total / qty);
+    return { name: item.name, unitPrice, qty };
+  });
+
+  // Set items in assignment table (replaces all)
+  setItems(items);
 
   // Set bill parameters
-  setParams({ totalDiscount: data.discount, totalShipping: data.deliveryFee });
+  setParams({ totalDiscount: data.discount || 0, totalShipping: data.deliveryFee || 0 });
+
+  updateCalculateButton();
 }
 
-function showAssigner() {
-  const assignerSection = document.querySelector('#assigner-section');
-  const assignerEl = document.querySelector('#assigner-section .section-content');
-  const resultsEl = document.querySelector('#results .section-content');
+function updateCalculateButton() {
+  const calculateBtn = document.querySelector('#calculate');
+  const statusEl = document.querySelector('#calculate-status');
+  if (!calculateBtn || !statusEl) return;
 
-  if (!assignerSection || !assignerEl) return;
+  const state = getAssignmentState();
 
-  const participants = getParticipants();
-  const rawItems = getItems();
-
-  if (participants.length === 0 || rawItems.length === 0) {
-    return;
-  }
-
-  // Map items for assigner (only need name and price)
-  const assignerItems = rawItems.map((item) => ({
-    name: item.name,
-    price: item.price,
-  }));
-
-  assignerSection.hidden = false;
-
-  initAssigner(assignerEl, {
-    items: assignerItems,
-    participants,
-    onAssignmentChange: (assignmentData) => {
-      handleAssignmentChange(assignmentData, resultsEl);
-    },
-  });
-
-  assignerSection.scrollIntoView({ behavior: 'smooth' });
-}
-
-function handleAssignmentChange(assignmentData, resultsEl) {
-  const params = getParams();
-  const participants = getParticipants();
-
-  // Build orders from assignments
-  const orders = [];
-  participants.forEach((name) => {
-    const data = assignmentData[name];
-    if (data && data.subtotal > 0) {
-      orders.push({ name, amount: data.subtotal });
+  if (state.allAssigned) {
+    calculateBtn.disabled = false;
+    statusEl.textContent = t('table.allAssigned');
+    statusEl.className = 'calculate-status success';
+  } else {
+    calculateBtn.disabled = true;
+    if (state.totalRemaining > 0) {
+      statusEl.textContent = t('table.itemsRemaining').replace('{n}', String(state.totalRemaining));
+      statusEl.className = 'calculate-status warning';
+    } else {
+      statusEl.textContent = '';
+      statusEl.className = 'calculate-status warning';
     }
-  });
-
-  if (orders.length === 0) {
-    resultsEl.innerHTML = '';
-    currentResult = null;
-    updateExportVisibility(false);
-    return;
-  }
-
-  // Call engine
-  const result = splitBill({
-    orders,
-    totalDiscount: params.totalDiscount,
-    totalShipping: params.totalShipping,
-  });
-
-  currentResult = result;
-
-  // Build items map from assignment data
-  const itemsMap = {};
-  participants.forEach((name) => {
-    const data = assignmentData[name];
-    if (data && data.items && data.items.length > 0) {
-      itemsMap[name] = data.items.map((item) => ({ name: item.name, price: item.price }));
-    }
-  });
-  currentItemsMap = itemsMap;
-
-  // Render results
-  renderResults(result, resultsEl, itemsMap);
-  updateExportVisibility(true);
-}
-
-function updateExportVisibility(show) {
-  const exportSection = document.querySelector('#export-section');
-  if (exportSection) {
-    exportSection.hidden = !show;
   }
 }
 
@@ -269,32 +243,30 @@ function handleCalculate(resultsEl) {
   clearAllErrors();
 
   const participants = getParticipants();
-  const items = getItems();
+  const state = getAssignmentState();
   const params = getParams();
 
-  // Validate
-  const errors = validate(participants, items);
-  if (errors.length > 0) {
-    showValidationErrors(errors);
+  if (participants.length === 0) {
+    showValidationErrors([{ message: t('validation.noParticipants') }]);
     return;
   }
 
-  // Build orders array: for each participant, sum all their assigned item prices
-  const orderMap = {};
-  participants.forEach((name) => {
-    orderMap[name] = 0;
+  if (!state.allAssigned) {
+    return;
+  }
+
+  // Build orders from assignments
+  const assignmentData = state.assignments;
+  const orders = [];
+  Object.entries(assignmentData).forEach(([name, data]) => {
+    if (data.subtotal > 0) {
+      orders.push({ name, amount: data.subtotal });
+    }
   });
 
-  items.forEach((item) => {
-    orderMap[item.participant] += item.price;
-  });
-
-  const orders = participants
-    .filter((name) => orderMap[name] > 0)
-    .map((name) => ({
-      name,
-      amount: orderMap[name],
-    }));
+  if (orders.length === 0) {
+    return;
+  }
 
   // Call engine
   const result = splitBill({
@@ -307,10 +279,9 @@ function handleCalculate(resultsEl) {
 
   // Build items map for results display
   const itemsMap = {};
-  items.forEach((item) => {
-    if (item.participant) {
-      if (!itemsMap[item.participant]) itemsMap[item.participant] = [];
-      itemsMap[item.participant].push({ name: item.name, price: item.price });
+  Object.entries(assignmentData).forEach(([name, data]) => {
+    if (data.items && data.items.length > 0) {
+      itemsMap[name] = data.items.map((item) => ({ name: item.name, price: item.price }));
     }
   });
   currentItemsMap = itemsMap;
@@ -329,39 +300,11 @@ function handleCalculate(resultsEl) {
   }
 }
 
-function validate(participants, items) {
-  const errors = [];
-
-  if (participants.length === 0) {
-    errors.push({ field: 'participants', message: t('validation.noParticipants') });
+function updateExportVisibility(show) {
+  const exportSection = document.querySelector('#export-section');
+  if (exportSection) {
+    exportSection.hidden = !show;
   }
-
-  if (items.length === 0) {
-    errors.push({ field: 'items', message: t('validation.noItems') });
-  }
-
-  items.forEach((item, index) => {
-    if (!item.name.trim()) {
-      errors.push({
-        field: `item-name-${index}`,
-        message: t('validation.itemNameRequired').replace('{n}', index + 1),
-      });
-    }
-    if (item.price < 0) {
-      errors.push({
-        field: `item-price-${index}`,
-        message: t('validation.itemPriceNegative').replace('{n}', index + 1),
-      });
-    }
-    if (!item.participant) {
-      errors.push({
-        field: `item-participant-${index}`,
-        message: t('validation.itemNoParticipant').replace('{n}', index + 1),
-      });
-    }
-  });
-
-  return errors;
 }
 
 function showValidationErrors(errors) {

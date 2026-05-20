@@ -1,94 +1,74 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { initItems, getItems, addItemsFromOCR, setItems } from '../../src/ui/items.js';
+import {
+  initAssignmentTable,
+  setItems,
+  getAssignmentState,
+} from '../../src/ui/assignment-table.js';
 import { initBillParams, getParams, setParams } from '../../src/ui/bill-params.js';
 
 describe('OCR Populate', () => {
-  let itemsEl;
+  let tableEl;
   let billParamsEl;
 
   beforeEach(() => {
     document.body.innerHTML = `
-      <div id="items-container"></div>
+      <div id="table-container"></div>
       <div id="bill-params-container"></div>
     `;
-    itemsEl = document.getElementById('items-container');
+    tableEl = document.getElementById('table-container');
     billParamsEl = document.getElementById('bill-params-container');
   });
 
-  describe('addItemsFromOCR', () => {
+  describe('setItems (from OCR)', () => {
     it('should populate items from OCR data and render them', () => {
-      initItems(itemsEl);
+      initAssignmentTable(tableEl, { participants: ['Alice'] });
 
-      addItemsFromOCR([
-        { name: 'Nasi Goreng', quantity: 2, price: 15000, total: 30000 },
-        { name: 'Es Teh', quantity: 1, price: 5000, total: 5000 },
+      // Simulate OCR items converted to assignment table format
+      setItems([
+        { name: 'Nasi Goreng', unitPrice: 15000, qty: 2 },
+        { name: 'Es Teh', unitPrice: 5000, qty: 1 },
       ]);
 
-      const items = getItems();
-      expect(items.length).toBe(3);
-      expect(items[0]).toEqual({ name: 'Nasi Goreng', price: 15000, participant: '' });
-      expect(items[1]).toEqual({ name: 'Nasi Goreng', price: 15000, participant: '' });
-      expect(items[2]).toEqual({ name: 'Es Teh', price: 5000, participant: '' });
+      const state = getAssignmentState();
+      expect(state.totalRemaining).toBe(3); // 2 + 1
     });
 
     it('should render item rows in the DOM', () => {
-      initItems(itemsEl);
+      initAssignmentTable(tableEl, { participants: ['Alice'] });
 
-      addItemsFromOCR([{ name: 'Mie Ayam', quantity: 1, price: 20000, total: 20000 }]);
+      setItems([{ name: 'Mie Ayam', unitPrice: 20000, qty: 1 }]);
 
-      const rows = itemsEl.querySelectorAll('.item-row');
+      const rows = tableEl.querySelectorAll('.assignment-table tbody tr');
       expect(rows.length).toBe(1);
-      expect(rows[0].querySelector('.item-name').value).toBe('Mie Ayam');
-      expect(rows[0].querySelector('.item-price').value).toBe('20000');
+      expect(rows[0].querySelector('.item-name-cell').textContent).toContain('Mie Ayam');
     });
 
-    it('should split items by quantity with correct unit price', () => {
-      initItems(itemsEl);
+    it('should handle items with multiple quantities', () => {
+      initAssignmentTable(tableEl, { participants: ['Alice'] });
 
-      addItemsFromOCR([{ name: 'Ayam Geprek', quantity: 4, price: 20300, total: 81200 }]);
+      setItems([{ name: 'Ayam Geprek', unitPrice: 20300, qty: 4 }]);
 
-      const items = getItems();
-      expect(items.length).toBe(4);
-      items.forEach((item) => {
-        expect(item.name).toBe('Ayam Geprek');
-        expect(item.price).toBe(20300);
-        expect(item.participant).toBe('');
-      });
+      const state = getAssignmentState();
+      expect(state.totalRemaining).toBe(4);
+
+      const rows = tableEl.querySelectorAll('.assignment-table tbody tr');
+      expect(rows.length).toBe(1);
     });
 
-    it('should append to existing items', () => {
-      initItems(itemsEl);
+    it('should replace existing items on second call', () => {
+      initAssignmentTable(tableEl, { participants: ['Alice'] });
 
-      addItemsFromOCR([{ name: 'Item A', quantity: 1, price: 10000, total: 10000 }]);
-      addItemsFromOCR([{ name: 'Item B', quantity: 2, price: 5000, total: 10000 }]);
+      setItems([{ name: 'Item A', unitPrice: 10000, qty: 1 }]);
+      setItems([{ name: 'Item B', unitPrice: 5000, qty: 2 }]);
 
-      const items = getItems();
-      expect(items.length).toBe(3);
-      expect(items[0].name).toBe('Item A');
-      expect(items[1].name).toBe('Item B');
-      expect(items[1].price).toBe(5000);
-      expect(items[2].name).toBe('Item B');
-      expect(items[2].price).toBe(5000);
-    });
-  });
+      const state = getAssignmentState();
+      expect(state.totalRemaining).toBe(2);
 
-  describe('setItems', () => {
-    it('should replace items array and render', () => {
-      initItems(itemsEl);
-
-      addItemsFromOCR([{ name: 'Old Item', quantity: 1, price: 5000, total: 5000 }]);
-
-      setItems([
-        { name: 'New Item 1', price: 12000, participant: '' },
-        { name: 'New Item 2', price: 8000, participant: '' },
-      ]);
-
-      const items = getItems();
-      expect(items.length).toBe(2);
-      expect(items[0]).toEqual({ name: 'New Item 1', price: 12000, participant: '' });
-      expect(items[1]).toEqual({ name: 'New Item 2', price: 8000, participant: '' });
+      const rows = tableEl.querySelectorAll('.assignment-table tbody tr');
+      expect(rows.length).toBe(1);
+      expect(rows[0].querySelector('.item-name-cell').textContent).toContain('Item B');
     });
   });
 
@@ -126,7 +106,7 @@ describe('OCR Populate', () => {
 
   describe('Integration: OCR confirm flow', () => {
     it('should populate items and params like populateManualFromOCR would', () => {
-      initItems(itemsEl);
+      initAssignmentTable(tableEl, { participants: ['Alice', 'Bob'] });
       initBillParams(billParamsEl);
 
       // Simulate the confirmed data shape from ocr-results.js
@@ -140,17 +120,18 @@ describe('OCR Populate', () => {
         platform: 'grabfood',
       };
 
-      // This is what populateManualFromOCR does (uses setItems to replace, not append)
-      setItems(
-        confirmedData.items.map((item) => ({ name: item.name, price: item.total, participant: '' })),
-      );
+      // This is what populateManualFromOCR does - convert items for assignment table
+      const items = confirmedData.items.map((item) => {
+        const qty = item.quantity || 1;
+        const unitPrice = Math.round(item.total / qty);
+        return { name: item.name, unitPrice, qty };
+      });
+      setItems(items);
       setParams({ totalDiscount: confirmedData.discount, totalShipping: confirmedData.deliveryFee });
 
       // Verify items
-      const items = getItems();
-      expect(items.length).toBe(2);
-      expect(items[0]).toEqual({ name: 'Nasi Goreng', price: 30000, participant: '' });
-      expect(items[1]).toEqual({ name: 'Ayam Bakar', price: 35000, participant: '' });
+      const state = getAssignmentState();
+      expect(state.totalRemaining).toBe(3); // 2 + 1
 
       // Verify params
       const params = getParams();
@@ -159,26 +140,21 @@ describe('OCR Populate', () => {
     });
 
     it('should replace items on re-confirm instead of appending', () => {
-      initItems(itemsEl);
+      initAssignmentTable(tableEl, { participants: ['Alice'] });
 
       // First confirm
-      const firstData = [
-        { name: 'Item A', quantity: 1, price: 10000, total: 10000 },
-      ];
-      setItems(firstData.map((item) => ({ name: item.name, price: item.total, participant: '' })));
+      setItems([{ name: 'Item A', unitPrice: 10000, qty: 1 }]);
 
       // Second confirm (simulates re-scan and re-confirm)
-      const secondData = [
-        { name: 'Item B', quantity: 2, price: 5000, total: 10000 },
-      ];
-      setItems(
-        secondData.map((item) => ({ name: item.name, price: item.total, participant: '' })),
-      );
+      setItems([{ name: 'Item B', unitPrice: 5000, qty: 2 }]);
 
       // Should only have the second set of items, not both
-      const items = getItems();
-      expect(items.length).toBe(1);
-      expect(items[0]).toEqual({ name: 'Item B', price: 10000, participant: '' });
+      const state = getAssignmentState();
+      expect(state.totalRemaining).toBe(2);
+
+      const rows = tableEl.querySelectorAll('.assignment-table tbody tr');
+      expect(rows.length).toBe(1);
+      expect(rows[0].querySelector('.item-name-cell').textContent).toContain('Item B');
     });
   });
 });
