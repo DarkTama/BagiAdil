@@ -23,7 +23,13 @@ export function detectPlatform(text) {
     return 'gofood';
   }
 
-  if (lower.includes('shopeefood') || lower.includes('shopee food') || lower.includes('shopee')) {
+  if (
+    lower.includes('shopeefood') ||
+    lower.includes('shopee food') ||
+    lower.includes('shopee') ||
+    lower.includes('rincian pesanan') ||
+    lower.includes('subtotal pesanan')
+  ) {
     return 'shopeefood';
   }
 
