@@ -77,6 +77,97 @@ async function handleShareLink() {
   }
 }
 
+/**
+ * Build the printable PDF content as a detached DOM node.
+ * All participant and item names are set via textContent, so names coming
+ * from receipts or decoded share links cannot inject markup (XSS-safe).
+ * @param {object} results - Result from splitBill()
+ * @param {object|null} itemsMap - Map of participant name -> assigned items
+ * @returns {HTMLElement}
+ */
+export function buildPdfContent(results, itemsMap) {
+  const pdfContainer = document.createElement('div');
+  pdfContainer.style.cssText =
+    'position:absolute;top:0;left:0;width:210mm;z-index:-1;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
+
+  // Title and date
+  const header = document.createElement('div');
+  header.style.cssText = 'text-align:center;margin-bottom:20px;';
+  const h1 = document.createElement('h1');
+  h1.style.cssText = 'margin:0;font-size:24px;color:#1a1a2e;';
+  h1.textContent = 'BagiAdil';
+  const dateP = document.createElement('p');
+  dateP.style.cssText = 'margin:5px 0;color:#555;';
+  dateP.textContent = new Date().toLocaleDateString();
+  header.appendChild(h1);
+  header.appendChild(dateP);
+  pdfContainer.appendChild(header);
+
+  // Grand total
+  const totalDiv = document.createElement('div');
+  totalDiv.style.cssText =
+    'text-align:center;margin-bottom:20px;padding:10px;background:#f0f0f5;border-radius:8px;';
+  const totalStrong = document.createElement('strong');
+  totalStrong.textContent = t('results.grandTotal');
+  totalDiv.appendChild(totalStrong);
+  totalDiv.appendChild(
+    document.createTextNode(' ' + formatCurrency(results.grandTotal)),
+  );
+  pdfContainer.appendChild(totalDiv);
+
+  // Participant cards
+  results.participants.forEach((p) => {
+    const card = document.createElement('div');
+    card.style.cssText =
+      'border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:12px;';
+
+    const nameEl = document.createElement('h3');
+    nameEl.style.cssText = 'margin:0 0 8px 0;color:#1a1a2e;';
+    nameEl.textContent = p.name;
+    card.appendChild(nameEl);
+
+    const items = itemsMap && itemsMap[p.name];
+    if (items && items.length > 0) {
+      const ul = document.createElement('ul');
+      ul.style.cssText =
+        'list-style:none;padding:0;margin:0 0 8px 0;font-size:12px;color:#555;';
+      items.forEach((item) => {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding:2px 0;';
+        if (item.qty && item.qty > 1) {
+          li.textContent = `${item.qty}x ${item.name} @ ${formatCurrency(item.unitPrice)} - ${formatCurrency(item.price)}`;
+        } else {
+          li.textContent = `${item.name} - ${formatCurrency(item.price)}`;
+        }
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+    }
+
+    const details = document.createElement('div');
+    details.style.cssText = 'font-size:13px;color:#444;';
+    [
+      [t('results.originalOrder'), formatCurrency(p.originalOrder)],
+      [t('results.discount'), '-' + formatCurrency(p.discount)],
+      [t('results.shippingShare'), formatCurrency(p.shippingShare)],
+    ].forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.textContent = `${label}: ${value}`;
+      details.appendChild(row);
+    });
+    card.appendChild(details);
+
+    const finalEl = document.createElement('div');
+    finalEl.style.cssText = 'margin-top:8px;font-weight:bold;font-size:15px;';
+    finalEl.textContent = `${t('results.finalPayment')}: ${formatCurrency(p.finalPayment)}`;
+    card.appendChild(finalEl);
+
+    pdfContainer.appendChild(card);
+  });
+
+  return pdfContainer;
+}
+
 async function handlePdfExport() {
   const results = getResultsFn ? getResultsFn() : null;
   if (!results) return;
@@ -92,53 +183,8 @@ async function handlePdfExport() {
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
 
-    // Create temporary light-themed container for PDF.
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.cssText = 'position:absolute;top:0;left:0;width:210mm;z-index:-1;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
-
-    // Title and date
-    const header = document.createElement('div');
-    header.style.cssText = 'text-align:center;margin-bottom:20px;';
-    header.innerHTML = `<h1 style="margin:0;font-size:24px;color:#1a1a2e;">BagiAdil</h1><p style="margin:5px 0;color:#555;">${now.toLocaleDateString()}</p>`;
-    pdfContainer.appendChild(header);
-
-    // Grand total
-    const totalDiv = document.createElement('div');
-    totalDiv.style.cssText = 'text-align:center;margin-bottom:20px;padding:10px;background:#f0f0f5;border-radius:8px;';
-    totalDiv.innerHTML = `<strong>${t('results.grandTotal')}</strong> ${formatCurrency(results.grandTotal)}`;
-    pdfContainer.appendChild(totalDiv);
-
-    // Participant cards
     const itemsMap = getItemsMapFn ? getItemsMapFn() : null;
-    results.participants.forEach((p) => {
-      const card = document.createElement('div');
-      card.style.cssText = 'border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:12px;';
-
-      let cardHTML = `<h3 style="margin:0 0 8px 0;color:#1a1a2e;">${p.name}</h3>`;
-
-      if (itemsMap && itemsMap[p.name] && itemsMap[p.name].length > 0) {
-        cardHTML += `<ul style="list-style:none;padding:0;margin:0 0 8px 0;font-size:12px;color:#555;">`;
-        itemsMap[p.name].forEach((item) => {
-          if (item.qty && item.qty > 1) {
-            cardHTML += `<li style="padding:2px 0;">${item.qty}x ${item.name} @ ${formatCurrency(item.unitPrice)} - ${formatCurrency(item.price)}</li>`;
-          } else {
-            cardHTML += `<li style="padding:2px 0;">${item.name} - ${formatCurrency(item.price)}</li>`;
-          }
-        });
-        cardHTML += `</ul>`;
-      }
-
-      cardHTML += `<div style="font-size:13px;color:#444;">`;
-      cardHTML += `<div>${t('results.originalOrder')}: ${formatCurrency(p.originalOrder)}</div>`;
-      cardHTML += `<div>${t('results.discount')}: -${formatCurrency(p.discount)}</div>`;
-      cardHTML += `<div>${t('results.shippingShare')}: ${formatCurrency(p.shippingShare)}</div>`;
-      cardHTML += `</div>`;
-      cardHTML += `<div style="margin-top:8px;font-weight:bold;font-size:15px;">${t('results.finalPayment')}: ${formatCurrency(p.finalPayment)}</div>`;
-
-      card.innerHTML = cardHTML;
-      pdfContainer.appendChild(card);
-    });
-
+    const pdfContainer = buildPdfContent(results, itemsMap);
     document.body.appendChild(pdfContainer);
 
     // Allow browser to render the container before capturing

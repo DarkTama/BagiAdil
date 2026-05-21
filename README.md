@@ -1,6 +1,6 @@
 # BagiAdil
 
-Split your GoFood, ShopeeFood, and GrabFood bills fairly and automatically. A client-side web app using OCR to read receipts, proportional discount distribution, even shipping split, and intelligent rounding to nearest Rp 100.
+BagiAdil splits **GoFood and ShopeeFood** food-delivery bills fairly and automatically — GrabFood is supported too. A privacy-first, fully client-side web app: scan a receipt with OCR (or enter items manually), assign items to each person, and get everyone's fair share with proportional discount distribution, even shipping split, and intelligent rounding to the nearest Rp 100.
 
 ## Features
 

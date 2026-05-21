@@ -3,24 +3,7 @@
  * Extracts items, prices, subtotal, discount, and delivery fee from GoFood receipt text.
  */
 
-/**
- * Parse a price string in Indonesian format.
- * Handles: "Rp 25.000", "Rp25.000", "25000", "25,000", "Rp 25000", "-Rp42.400"
- * Always returns a positive number (minus sign is stripped).
- * @param {string} str
- * @returns {number}
- */
-function parsePrice(str) {
-  if (!str) return 0;
-  // Strip minus sign, Rp prefix, spaces, dots, and commas
-  const cleaned = str
-    .replace(/^-/, '')
-    .replace(/[Rr]p\.?\s*/g, '')
-    .replace(/[.,]/g, '')
-    .trim();
-  const num = parseInt(cleaned, 10);
-  return isNaN(num) ? 0 : num;
-}
+import { parsePrice } from './common.js';
 
 /**
  * Parse GoFood receipt text into structured data.

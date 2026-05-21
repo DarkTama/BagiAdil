@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { generateWhatsAppText } from '../../src/ui/export.js';
+import { generateWhatsAppText, buildPdfContent } from '../../src/ui/export.js';
 import { splitBill } from '../../src/engine/calculator.js';
 import { setLocale } from '../../src/i18n/index.js';
 
@@ -130,5 +130,58 @@ describe('Export - WhatsApp Text Generation', () => {
       expect(text).toContain('Diskon: Rp 0');
       expect(text).toContain('Ongkir: Rp 0');
     });
+  });
+});
+
+describe('Export - PDF content is XSS-safe', () => {
+  beforeAll(() => {
+    setLocale('id');
+  });
+
+  it('renders malicious participant and item names as text, not markup', () => {
+    const evilName = '<img src=x onerror="alert(1)">';
+    const evilItem = '<script>alert(2)</script>';
+
+    const result = splitBill({
+      orders: [
+        { name: evilName, amount: 25000 },
+        { name: 'Bob', amount: 15000 },
+      ],
+      totalDiscount: 0,
+      totalShipping: 0,
+    });
+    const itemsMap = {
+      [evilName]: [{ name: evilItem, qty: 2, unitPrice: 5000, price: 10000 }],
+    };
+
+    const node = buildPdfContent(result, itemsMap);
+
+    // No markup from the names was parsed into live elements.
+    expect(node.querySelectorAll('img').length).toBe(0);
+    expect(node.querySelectorAll('script').length).toBe(0);
+
+    // The names survive verbatim as plain text.
+    expect(node.textContent).toContain(evilName);
+    expect(node.textContent).toContain(evilItem);
+
+    const heading = [...node.querySelectorAll('h3')].find(
+      (h) => h.textContent === evilName,
+    );
+    expect(heading).toBeTruthy();
+  });
+
+  it('builds one card per participant', () => {
+    const result = splitBill({
+      orders: [
+        { name: 'Alice', amount: 25000 },
+        { name: 'Bob', amount: 15000 },
+      ],
+      totalDiscount: 5000,
+      totalShipping: 4000,
+    });
+    const node = buildPdfContent(result, null);
+    expect(node.querySelectorAll('h3').length).toBe(2);
+    expect(node.textContent).toContain('Alice');
+    expect(node.textContent).toContain('Bob');
   });
 });

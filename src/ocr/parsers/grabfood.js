@@ -3,16 +3,16 @@
  * Extracts items, prices, subtotal, discount, and delivery fee from GrabFood receipt text.
  */
 
+import { parsePrice as parsePriceShared } from './common.js';
+
 /**
- * Parse a price string in Indonesian format.
+ * Parse a price string, preserving any leading minus sign (GrabFood receipts
+ * occasionally list signed values).
  * @param {string} str
  * @returns {number}
  */
 function parsePrice(str) {
-  if (!str) return 0;
-  const cleaned = str.replace(/[Rr]p\.?\s*/g, '').replace(/[.,]/g, '').trim();
-  const num = parseInt(cleaned, 10);
-  return isNaN(num) ? 0 : num;
+  return parsePriceShared(str, { signed: true });
 }
 
 /**
