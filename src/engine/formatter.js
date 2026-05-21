@@ -20,3 +20,16 @@ export function formatCurrency(amount) {
   formatted = formatted.replace(/Rp /, 'Rp ').replace(/,/g, '.');
   return formatted;
 }
+
+/**
+ * Parse a user-entered Rupiah string into an integer amount.
+ * Strips every non-digit character ("Rp 15.500" -> 15500, "" -> 0).
+ * @param {string|number} str
+ * @returns {number}
+ */
+export function parseRupiah(str) {
+  if (typeof str === 'number') return Math.round(str) || 0;
+  if (!str) return 0;
+  const digits = String(str).replace(/\D/g, '');
+  return digits ? parseInt(digits, 10) : 0;
+}

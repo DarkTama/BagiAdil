@@ -12,6 +12,8 @@ Split your GoFood, ShopeeFood, and GrabFood bills fairly and automatically. A cl
 - Interactive drag-and-drop Assignment
 - Real-Time Calculation
 - PDF Export and WhatsApp text summary
+- Shareable Result Links (read-only detailed result, encoded entirely in the URL)
+- Editable Local History (reopen and correct past splits)
 - PWA Support
 - Privacy-First (all client-side)
 - Mobile-First Design
@@ -108,6 +110,8 @@ D. **Discount Distribution** - Total discount is distributed proportionally base
 E. **Shipping Split** - Delivery fee is split evenly among all participants
 
 F. **Rounding** - Final amounts are rounded to the nearest Rp 100 using intelligent rounding that preserves the total
+
+G. **History & Sharing** - Every completed split is auto-saved to a local, editable history so you can reopen and correct it later. Any result can be shared via a link that opens a read-only detailed view - the split data is encoded in the URL hash, so nothing is ever sent to a server
 
 ## Tech Stack
 

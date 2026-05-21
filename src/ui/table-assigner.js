@@ -129,6 +129,28 @@ export function clearItems() {
   notifyChange();
 }
 
+/**
+ * Replace all items with a saved set (including their assignments).
+ * Used when loading a split from history.
+ * @param {Array<{name: string, unitPrice: number, totalQty: number, assignments: Array<{person: string, qty: number}>}>} itemsArray
+ */
+export function loadItems(itemsArray) {
+  nextId = 1;
+  activePopupItemId = null;
+  items = (itemsArray || []).map((item) => ({
+    id: nextId++,
+    name: item.name,
+    unitPrice: item.unitPrice,
+    totalQty: item.totalQty,
+    assignments: (item.assignments || []).map((a) => ({
+      person: a.person,
+      qty: a.qty,
+    })),
+  }));
+  render();
+  notifyChange();
+}
+
 function getRemainingQty(item) {
   const assigned = item.assignments.reduce((sum, a) => sum + a.qty, 0);
   return item.totalQty - assigned;

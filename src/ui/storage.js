@@ -4,6 +4,8 @@
  */
 
 const STORAGE_KEY = 'bagiadil_participants';
+const HISTORY_KEY = 'bagiadil_history';
+const HISTORY_LIMIT = 50;
 
 /**
  * Initialize storage module. No-op currently, but provides a hook for future setup.
@@ -73,5 +75,113 @@ function loadAllNames() {
     return parsed.filter((n) => typeof n === 'string' && n.trim());
   } catch {
     return [];
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Split history
+ * ------------------------------------------------------------------------- */
+
+function generateId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readHistory() {
+  try {
+    const data = localStorage.getItem(HISTORY_KEY);
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHistory(entries) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, HISTORY_LIMIT)));
+  } catch {
+    // localStorage may be unavailable or full - silently fail
+  }
+}
+
+/**
+ * Save a split to history. Updates an existing entry when `entry.id` matches,
+ * otherwise creates a new entry. Returns the entry id.
+ * @param {object} entry - { id?, label, participants, params, items }
+ * @returns {string} the entry id
+ */
+export function saveHistoryEntry(entry) {
+  const entries = readHistory();
+  const now = Date.now();
+  const existingIndex = entry.id ? entries.findIndex((e) => e.id === entry.id) : -1;
+
+  if (existingIndex !== -1) {
+    entries[existingIndex] = {
+      ...entries[existingIndex],
+      ...entry,
+      updatedAt: now,
+    };
+    writeHistory(entries);
+    return entries[existingIndex].id;
+  }
+
+  const id = entry.id || generateId();
+  entries.unshift({ ...entry, id, createdAt: now, updatedAt: now });
+  writeHistory(entries);
+  return id;
+}
+
+/**
+ * Load all history entries, newest-updated first.
+ * @returns {object[]}
+ */
+export function loadHistory() {
+  return readHistory().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+/**
+ * Get a single history entry by id.
+ * @param {string} id
+ * @returns {object|null}
+ */
+export function getHistoryEntry(id) {
+  return readHistory().find((e) => e.id === id) || null;
+}
+
+/**
+ * Delete a history entry by id.
+ * @param {string} id
+ */
+export function deleteHistoryEntry(id) {
+  writeHistory(readHistory().filter((e) => e.id !== id));
+}
+
+/**
+ * Rename a history entry.
+ * @param {string} id
+ * @param {string} label
+ */
+export function renameHistoryEntry(id, label) {
+  const entries = readHistory();
+  const entry = entries.find((e) => e.id === id);
+  if (entry) {
+    entry.label = label;
+    entry.updatedAt = Date.now();
+    writeHistory(entries);
+  }
+}
+
+/**
+ * Remove all history entries.
+ */
+export function clearHistory() {
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // silently fail
   }
 }

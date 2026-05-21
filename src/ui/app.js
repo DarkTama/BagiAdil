@@ -3,7 +3,7 @@
  * Initializes and coordinates all UI components.
  */
 
-import { initParticipants, getParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
+import { initParticipants, getParticipants, setParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
 import { initAddItemForm, updateTranslations as updateAddItemFormTranslations } from './items.js';
 import { initBillParams, getParams, setParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
 import { renderResults } from './results.js';
@@ -20,18 +20,30 @@ import {
   updateTranslations as updateTableTranslations,
   addItems as tableAddItems,
   clearItems as tableClearItems,
+  loadItems as tableLoadItems,
 } from './table-assigner.js';
 import { initExport, updateTranslations as updateExportTranslations } from './export.js';
-import { initStorage, saveParticipants } from './storage.js';
+import { initStorage, saveParticipants, saveHistoryEntry } from './storage.js';
+import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
+import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
 
 let currentResult = null;
 let currentItemsMap = null;
+let currentSnapshot = null;
+let currentHistoryId = null;
 
 /**
  * Initialize the entire app UI.
  */
 export function initApp() {
+  // Shared link: if the URL carries a split snapshot, show a read-only result.
+  const sharedSnapshot = getSharedSnapshot();
+  if (sharedSnapshot) {
+    renderSharedView(sharedSnapshot);
+    return;
+  }
+
   const participantsEl = document.querySelector('#participants .section-content');
   const billParamsEl = document.querySelector('#bill-params .section-content');
   const addItemFormEl = document.querySelector('#add-item-form .section-content');
@@ -78,7 +90,19 @@ export function initApp() {
   // Initialize export
   const exportEl = document.querySelector('#export-section .section-content');
   if (exportEl) {
-    initExport(exportEl, () => currentResult, () => getParams(), () => currentItemsMap);
+    initExport(
+      exportEl,
+      () => currentResult,
+      () => getParams(),
+      () => currentItemsMap,
+      () => currentSnapshot,
+    );
+  }
+
+  // Initialize split history
+  const historyEl = document.querySelector('#history .section-content');
+  if (historyEl) {
+    initHistory(historyEl, { onLoad: loadSplit });
   }
 
   // Wire up calculate button
@@ -123,6 +147,7 @@ function updateAllTranslations() {
   updateUploadTranslations();
   updateExportTranslations();
   updateTableTranslations();
+  updateHistoryTranslations();
 
   // Re-render results if they exist
   if (currentResult) {
@@ -201,6 +226,9 @@ function handleOCRResult(ocrResult) {
 }
 
 function populateFromOCR(data) {
+  // A freshly scanned receipt starts a new split, not an edit of a saved one.
+  currentHistoryId = null;
+
   // Clear existing items before adding OCR items (prevents duplicates on re-confirm)
   tableClearItems();
 
@@ -288,11 +316,119 @@ function handleCalculate(resultsEl) {
   // Save participants
   saveParticipants(participants);
 
+  // Auto-save this split to history. Reusing currentHistoryId means a
+  // reload-then-recalculate updates the same entry instead of duplicating it.
+  currentSnapshot = buildSnapshot(participants, params, state.items);
+  const historyEntry = { ...currentSnapshot };
+  if (currentHistoryId) {
+    historyEntry.id = currentHistoryId;
+  } else {
+    historyEntry.label = defaultHistoryLabel();
+  }
+  currentHistoryId = saveHistoryEntry(historyEntry);
+  refreshHistory();
+
   // Scroll to results
   const resultsSection = document.querySelector('#results');
   if (resultsSection) {
     resultsSection.scrollIntoView({ behavior: 'smooth' });
   }
+}
+
+function defaultHistoryLabel() {
+  return new Date().toLocaleString();
+}
+
+/**
+ * Restore a saved split into the editor and recalculate it.
+ * @param {object} entry - history entry (snapshot + id/label)
+ */
+function loadSplit(entry) {
+  // Restore participants first so the table assigner knows the names.
+  setParticipants(entry.participants || []);
+  tableLoadItems(entry.items || []);
+  setParams(entry.params || { totalDiscount: 0, totalShipping: 0 });
+  currentHistoryId = entry.id || null;
+
+  // Switch to manual mode so the editor is visible.
+  const tabs = document.querySelectorAll('.mode-tab');
+  tabs.forEach((tab) => tab.classList.remove('active'));
+  if (tabs[0]) tabs[0].classList.add('active');
+  const manualSection = document.querySelector('#manual-section');
+  const ocrSection = document.querySelector('#ocr-section');
+  if (manualSection) manualSection.hidden = false;
+  if (ocrSection) ocrSection.hidden = true;
+
+  // Recalculate so the result is shown immediately.
+  const resultsEl = document.querySelector('#results .section-content');
+  handleCalculate(resultsEl);
+}
+
+/**
+ * Read a shared snapshot from the URL hash (#share=...).
+ * @returns {object|null}
+ */
+function getSharedSnapshot() {
+  const match = (location.hash || '').match(/share=([^&]+)/);
+  if (!match) return null;
+  return decodeSnapshot(match[1]);
+}
+
+/**
+ * Render a read-only shared split result, hiding all editor controls.
+ * @param {object} snapshot
+ */
+function renderSharedView(snapshot) {
+  ['.mode-tabs', '#manual-section', '#ocr-section', '#table-assigner',
+    '#calculate', '#calculate-status', '#validation-errors',
+    '#export-section', '#history'].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.hidden = true;
+  });
+
+  initLangToggle();
+
+  const resultsEl = document.querySelector('#results .section-content');
+
+  function renderShared() {
+    resultsEl.innerHTML = '';
+
+    const banner = document.createElement('div');
+    banner.className = 'share-banner';
+    banner.textContent = t('share.banner');
+    resultsEl.appendChild(banner);
+
+    const resultsContainer = document.createElement('div');
+    resultsEl.appendChild(resultsContainer);
+    try {
+      const { result, itemsMap } = computeSplit(snapshot);
+      renderResults(result, resultsContainer, itemsMap);
+    } catch {
+      resultsContainer.textContent = t('share.invalid');
+    }
+
+    const newBtn = document.createElement('button');
+    newBtn.type = 'button';
+    newBtn.className = 'btn btn-primary share-new-btn';
+    newBtn.textContent = t('share.newSplit');
+    newBtn.addEventListener('click', () => {
+      location.hash = '';
+      location.reload();
+    });
+    resultsEl.appendChild(newBtn);
+  }
+
+  document.addEventListener('locale-changed', () => {
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    renderShared();
+  });
+
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  renderShared();
 }
 
 function updateExportVisibility(show) {

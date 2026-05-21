@@ -96,30 +96,34 @@ export function initUpload(containerEl, onComplete) {
     resetUpload();
   });
 
-  function handleFile(file) {
+  function showPdfFallback(file) {
+    previewImage.hidden = true;
+    const pdfPreview = document.createElement('div');
+    pdfPreview.className = 'pdf-preview-info';
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'pdf-icon';
+    iconSpan.textContent = '\u{1F4C4}';
+    pdfPreview.appendChild(iconSpan);
+    const filenameSpan = document.createElement('span');
+    filenameSpan.className = 'pdf-filename';
+    filenameSpan.textContent = file.name;
+    pdfPreview.appendChild(filenameSpan);
+    previewSection.insertBefore(pdfPreview, removeBtn);
+  }
+
+  async function handleFile(file) {
     // Revoke previous object URL to prevent memory leak
     if (currentObjectURL) {
       URL.revokeObjectURL(currentObjectURL);
       currentObjectURL = null;
     }
+    previewSection.querySelector('.pdf-preview-info')?.remove();
 
     if (file.type === 'application/pdf') {
-      previewImage.hidden = true;
-      previewSection.querySelector('.pdf-preview-info')?.remove();
-      const pdfPreview = document.createElement('div');
-      pdfPreview.className = 'pdf-preview-info';
-      const iconSpan = document.createElement('span');
-      iconSpan.className = 'pdf-icon';
-      iconSpan.textContent = '\u{1F4C4}';
-      pdfPreview.appendChild(iconSpan);
-      const filenameSpan = document.createElement('span');
-      filenameSpan.className = 'pdf-filename';
-      filenameSpan.textContent = file.name;
-      pdfPreview.appendChild(filenameSpan);
-      previewSection.insertBefore(pdfPreview, removeBtn);
+      previewImage.hidden = false;
+      previewImage.removeAttribute('src');
     } else {
       previewImage.hidden = false;
-      previewSection.querySelector('.pdf-preview-info')?.remove();
       currentObjectURL = URL.createObjectURL(file);
       previewImage.src = currentObjectURL;
     }
@@ -127,6 +131,21 @@ export function initUpload(containerEl, onComplete) {
     previewSection.hidden = false;
     progressSection.hidden = false;
     processFile(file);
+
+    if (file.type === 'application/pdf') {
+      // Render the first page as a thumbnail preview
+      try {
+        const { renderPDFFirstPage } = await import('../ocr/pdf-engine.js');
+        const dataUrl = await renderPDFFirstPage(file);
+        if (dataUrl) {
+          previewImage.src = dataUrl;
+        } else {
+          showPdfFallback(file);
+        }
+      } catch {
+        showPdfFallback(file);
+      }
+    }
   }
 
   async function processFile(file) {
@@ -180,7 +199,9 @@ export function initUpload(containerEl, onComplete) {
       currentObjectURL = null;
     }
     fileInput.value = '';
-    previewImage.src = '';
+    previewImage.removeAttribute('src');
+    previewImage.hidden = false;
+    previewSection.querySelector('.pdf-preview-info')?.remove();
     zone.hidden = false;
     previewSection.hidden = true;
     progressSection.hidden = true;
