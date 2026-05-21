@@ -1347,6 +1347,17 @@ label {
 }
 
 /* Shared (read-only) split view */
+.share-banner {
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
 .share-new-btn {
   margin-top: var(--space-lg);
   width: 100%;

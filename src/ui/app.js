@@ -348,7 +348,13 @@ function loadSplit(entry) {
   currentHistoryId = entry.id || null;
 
   // Switch to manual mode so the editor is visible.
-  setMode('manual');
+  const tabs = document.querySelectorAll('.mode-tab');
+  tabs.forEach((tab) => tab.classList.remove('active'));
+  if (tabs[0]) tabs[0].classList.add('active');
+  const manualSection = document.querySelector('#manual-section');
+  const ocrSection = document.querySelector('#ocr-section');
+  if (manualSection) manualSection.hidden = false;
+  if (ocrSection) ocrSection.hidden = true;
 
   // Recalculate so the result is shown immediately.
   const resultsEl = document.querySelector('#results .section-content');
@@ -370,16 +376,11 @@ function getSharedSnapshot() {
  * @param {object} snapshot
  */
 function renderSharedView(snapshot) {
-  // Hide every editor control. Use inline display:none rather than the hidden
-  // attribute - .mode-tabs has display:flex, which would override [hidden].
-  // #split-workflow and #results stay visible so the result can render.
-  [
-    '.mode-tabs', '#manual-section', '#ocr-section', '#history',
-    '#table-assigner', '#calculate-status', '#calculate',
-    '#validation-errors', '#export-section',
-  ].forEach((sel) => {
+  ['.mode-tabs', '#manual-section', '#ocr-section', '#table-assigner',
+    '#calculate', '#calculate-status', '#validation-errors',
+    '#export-section', '#history'].forEach((sel) => {
     const el = document.querySelector(sel);
-    if (el) el.style.display = 'none';
+    if (el) el.hidden = true;
   });
 
   initLangToggle();
@@ -388,6 +389,11 @@ function renderSharedView(snapshot) {
 
   function renderShared() {
     resultsEl.innerHTML = '';
+
+    const banner = document.createElement('div');
+    banner.className = 'share-banner';
+    banner.textContent = t('share.banner');
+    resultsEl.appendChild(banner);
 
     const resultsContainer = document.createElement('div');
     resultsEl.appendChild(resultsContainer);
