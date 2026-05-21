@@ -159,25 +159,29 @@ function updateAllTranslations() {
 }
 
 function initModeTabs() {
-  const tabs = document.querySelectorAll('.mode-tab');
-  const manualSection = document.querySelector('#manual-section');
-  const ocrSection = document.querySelector('#ocr-section');
-
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      tabs.forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      const mode = tab.dataset.mode;
-      if (mode === 'manual') {
-        manualSection.hidden = false;
-        ocrSection.hidden = true;
-      } else {
-        manualSection.hidden = true;
-        ocrSection.hidden = false;
-      }
-    });
+  document.querySelectorAll('.mode-tab').forEach((tab) => {
+    tab.addEventListener('click', () => setMode(tab.dataset.mode));
   });
+}
+
+/**
+ * Switch the active tab/mode: 'manual', 'ocr', or 'history'.
+ * The split workflow (table assigner, calculate, results, export) is shown
+ * for manual and ocr, and hidden for history.
+ * @param {string} mode
+ */
+function setMode(mode) {
+  document.querySelectorAll('.mode-tab').forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.mode === mode);
+  });
+  const show = (sel, visible) => {
+    const el = document.querySelector(sel);
+    if (el) el.hidden = !visible;
+  };
+  show('#manual-section', mode === 'manual');
+  show('#ocr-section', mode === 'ocr');
+  show('#history', mode === 'history');
+  show('#split-workflow', mode !== 'history');
 }
 
 function handleTableStateChange(state) {
@@ -238,15 +242,8 @@ function populateFromOCR(data) {
   // Set bill parameters
   setParams({ totalDiscount: data.discount, totalShipping: data.deliveryFee });
 
-  // Hide OCR section, show manual section (so user can see participants/params)
-  const ocrSection = document.querySelector('#ocr-section');
-  const manualSection = document.querySelector('#manual-section');
-  const tabs = document.querySelectorAll('.mode-tab');
-
-  tabs.forEach((t) => t.classList.remove('active'));
-  tabs[0].classList.add('active');
-  manualSection.hidden = false;
-  ocrSection.hidden = true;
+  // Switch to manual mode so the user can see participants/params.
+  setMode('manual');
 }
 
 function handleCalculate(resultsEl) {
@@ -351,13 +348,7 @@ function loadSplit(entry) {
   currentHistoryId = entry.id || null;
 
   // Switch to manual mode so the editor is visible.
-  const tabs = document.querySelectorAll('.mode-tab');
-  tabs.forEach((tab) => tab.classList.remove('active'));
-  if (tabs[0]) tabs[0].classList.add('active');
-  const manualSection = document.querySelector('#manual-section');
-  const ocrSection = document.querySelector('#ocr-section');
-  if (manualSection) manualSection.hidden = false;
-  if (ocrSection) ocrSection.hidden = true;
+  setMode('manual');
 
   // Recalculate so the result is shown immediately.
   const resultsEl = document.querySelector('#results .section-content');
@@ -379,11 +370,16 @@ function getSharedSnapshot() {
  * @param {object} snapshot
  */
 function renderSharedView(snapshot) {
-  ['.mode-tabs', '#manual-section', '#ocr-section', '#table-assigner',
-    '#calculate', '#calculate-status', '#validation-errors',
-    '#export-section', '#history'].forEach((sel) => {
+  // Hide every editor control. Use inline display:none rather than the hidden
+  // attribute - .mode-tabs has display:flex, which would override [hidden].
+  // #split-workflow and #results stay visible so the result can render.
+  [
+    '.mode-tabs', '#manual-section', '#ocr-section', '#history',
+    '#table-assigner', '#calculate-status', '#calculate',
+    '#validation-errors', '#export-section',
+  ].forEach((sel) => {
     const el = document.querySelector(sel);
-    if (el) el.hidden = true;
+    if (el) el.style.display = 'none';
   });
 
   initLangToggle();
@@ -392,11 +388,6 @@ function renderSharedView(snapshot) {
 
   function renderShared() {
     resultsEl.innerHTML = '';
-
-    const banner = document.createElement('div');
-    banner.className = 'share-banner';
-    banner.textContent = t('share.banner');
-    resultsEl.appendChild(banner);
 
     const resultsContainer = document.createElement('div');
     resultsEl.appendChild(resultsContainer);
