@@ -84,14 +84,9 @@ export function computeSplit(snapshot) {
   return { result, itemsMap };
 }
 
-/**
- * Encode a snapshot into a URL-safe base64 string (UTF-8 safe).
- * @param {object} snapshot
- * @returns {string}
- */
-export function encodeSnapshot(snapshot) {
-  const json = JSON.stringify(snapshot);
-  const bytes = new TextEncoder().encode(json);
+/** UTF-8-safe string -> URL-safe base64. */
+function toBase64Url(str) {
+  const bytes = new TextEncoder().encode(str);
   let binary = '';
   bytes.forEach((b) => {
     binary += String.fromCharCode(b);
@@ -99,24 +94,78 @@ export function encodeSnapshot(snapshot) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** URL-safe base64 -> UTF-8 string. */
+function fromBase64Url(str) {
+  let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  const binary = atob(b64);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 /**
- * Decode a URL-safe base64 string back into a snapshot.
+ * Encode a snapshot into a compact URL-safe string.
+ * Uses a positional-array form with assignment persons referenced by index
+ * into the participants list, so names are not repeated per assignment:
+ *   [ participants, totalDiscount, totalShipping,
+ *     [ [name, unitPrice, totalQty, [ [personIdx, qty], ... ]], ... ] ]
+ * @param {object} snapshot
+ * @returns {string}
+ */
+export function encodeSnapshot(snapshot) {
+  const persons = [...(snapshot.participants || [])];
+  const personIndex = (name) => {
+    let i = persons.indexOf(name);
+    if (i === -1) {
+      persons.push(name);
+      i = persons.length - 1;
+    }
+    return i;
+  };
+  const items = (snapshot.items || []).map((item) => [
+    item.name,
+    item.unitPrice,
+    item.totalQty,
+    (item.assignments || []).map((a) => [personIndex(a.person), a.qty]),
+  ]);
+  const params = snapshot.params || {};
+  const compact = [
+    persons,
+    params.totalDiscount || 0,
+    params.totalShipping || 0,
+    items,
+  ];
+  return toBase64Url(JSON.stringify(compact));
+}
+
+/**
+ * Decode a compact share string back into a snapshot.
  * @param {string} str
  * @returns {object|null} snapshot, or null if malformed
  */
 export function decodeSnapshot(str) {
   try {
     if (!str) return null;
-    let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    const binary = atob(b64);
-    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-    const json = new TextDecoder().decode(bytes);
-    const parsed = JSON.parse(json);
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.items)) {
-      return null;
-    }
-    return parsed;
+    const compact = JSON.parse(fromBase64Url(str));
+    if (!Array.isArray(compact) || compact.length < 4) return null;
+    const [persons, totalDiscount, totalShipping, items] = compact;
+    if (!Array.isArray(persons) || !Array.isArray(items)) return null;
+    return {
+      participants: persons,
+      params: {
+        totalDiscount: totalDiscount || 0,
+        totalShipping: totalShipping || 0,
+      },
+      items: items.map((item) => ({
+        name: item[0],
+        unitPrice: item[1],
+        totalQty: item[2],
+        assignments: (item[3] || []).map((a) => ({
+          person: persons[a[0]],
+          qty: a[1],
+        })),
+      })),
+    };
   } catch {
     return null;
   }
