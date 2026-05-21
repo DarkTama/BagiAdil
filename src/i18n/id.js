@@ -5,6 +5,7 @@ const id = {
   'header.subtitle': 'Bagi tagihan secara adil dan akurat',
   'tab.manual': 'Input Manual',
   'tab.scan': 'Scan Struk',
+  'tab.history': 'Riwayat',
   'section.participants': 'Peserta',
   'section.items': 'Item Makanan',
   'section.discountShipping': 'Diskon & Ongkir',

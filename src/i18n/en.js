@@ -5,6 +5,7 @@ const en = {
   'header.subtitle': 'Split bills fairly and accurately',
   'tab.manual': 'Manual Entry',
   'tab.scan': 'Scan Receipt',
+  'tab.history': 'History',
   'section.participants': 'Participants',
   'section.items': 'Food Items',
   'section.discountShipping': 'Discount & Shipping',

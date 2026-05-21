@@ -25,6 +25,7 @@
       <div class="mode-tabs">
         <button type="button" class="mode-tab active" data-mode="manual" data-i18n="tab.manual">Input Manual</button>
         <button type="button" class="mode-tab" data-mode="ocr" data-i18n="tab.scan">Scan Struk</button>
+        <button type="button" class="mode-tab" data-mode="history" data-i18n="tab.history">Riwayat</button>
       </div>
 
       <div id="ocr-section" class="mode-section" hidden>
@@ -56,22 +57,22 @@
         </section>
       </div>
 
-      <section id="table-assigner">
+      <section id="history" class="mode-section" hidden>
         <div class="section-content"></div>
       </section>
 
-      <div id="calculate-status"></div>
+      <div id="split-workflow">
+        <section id="table-assigner">
+          <div class="section-content"></div>
+        </section>
 
-      <button id="calculate" class="btn btn-primary btn-calculate" type="button" data-i18n="btn.calculate" disabled>
-        Hitung Pembagian
-      </button>
+        <div id="calculate-status"></div>
 
-      <div id="validation-errors"></div>
+        <button id="calculate" class="btn btn-primary btn-calculate" type="button" data-i18n="btn.calculate" disabled>
+          Hitung Pembagian
+        </button>
 
-      <section id="results">
-        <h2 data-i18n="section.results">Hasil</h2>
-        <div class="section-content"></div>
-      </section>
+        <div id="validation-errors"></div>
 
       <section id="export-section" hidden>
         <h2 data-i18n="export.title">Ekspor</h2>
