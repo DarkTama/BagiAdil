@@ -4,11 +4,13 @@
 
 import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
+import { encodeSnapshot } from './snapshot.js';
 
 let containerEl = null;
 let getResultsFn = null;
 let getParamsFn = null;
 let getItemsMapFn = null;
+let getSnapshotFn = null;
 
 /**
  * Initialize the export component.
@@ -16,12 +18,14 @@ let getItemsMapFn = null;
  * @param {function} resultsFn - Function that returns current results object
  * @param {function} [paramsFn] - Function that returns current params
  * @param {function} [itemsMapFn] - Function that returns current items map
+ * @param {function} [snapshotFn] - Function that returns the current split snapshot
  */
-export function initExport(el, resultsFn, paramsFn, itemsMapFn) {
+export function initExport(el, resultsFn, paramsFn, itemsMapFn, snapshotFn) {
   containerEl = el;
   getResultsFn = resultsFn;
   getParamsFn = paramsFn || null;
   getItemsMapFn = itemsMapFn || null;
+  getSnapshotFn = snapshotFn || null;
   render();
 }
 
@@ -47,7 +51,30 @@ function render() {
   waBtn.addEventListener('click', handleWhatsAppCopy);
   wrapper.appendChild(waBtn);
 
+  // Share link button
+  const shareBtn = document.createElement('button');
+  shareBtn.type = 'button';
+  shareBtn.className = 'btn btn-primary export-btn export-share-btn';
+  shareBtn.innerHTML = `\u{1F517} ${t('export.shareLink')}`;
+  shareBtn.addEventListener('click', handleShareLink);
+  wrapper.appendChild(shareBtn);
+
   containerEl.appendChild(wrapper);
+}
+
+async function handleShareLink() {
+  const snapshot = getSnapshotFn ? getSnapshotFn() : null;
+  if (!snapshot) return;
+
+  const url = `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
+  const btn = containerEl.querySelector('.export-share-btn');
+
+  try {
+    await navigator.clipboard.writeText(url);
+    showCopySuccess(btn);
+  } catch {
+    fallbackCopy(url, btn);
+  }
 }
 
 async function handlePdfExport() {
@@ -65,9 +92,9 @@ async function handlePdfExport() {
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
 
-    // Create temporary light-themed container for PDF
+    // Create temporary light-themed container for PDF.
     const pdfContainer = document.createElement('div');
-    pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:210mm;z-index:-1;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
+    pdfContainer.style.cssText = 'position:absolute;top:0;left:0;width:210mm;z-index:-1;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
 
     // Title and date
     const header = document.createElement('div');
@@ -117,11 +144,23 @@ async function handlePdfExport() {
     // Allow browser to render the container before capturing
     await new Promise(resolve => setTimeout(resolve, 300));
 
+    // html2canvas mis-measures an off-screen (absolute/fixed) element as
+    // zero-height, which produces a blank PDF. Pass the container's real
+    // rendered dimensions explicitly so the full content is captured.
+    const captureWidth = pdfContainer.scrollWidth;
+    const captureHeight = pdfContainer.scrollHeight;
+
     const opt = {
       margin: [10, 10, 10, 10],
       filename: `BagiAdil-${dateStr}.pdf`,
       image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2 },
+      html2canvas: {
+        scale: 2,
+        width: captureWidth,
+        height: captureHeight,
+        windowWidth: captureWidth,
+        windowHeight: captureHeight,
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     };
 
@@ -188,6 +227,8 @@ export function updateTranslations() {
   if (pdfBtn) pdfBtn.innerHTML = `\u{1F4C4} ${t('export.pdf')}`;
   const waBtn = containerEl.querySelector('.export-wa-btn');
   if (waBtn) waBtn.innerHTML = `\u{1F4CB} ${t('export.whatsapp')}`;
+  const shareBtn = containerEl.querySelector('.export-share-btn');
+  if (shareBtn) shareBtn.innerHTML = `\u{1F517} ${t('export.shareLink')}`;
 }
 
 /**

@@ -30,6 +30,7 @@ const id = {
   'export.title': 'Ekspor',
   'export.pdf': 'Unduh PDF',
   'export.whatsapp': 'Salin untuk WhatsApp',
+  'export.shareLink': 'Salin Tautan Bagikan',
   'privacy.text':
     'Semua perhitungan dilakukan di browser Anda. Tidak ada data yang dikirim ke server manapun.',
   'label.item': 'Item',
@@ -77,6 +78,18 @@ const id = {
   'table.itemName': 'Nama item',
   'table.itemCount': '{n} item tersisa',
   'table.addItemsHint': 'Tambahkan item untuk memulai',
+  'history.title': 'Riwayat',
+  'history.empty': 'Belum ada pembagian tersimpan. Pembagian akan otomatis tersimpan saat Anda menekan Hitung.',
+  'history.load': 'Buka',
+  'history.delete': 'Hapus',
+  'history.rename': 'Ganti nama',
+  'history.share': 'Bagikan',
+  'history.peopleCount': '{n} orang',
+  'history.deleteConfirm': 'Hapus pembagian ini dari riwayat?',
+  'share.banner': 'Hasil pembagian yang dibagikan',
+  'share.newSplit': 'Buat Pembagian Baru',
+  'share.linkCopied': 'Tautan disalin!',
+  'share.invalid': 'Tautan pembagian tidak valid.',
 };
 
 export default id;

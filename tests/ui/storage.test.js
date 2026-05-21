@@ -6,6 +6,12 @@ import {
   loadParticipants,
   getSuggestions,
   clearStorage,
+  saveHistoryEntry,
+  loadHistory,
+  getHistoryEntry,
+  deleteHistoryEntry,
+  renameHistoryEntry,
+  clearHistory,
 } from '../../src/ui/storage.js';
 
 describe('Storage - localStorage integration', () => {
@@ -84,6 +90,79 @@ describe('Storage - localStorage integration', () => {
 
       clearStorage();
       expect(loadParticipants()).toEqual([]);
+    });
+  });
+
+  describe('split history', () => {
+    const sampleSnapshot = () => ({
+      label: 'Lunch',
+      participants: ['Alice', 'Bob'],
+      params: { totalDiscount: 5000, totalShipping: 10000 },
+      items: [
+        { name: 'Nasi', unitPrice: 20000, totalQty: 1, assignments: [{ person: 'Alice', qty: 1 }] },
+      ],
+    });
+
+    it('should create a new entry and return its id', () => {
+      const id = saveHistoryEntry(sampleSnapshot());
+      expect(typeof id).toBe('string');
+
+      const history = loadHistory();
+      expect(history.length).toBe(1);
+      expect(history[0].id).toBe(id);
+      expect(history[0].label).toBe('Lunch');
+      expect(history[0].createdAt).toBeTypeOf('number');
+    });
+
+    it('should update an existing entry instead of duplicating', () => {
+      const id = saveHistoryEntry(sampleSnapshot());
+
+      const updated = sampleSnapshot();
+      updated.id = id;
+      updated.params.totalShipping = 15000;
+      saveHistoryEntry(updated);
+
+      const history = loadHistory();
+      expect(history.length).toBe(1);
+      expect(history[0].params.totalShipping).toBe(15000);
+    });
+
+    it('should retrieve a single entry by id', () => {
+      const id = saveHistoryEntry(sampleSnapshot());
+      const entry = getHistoryEntry(id);
+      expect(entry).not.toBeNull();
+      expect(entry.id).toBe(id);
+      expect(getHistoryEntry('does-not-exist')).toBeNull();
+    });
+
+    it('should delete an entry by id', () => {
+      const id = saveHistoryEntry(sampleSnapshot());
+      saveHistoryEntry(sampleSnapshot());
+      expect(loadHistory().length).toBe(2);
+
+      deleteHistoryEntry(id);
+      const history = loadHistory();
+      expect(history.length).toBe(1);
+      expect(history.some((e) => e.id === id)).toBe(false);
+    });
+
+    it('should rename an entry', () => {
+      const id = saveHistoryEntry(sampleSnapshot());
+      renameHistoryEntry(id, 'Dinner');
+      expect(getHistoryEntry(id).label).toBe('Dinner');
+    });
+
+    it('should clear all history', () => {
+      saveHistoryEntry(sampleSnapshot());
+      saveHistoryEntry(sampleSnapshot());
+      expect(loadHistory().length).toBe(2);
+
+      clearHistory();
+      expect(loadHistory()).toEqual([]);
+    });
+
+    it('should return an empty array when no history exists', () => {
+      expect(loadHistory()).toEqual([]);
     });
   });
 });

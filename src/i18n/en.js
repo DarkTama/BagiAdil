@@ -30,6 +30,7 @@ const en = {
   'export.title': 'Export',
   'export.pdf': 'Download PDF',
   'export.whatsapp': 'Copy for WhatsApp',
+  'export.shareLink': 'Copy Share Link',
   'privacy.text':
     'All calculations are done in your browser. No data is sent to any server.',
   'label.item': 'Item',
@@ -77,6 +78,18 @@ const en = {
   'table.itemName': 'Item name',
   'table.itemCount': '{n} items remaining',
   'table.addItemsHint': 'Add items to get started',
+  'history.title': 'History',
+  'history.empty': 'No saved splits yet. Splits are saved automatically when you press Calculate.',
+  'history.load': 'Open',
+  'history.delete': 'Delete',
+  'history.rename': 'Rename',
+  'history.share': 'Share',
+  'history.peopleCount': '{n} people',
+  'history.deleteConfirm': 'Delete this split from history?',
+  'share.banner': 'Shared split result',
+  'share.newSplit': 'Create New Split',
+  'share.linkCopied': 'Link copied!',
+  'share.invalid': 'Invalid share link.',
 };
 
 export default en;

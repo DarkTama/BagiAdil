@@ -58,6 +58,10 @@ export function parseGoFoodReceipt(text) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    // Stop at the payment-summary / Faktur boundary. The GoFood "Faktur" page
+    // re-lists delivery fees and would otherwise be double-counted.
+    if (/^total\s*pembayaran/i.test(line) || /^faktur\b/i.test(line)) break;
+
     // Check for subtotal (Total harga, Subtotal)
     if (/^(total\s*harga|subtotal)/i.test(line)) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
@@ -80,8 +84,13 @@ export function parseGoFoodReceipt(text) {
       continue;
     }
 
-    // Check for delivery/service fees - accumulate ALL "Biaya" lines
-    if (/biaya/i.test(line) && !/total/i.test(line) && !/pembayaran/i.test(line)) {
+    // Check for delivery/service fees - accumulate "Biaya" lines (not totals or discounts)
+    if (
+      /biaya/i.test(line) &&
+      !/total/i.test(line) &&
+      !/pembayaran/i.test(line) &&
+      !/diskon/i.test(line)
+    ) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         deliveryFee += parsePrice(priceMatch[1]);

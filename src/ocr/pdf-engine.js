@@ -95,3 +95,39 @@ export async function processPDF(file, onProgress) {
     return { error: err.message || 'Failed to process PDF' };
   }
 }
+
+/**
+ * Render the first page of a PDF to a PNG data URL for use as a preview thumbnail.
+ * @param {File} file - PDF file to render
+ * @param {number} [maxWidth=320] - Maximum width of the rendered thumbnail in px
+ * @returns {Promise<string|null>} data URL, or null if rendering fails
+ */
+export async function renderPDFFirstPage(file, maxWidth = 320) {
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url,
+    ).href;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(maxWidth / baseViewport.width, 2);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext('2d');
+
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
+}

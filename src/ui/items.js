@@ -4,6 +4,7 @@
  */
 
 import { t } from '../i18n/index.js';
+import { attachCurrencyInput, getCurrencyValue } from './currency-input.js';
 
 let containerEl = null;
 let onAddItemCallback = null;
@@ -63,10 +64,9 @@ function render() {
 
   // Unit price input
   const priceInput = document.createElement('input');
-  priceInput.type = 'number';
   priceInput.className = 'add-item-price';
-  priceInput.placeholder = '0';
-  priceInput.min = '0';
+  priceInput.placeholder = 'Rp 0';
+  attachCurrencyInput(priceInput);
   form.appendChild(priceInput);
 
   // Quantity input
@@ -100,7 +100,7 @@ function render() {
 
 function handleSubmit(nameInput, priceInput, qtyInput) {
   const name = nameInput.value.trim();
-  const unitPrice = Number(priceInput.value) || 0;
+  const unitPrice = getCurrencyValue(priceInput);
   const qty = parseInt(qtyInput.value, 10) || 1;
 
   // Validate

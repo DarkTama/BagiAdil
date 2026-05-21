@@ -260,6 +260,30 @@ Diskon  -Rp42.400`;
     // "Total biaya..." should NOT be counted - only the individual Biaya lines
     expect(result.deliveryFee).toBe(19500);
   });
+
+  it('ignores fees re-listed on the GoFood Faktur page', () => {
+    // A multi-page GoFood PDF: page 1 main receipt, then a "Faktur" page that
+    // re-lists the delivery fee and a fee discount. Only page 1 fees count.
+    const text = `gofood
+4  L Original Pot Besar  @Rp20.300  Rp81.200
+4  Original Pot Kecil  @Rp16.100  Rp64.400
+Total harga  Rp145.600
+Biaya penanganan dan pengiriman  Rp15.500
+Biaya lainnya  Rp4.000
+Diskon  -Rp42.400
+Total pembayaran  Rp122.700
+Bayar pakai GoPay Later  Rp122.700
+Faktur
+Semua jumlah sudah termasuk PPN
+Biaya penanganan dan pengiriman  Rp15.500
+Diskon biaya penanganan dan pengiriman  -Rp15.400
+Total biaya penanganan dan pengiriman  Rp100`;
+
+    const result = parseGoFoodReceipt(text);
+    expect(result.deliveryFee).toBe(19500); // 15500 + 4000, faktur page excluded
+    expect(result.discount).toBe(42400);
+    expect(result.subtotal).toBe(145600);
+  });
 });
 
 describe('GrabFood receipt parser', () => {

@@ -30,6 +30,18 @@ export function getParticipants() {
   return [...participants];
 }
 
+/**
+ * Replace the participant list (used when loading a saved split).
+ * @param {string[]} names
+ */
+export function setParticipants(names) {
+  participants = Array.isArray(names) ? [...names] : [];
+  render();
+  if (onChangeCallback) {
+    onChangeCallback(getParticipants());
+  }
+}
+
 function render() {
   containerEl.innerHTML = '';
 

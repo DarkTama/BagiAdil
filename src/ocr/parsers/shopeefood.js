@@ -75,8 +75,8 @@ export function parseShopeeReceipt(text) {
       continue;
     }
 
-    // Check for delivery/service fees - accumulate ALL "Biaya" lines
-    if (/biaya/i.test(line)) {
+    // Check for delivery/service fees - accumulate "Biaya" lines (not totals)
+    if (/biaya/i.test(line) && !/total/i.test(line)) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         deliveryFee += parsePrice(priceMatch[1]);
