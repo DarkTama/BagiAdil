@@ -14,11 +14,13 @@ BagiAdil is a client-side web application built with Vanilla JavaScript. Its pri
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Receipt Parsing (OCR) | Upload screenshots or PDFs of receipts to automatically extract food items, quantities, and prices. | Planned |
-| Interactive Assignment | Drag-and-drop or dropdown UI to assign extracted items to specific participants. | Planned |
-| Proportional Math Engine | Calculates discounts proportionally based on the individual's subtotal relative to the whole order. | Planned |
-| Intelligent Rounding | Rounds each person's final total to the nearest hundred Rupiah, ensuring the sum of all rounded payments exactly matches the total bill. | Planned |
-| Automated Receipt Generation | Exports a clean, finalized receipt (HTML/PDF) showing what everyone owes. | Planned |
+| Receipt Parsing (OCR) | Upload screenshots or PDFs of receipts to automatically extract food items, quantities, and prices. | ✅ Done |
+| Interactive Assignment | Drag-and-drop or dropdown UI to assign extracted items to specific participants. | ✅ Done |
+| Proportional Math Engine | Calculates discounts proportionally based on the individual's subtotal relative to the whole order. | ✅ Done |
+| Intelligent Rounding | Rounds each person's final total to the nearest hundred Rupiah, ensuring the sum of all rounded payments exactly matches the total bill. | ✅ Done |
+| Automated Receipt Generation | Exports a clean, finalized receipt (HTML/PDF) showing what everyone owes. | ✅ Done |
+
+All five core features are implemented and tested. **Shipped beyond the original plan:** receipt OCR for GoFood / ShopeeFood / GrabFood, PDF receipt support with first-page preview, editable local split history (with stored receipt images), shareable read-only result links, IDR-formatted currency inputs, bilingual UI (Indonesian / English), and PWA support. CI runs lint, HTML validation, tests, and build on every pull request.
 
 ---
 
@@ -39,45 +41,45 @@ BagiAdil is a client-side web application built with Vanilla JavaScript. Its pri
 ## 4. Execution Phases & Progress
 
 ### Phase 0: Project Setup & Tooling
-- [ ] Define folder structure (`src/`, `src/engine/`, `src/ocr/`, `src/ui/`, `assets/`, `tests/`)
-- [ ] Initialize project with Vite
-- [ ] Configure ESLint + Prettier
-- [ ] Set up basic HTML shell with mobile-first responsive layout
-- [ ] Add PWA manifest for offline use and "Add to Home Screen"
+- [x] Define folder structure (`src/`, `src/engine/`, `src/ocr/`, `src/ui/`, `assets/`, `tests/`)
+- [x] Initialize project with Vite
+- [x] Configure ESLint + Prettier
+- [x] Set up basic HTML shell with mobile-first responsive layout
+- [x] Add PWA manifest for offline use and "Add to Home Screen"
 
 ### Phase 1: Core Engine & Manual UI (The Foundation)
-- [ ] Build basic UI structure (participant lists, manual entry fields)
-- [ ] Implement decimal.js for exact financial calculations
-- [ ] Implement Step A: Calculate Base Totals
-- [ ] Implement Step B: Distribute Discount Proportionally
-- [ ] Implement Step C: Distribute Shipping Evenly
-- [ ] Implement Step D: Calculate Pre-Rounding Payments
-- [ ] Implement Step E: Rounding to Nearest Hundred
-- [ ] Implement Step F: Reconcile Rounding Differences
-- [ ] Input validation (no negative prices, no empty names)
-- [ ] Test against historical manual data to verify parity with the Python script
+- [x] Build basic UI structure (participant lists, manual entry fields)
+- [x] Implement decimal.js for exact financial calculations
+- [x] Implement Step A: Calculate Base Totals
+- [x] Implement Step B: Distribute Discount Proportionally
+- [x] Implement Step C: Distribute Shipping Evenly
+- [x] Implement Step D: Calculate Pre-Rounding Payments
+- [x] Implement Step E: Rounding to Nearest Hundred
+- [x] Implement Step F: Reconcile Rounding Differences
+- [x] Input validation (no negative prices, no empty names)
+- [x] Test against historical manual data to verify parity with the Python script
 
 ### Phase 2: OCR & Data Extraction
-- [ ] Integrate Tesseract.js
-- [ ] Develop Regex patterns for GoFood receipts
-- [ ] Develop Regex patterns for ShopeeFood receipts
-- [ ] Develop Regex patterns for GrabFood receipts
-- [ ] Implement OCR confidence scoring (flag uncertain items for manual review)
-- [ ] Error handling for blurry images or unrecognized text
+- [x] Integrate Tesseract.js
+- [x] Develop Regex patterns for GoFood receipts
+- [x] Develop Regex patterns for ShopeeFood receipts
+- [x] Develop Regex patterns for GrabFood receipts
+- [x] Implement OCR confidence scoring (flag uncertain items for manual review)
+- [x] Error handling for blurry images or unrecognized text
 
 ### Phase 3: The Interactive Assigner UI
-- [ ] Create dynamic list of extracted food items
-- [ ] Build UI to add/manage "Participants"
-- [ ] Allow users to assign items to participants (tap-to-assign + drag-and-drop)
-- [ ] Implement real-time recalculations as items are assigned
-- [ ] Mobile touch-friendly interactions
+- [x] Create dynamic list of extracted food items
+- [x] Build UI to add/manage "Participants"
+- [x] Allow users to assign items to participants (tap-to-assign + drag-and-drop)
+- [x] Implement real-time recalculations as items are assigned
+- [x] Mobile touch-friendly interactions
 
 ### Phase 4: Export, Polish, & Quality of Life
-- [ ] Implement html2pdf.js for PDF export
-- [ ] WhatsApp-friendly text summary (copy to clipboard)
-- [ ] Add localStorage to remember frequent participants
-- [ ] Privacy badge/note (all processing is client-side)
-- [ ] Final UI polish and responsive testing
+- [x] Implement html2pdf.js for PDF export
+- [x] WhatsApp-friendly text summary (copy to clipboard)
+- [x] Add localStorage to remember frequent participants
+- [x] Privacy badge/note (all processing is client-side)
+- [x] Final UI polish and responsive testing
 
 ---
 
@@ -141,8 +143,11 @@ Round their total to the nearest hundred again
 |-------------|-------|----------|
 | Payment Integrations (QRIS, GoPay, DANA, BCA) | Requires backend/server component | Low |
 | Multi-Receipt Merging | Support uploading multiple screenshots for a single large order | Medium |
-| Dark Mode | UI theme toggle | Low |
-| Receipt History | Store past splits in localStorage/IndexedDB | Medium |
+| In-place item editing | Edit an item's name/price after it is added | Medium |
+| PPN / tax line | Itemise tax separately from discount and shipping | Medium |
+| QR code for share links | Scannable code for the read-only result link | Low |
+
+> Receipt History shipped — see the Core Features note above.
 
 ---
 
@@ -164,4 +169,4 @@ Round their total to the nearest hundred again
 
 ---
 
-*Last Updated: May 19, 2025*
+*Last Updated: May 21, 2026*

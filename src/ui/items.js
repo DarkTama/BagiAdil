@@ -32,22 +32,6 @@ export function updateTranslations() {
   if (addBtn) addBtn.textContent = '+ ' + t('table.addItem');
 }
 
-// Backward-compatible stubs for old API
-export function initItems(el) {
-  containerEl = el;
-  render();
-}
-
-export function getItems() {
-  return [];
-}
-
-export function setItems() {}
-
-export function addItemsFromOCR() {}
-
-export function updateParticipantOptions() {}
-
 function render() {
   if (!containerEl) return;
   containerEl.innerHTML = '';

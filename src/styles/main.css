@@ -1346,6 +1346,21 @@ label {
   font-size: var(--font-size-sm);
 }
 
+.history-receipt {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: var(--space-xs);
+}
+
+.history-receipt-thumb {
+  display: block;
+  max-width: 96px;
+  max-height: 128px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  object-fit: cover;
+}
+
 /* Shared (read-only) split view */
 .share-new-btn {
   margin-top: var(--space-lg);

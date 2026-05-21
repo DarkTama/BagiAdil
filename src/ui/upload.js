@@ -111,7 +111,7 @@ export function initUpload(containerEl, onComplete) {
     previewSection.insertBefore(pdfPreview, removeBtn);
   }
 
-  async function handleFile(file) {
+  function handleFile(file) {
     // Revoke previous object URL to prevent memory leak
     if (currentObjectURL) {
       URL.revokeObjectURL(currentObjectURL);
@@ -119,11 +119,9 @@ export function initUpload(containerEl, onComplete) {
     }
     previewSection.querySelector('.pdf-preview-info')?.remove();
 
-    if (file.type === 'application/pdf') {
-      previewImage.hidden = false;
-      previewImage.removeAttribute('src');
-    } else {
-      previewImage.hidden = false;
+    previewImage.hidden = false;
+    previewImage.removeAttribute('src');
+    if (file.type !== 'application/pdf') {
       currentObjectURL = URL.createObjectURL(file);
       previewImage.src = currentObjectURL;
     }
@@ -131,20 +129,14 @@ export function initUpload(containerEl, onComplete) {
     previewSection.hidden = false;
     progressSection.hidden = false;
     processFile(file);
+  }
 
-    if (file.type === 'application/pdf') {
-      // Render the first page as a thumbnail preview
-      try {
-        const { renderPDFFirstPage } = await import('../ocr/pdf-engine.js');
-        const dataUrl = await renderPDFFirstPage(file);
-        if (dataUrl) {
-          previewImage.src = dataUrl;
-        } else {
-          showPdfFallback(file);
-        }
-      } catch {
-        showPdfFallback(file);
-      }
+  async function dataUrlToBlob(dataUrl) {
+    try {
+      const res = await fetch(dataUrl);
+      return await res.blob();
+    } catch {
+      return null;
     }
   }
 
@@ -152,21 +144,44 @@ export function initUpload(containerEl, onComplete) {
     progressStatus.textContent = 'Initializing...';
     progressBar.style.width = '0%';
 
+    const onProgress = (info) => {
+      progressStatus.textContent = info.status || 'Processing...';
+      progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
+    };
+
+    // Receipt image saved alongside the split in history.
+    let receiptBlob = null;
+
     try {
       let result;
 
       if (file.type === 'application/pdf') {
+        // Render the first page once - used for both the preview and the
+        // receipt image stored with the split.
+        try {
+          const { renderPDFFirstPage } = await import('../ocr/pdf-engine.js');
+          const dataUrl = await renderPDFFirstPage(file, 1000);
+          if (dataUrl) {
+            previewImage.src = dataUrl;
+            receiptBlob = await dataUrlToBlob(dataUrl);
+          } else {
+            showPdfFallback(file);
+          }
+        } catch {
+          showPdfFallback(file);
+        }
+
         const { processPDF } = await import('../ocr/pdf-engine.js');
-        result = await processPDF(file, (info) => {
-          progressStatus.textContent = info.status || 'Processing...';
-          progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
-        });
+        result = await processPDF(file, onProgress);
       } else {
+        // Downscale large photos: faster OCR, smaller stored receipt.
+        progressStatus.textContent = t('upload.optimizing');
+        const { compressImage } = await import('../ocr/image-compress.js');
+        const source = await compressImage(file);
+        receiptBlob = source;
+
         const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
-        result = await processImage(file, (info) => {
-          progressStatus.textContent = info.status || 'Processing...';
-          progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
-        });
+        result = await processImage(source, onProgress);
 
         // Terminate the worker after processing to free resources
         await terminateOCR();
@@ -176,7 +191,7 @@ export function initUpload(containerEl, onComplete) {
       progressStatus.textContent = 'Complete!';
 
       if (onComplete) {
-        onComplete(result);
+        onComplete({ ...result, receiptBlob });
       }
     } catch (err) {
       progressStatus.textContent = 'Error: ' + (err.message || 'Processing failed');

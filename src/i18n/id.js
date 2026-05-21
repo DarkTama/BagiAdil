@@ -2,7 +2,7 @@
  * Indonesian translations (default language).
  */
 const id = {
-  'header.subtitle': 'Bagi tagihan secara adil dan akurat',
+  'header.subtitle': 'Bagi tagihan GoFood & ShopeeFood secara adil & otomatis',
   'tab.manual': 'Input Manual',
   'tab.scan': 'Scan Struk',
   'tab.history': 'Riwayat',
@@ -14,6 +14,7 @@ const id = {
   'btn.assignItems': 'Tetapkan Item ke Peserta',
   'upload.dragDrop': 'Seret & lepas gambar struk di sini',
   'upload.chooseImage': 'Pilih Gambar',
+  'upload.optimizing': 'Mengompres gambar...',
   'ocr.scanResults': 'Hasil Scan',
   'ocr.detectedItems': 'Item Terdeteksi',
   'ocr.confirmUse': 'Konfirmasi & Gunakan',
@@ -86,6 +87,7 @@ const id = {
   'history.share': 'Bagikan',
   'history.peopleCount': '{n} orang',
   'history.deleteConfirm': 'Hapus pembagian ini dari riwayat?',
+  'history.viewReceipt': 'Lihat struk',
   'share.newSplit': 'Buat Pembagian Baru',
   'share.linkCopied': 'Tautan disalin!',
   'share.invalid': 'Tautan pembagian tidak valid.',

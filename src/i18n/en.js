@@ -2,7 +2,7 @@
  * English translations.
  */
 const en = {
-  'header.subtitle': 'Split bills fairly and accurately',
+  'header.subtitle': 'Fairly & automatically split your GoFood & ShopeeFood delivery bills',
   'tab.manual': 'Manual Entry',
   'tab.scan': 'Scan Receipt',
   'tab.history': 'History',
@@ -14,6 +14,7 @@ const en = {
   'btn.assignItems': 'Assign Items to Participants',
   'upload.dragDrop': 'Drag & drop receipt image here',
   'upload.chooseImage': 'Choose Image',
+  'upload.optimizing': 'Optimizing image...',
   'ocr.scanResults': 'Scan Results',
   'ocr.detectedItems': 'Detected Items',
   'ocr.confirmUse': 'Confirm & Use',
@@ -86,6 +87,7 @@ const en = {
   'history.share': 'Share',
   'history.peopleCount': '{n} people',
   'history.deleteConfirm': 'Delete this split from history?',
+  'history.viewReceipt': 'View receipt',
   'share.newSplit': 'Create New Split',
   'share.linkCopied': 'Link copied!',
   'share.invalid': 'Invalid share link.',

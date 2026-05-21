@@ -23,8 +23,9 @@ import {
   loadItems as tableLoadItems,
 } from './table-assigner.js';
 import { initExport, updateTranslations as updateExportTranslations } from './export.js';
-import { initStorage, saveParticipants, saveHistoryEntry } from './storage.js';
+import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './storage.js';
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
+import { putReceipt, pruneReceipts } from './image-store.js';
 import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
 
@@ -32,6 +33,10 @@ let currentResult = null;
 let currentItemsMap = null;
 let currentSnapshot = null;
 let currentHistoryId = null;
+// Receipt image of the most recent scan, awaiting a confirmed populate.
+let pendingReceiptBlob = null;
+// Receipt image to attach to the next saved split (set once a scan is used).
+let currentReceiptBlob = null;
 
 /**
  * Initialize the entire app UI.
@@ -220,6 +225,9 @@ function handleOCRResult(ocrResult) {
     return;
   }
 
+  // Hold the receipt image until the user confirms and populates the split.
+  pendingReceiptBlob = ocrResult.receiptBlob || null;
+
   const parsedData = parseReceipt(ocrResult.text);
   const confidence = scoreConfidence(ocrResult.confidence, parsedData);
 
@@ -232,6 +240,7 @@ function handleOCRResult(ocrResult) {
 function populateFromOCR(data) {
   // A freshly scanned receipt starts a new split, not an edit of a saved one.
   currentHistoryId = null;
+  currentReceiptBlob = pendingReceiptBlob;
 
   // Clear existing items before adding OCR items (prevents duplicates on re-confirm)
   tableClearItems();
@@ -323,6 +332,14 @@ function handleCalculate(resultsEl) {
     historyEntry.label = defaultHistoryLabel();
   }
   currentHistoryId = saveHistoryEntry(historyEntry);
+
+  // Attach the scanned receipt image to this split. Consumed once, so a later
+  // recalculation of the same entry keeps the receipt instead of clearing it.
+  if (currentReceiptBlob) {
+    putReceipt(currentHistoryId, currentReceiptBlob);
+    currentReceiptBlob = null;
+  }
+  pruneReceipts(loadHistory().map((e) => e.id));
   refreshHistory();
 
   // Scroll to results
@@ -346,6 +363,8 @@ function loadSplit(entry) {
   tableLoadItems(entry.items || []);
   setParams(entry.params || { totalDiscount: 0, totalShipping: 0 });
   currentHistoryId = entry.id || null;
+  // Loading a saved split is not a new scan - keep its stored receipt as-is.
+  currentReceiptBlob = null;
 
   // Switch to manual mode so the editor is visible.
   setMode('manual');

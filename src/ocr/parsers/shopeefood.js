@@ -3,24 +3,7 @@
  * Extracts items, prices, subtotal, discount, and delivery fee from ShopeeFood receipt text.
  */
 
-/**
- * Parse a price string in Indonesian format.
- * Handles: "Rp47.600", "-Rp38.601", "Rp 13.000", "Rp13000", "28.000", "-Rp 5.000"
- * Always returns a positive number (minus sign is stripped).
- * @param {string} str
- * @returns {number}
- */
-function parsePrice(str) {
-  if (!str) return 0;
-  // Strip minus sign, Rp prefix, spaces, dots, and commas
-  const cleaned = str
-    .replace(/^-/, '')
-    .replace(/[Rr]p\.?\s*/g, '')
-    .replace(/[.,]/g, '')
-    .trim();
-  const num = parseInt(cleaned, 10);
-  return isNaN(num) ? 0 : num;
-}
+import { parsePrice } from './common.js';
 
 /**
  * Parse ShopeeFood receipt text into structured data.
