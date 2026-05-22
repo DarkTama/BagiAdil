@@ -207,7 +207,14 @@ export function splitBill({ orders, totalDiscount, totalShipping }) {
     verification: {
       sumOfPayments,
       expectedTotal,
-      balanced: sumOfPayments.equals(expectedTotal),
+      // Compare to the whole rupiah. Splitting a discount proportionally
+      // involves divisions (e.g. 68899/91798) that decimal.js truncates,
+      // leaving a sub-rupiah residue; an exact comparison would wrongly flag
+      // that as "unbalanced". A genuine imbalance (such as a discount clamped
+      // to zero) is always rupiah-scale and is still caught.
+      balanced: sumOfPayments
+        .toDecimalPlaces(0)
+        .equals(expectedTotal.toDecimalPlaces(0)),
     },
   };
 }

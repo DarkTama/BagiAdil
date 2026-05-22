@@ -323,6 +323,46 @@ describe('splitBill (main entry)', () => {
     expect(result.verification.sumOfPayments.equals(result.verification.expectedTotal)).toBe(true);
   });
 
+  it('reports balanced for a proportional-discount split with a sub-rupiah residue', () => {
+    // Splitting the discount proportionally over uneven orders leaves a tiny
+    // decimal-division residue (sumOfPayments comes out as 97000.999...999).
+    // An exact comparison wrongly flagged this as "unbalanced"; comparing to
+    // the whole rupiah does not.
+    const result = splitBill({
+      orders: [
+        { name: 'Alice', amount: 25000 },
+        { name: 'Bob', amount: 35000 },
+        { name: 'Charlie', amount: 42001 },
+      ],
+      totalDiscount: 15000,
+      totalShipping: 10000,
+    });
+
+    expect(result.verification.balanced).toBe(true);
+    // The residue is sub-rupiah - the payments do add up to the bill.
+    expect(
+      result.verification.sumOfPayments
+        .minus(result.verification.expectedTotal)
+        .abs()
+        .lessThan(new Decimal(1)),
+    ).toBe(true);
+    expect(result.grandTotal.equals(new Decimal(97001))).toBe(true);
+  });
+
+  it('still reports unbalanced for a genuine rupiah-scale imbalance', () => {
+    // Discount far exceeds the orders: discounted orders clamp to zero, so the
+    // payments cannot add up to the (negative) expected total.
+    const result = splitBill({
+      orders: [
+        { name: 'Alice', amount: 10000 },
+        { name: 'Bob', amount: 10000 },
+      ],
+      totalDiscount: 30000,
+      totalShipping: 5000,
+    });
+    expect(result.verification.balanced).toBe(false);
+  });
+
   it('tie-breaking determinism - first person in list order wins', () => {
     // Create a scenario where two people have the same rounding fraction
     // Both should have identical fractional parts so tie-breaking applies
