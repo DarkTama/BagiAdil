@@ -34,6 +34,7 @@ export default [
         TextDecoder: 'readonly',
         alert: 'readonly',
         setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     rules: {

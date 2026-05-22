@@ -10,13 +10,20 @@ import { t } from '../i18n/index.js';
  * Render calculation results into the container.
  * @param {object} result - Result from splitBill()
  * @param {HTMLElement} containerEl
+ * @param {object|null} [itemsMap] - Map of participant name -> assigned items
+ * @param {object} [options]
+ * @param {object} [options.paid] - Map of participant name -> true when paid
+ * @param {function} [options.onTogglePaid] - (name, isPaid) => void. When
+ *   provided, a "mark as paid" toggle is shown on each participant card.
  */
-export function renderResults(result, containerEl, itemsMap = null) {
+export function renderResults(result, containerEl, itemsMap = null, options = {}) {
   containerEl.innerHTML = '';
 
   if (!result) return;
 
   const { participants, grandTotal, verification } = result;
+  const paid = options.paid || {};
+  const onTogglePaid = options.onTogglePaid || null;
 
   // Verification badge
   const badge = document.createElement('div');
@@ -30,6 +37,17 @@ export function renderResults(result, containerEl, itemsMap = null) {
   totalEl.innerHTML = `<span class="grand-total-label">${t('results.grandTotal')}</span> <span class="grand-total-amount">${formatCurrency(grandTotal)}</span>`;
   containerEl.appendChild(totalEl);
 
+  // Paid summary (only when the paid tracker is enabled)
+  if (onTogglePaid) {
+    const paidCount = participants.filter((p) => paid[p.name]).length;
+    const summary = document.createElement('div');
+    summary.className = 'paid-summary';
+    summary.textContent = t('results.paidSummary')
+      .replace('{n}', paidCount)
+      .replace('{total}', participants.length);
+    containerEl.appendChild(summary);
+  }
+
   // Participant cards
   const cardsContainer = document.createElement('div');
   cardsContainer.className = 'result-cards';
@@ -37,6 +55,10 @@ export function renderResults(result, containerEl, itemsMap = null) {
   participants.forEach((p) => {
     const card = document.createElement('div');
     card.className = 'result-card';
+    const isPaid = !!paid[p.name];
+    if (onTogglePaid && isPaid) {
+      card.classList.add('result-card--paid');
+    }
 
     const nameEl = document.createElement('h3');
     nameEl.className = 'result-card-name';
@@ -73,6 +95,16 @@ export function renderResults(result, containerEl, itemsMap = null) {
     finalEl.className = 'result-card-final';
     finalEl.innerHTML = `<span>${t('results.finalPayment')}</span> <strong>${formatCurrency(p.finalPayment)}</strong>`;
     card.appendChild(finalEl);
+
+    // Mark-as-paid toggle (omitted in the read-only shared view)
+    if (onTogglePaid) {
+      const paidBtn = document.createElement('button');
+      paidBtn.type = 'button';
+      paidBtn.className = isPaid ? 'btn paid-toggle paid-toggle--on' : 'btn paid-toggle';
+      paidBtn.textContent = isPaid ? `✓ ${t('results.paid')}` : t('results.markPaid');
+      paidBtn.addEventListener('click', () => onTogglePaid(p.name, !isPaid));
+      card.appendChild(paidBtn);
+    }
 
     cardsContainer.appendChild(card);
   });

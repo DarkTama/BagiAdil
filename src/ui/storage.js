@@ -6,6 +6,7 @@
 const STORAGE_KEY = 'bagiadil_participants';
 const HISTORY_KEY = 'bagiadil_history';
 const HISTORY_LIMIT = 50;
+const GROUPS_KEY = 'bagiadil_groups';
 
 /**
  * Initialize storage module. No-op currently, but provides a hook for future setup.
@@ -181,6 +182,65 @@ export function renameHistoryEntry(id, label) {
 export function clearHistory() {
   try {
     localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // silently fail
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Participant groups
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Load all saved participant groups.
+ * @returns {Array<{name: string, members: string[]}>}
+ */
+export function loadGroups() {
+  try {
+    const data = localStorage.getItem(GROUPS_KEY);
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (g) => g && typeof g.name === 'string' && Array.isArray(g.members),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Save (or overwrite) a named participant group.
+ * @param {string} name - Group name.
+ * @param {string[]} members - Participant names.
+ */
+export function saveGroup(name, members) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return;
+  try {
+    const groups = loadGroups().filter(
+      (g) => g.name.toLowerCase() !== trimmed.toLowerCase(),
+    );
+    groups.push({
+      name: trimmed,
+      members: (members || []).filter((m) => typeof m === 'string' && m.trim()),
+    });
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
+  } catch {
+    // localStorage may be unavailable - silently fail
+  }
+}
+
+/**
+ * Delete a participant group by name.
+ * @param {string} name
+ */
+export function deleteGroup(name) {
+  try {
+    const groups = loadGroups().filter(
+      (g) => g.name.toLowerCase() !== String(name).toLowerCase(),
+    );
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
   } catch {
     // silently fail
   }

@@ -111,6 +111,14 @@ function renderEntry(entry) {
       t('history.peopleCount').replace('{n}', count) +
       ' · ' +
       formatCurrency(result.grandTotal);
+    const paidCount = Object.values(entry.paid || {}).filter(Boolean).length;
+    if (count > 0 && paidCount > 0) {
+      summary +=
+        ' · ' +
+        t('history.paidCount')
+          .replace('{n}', paidCount)
+          .replace('{total}', count);
+    }
   } catch {
     summary = '';
   }

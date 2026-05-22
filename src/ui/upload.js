@@ -174,14 +174,17 @@ export function initUpload(containerEl, onComplete) {
         const { processPDF } = await import('../ocr/pdf-engine.js');
         result = await processPDF(file, onProgress);
       } else {
-        // Downscale large photos: faster OCR, smaller stored receipt.
         progressStatus.textContent = t('upload.optimizing');
+        // Compressed colour image: stored with the split and shown as preview.
         const { compressImage } = await import('../ocr/image-compress.js');
-        const source = await compressImage(file);
-        receiptBlob = source;
+        receiptBlob = await compressImage(file);
+
+        // Separate grayscale/contrast pass: fed to OCR for better accuracy.
+        const { preprocessForOCR } = await import('../ocr/image-preprocess.js');
+        const ocrInput = await preprocessForOCR(file);
 
         const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
-        result = await processImage(source, onProgress);
+        result = await processImage(ocrInput, onProgress);
 
         // Terminate the worker after processing to free resources
         await terminateOCR();

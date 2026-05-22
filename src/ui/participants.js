@@ -4,6 +4,8 @@
  */
 
 import { t } from '../i18n/index.js';
+import { loadGroups, saveGroup, deleteGroup } from './storage.js';
+import { showToast } from './toast.js';
 
 let participants = [];
 let containerEl = null;
@@ -78,6 +80,9 @@ function render() {
   inputGroup.appendChild(errorEl);
 
   containerEl.appendChild(inputGroup);
+
+  // Saved participant groups
+  containerEl.appendChild(renderGroupsRow());
 
   // Handle enter key
   input.addEventListener('keydown', (e) => {
@@ -154,6 +159,102 @@ function removeParticipant(index) {
   }
 }
 
+/**
+ * Build the saved-groups row: a group picker with Load / Delete, and a
+ * Save-as-group button.
+ * @returns {HTMLElement}
+ */
+function renderGroupsRow() {
+  const groups = loadGroups();
+  const wrap = document.createElement('div');
+  wrap.className = 'groups-row';
+
+  const select = document.createElement('select');
+  select.className = 'groups-select';
+  select.setAttribute('aria-label', t('groups.select'));
+  if (groups.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = t('groups.none');
+    select.appendChild(opt);
+    select.disabled = true;
+  } else {
+    groups.forEach((g) => {
+      const opt = document.createElement('option');
+      opt.value = g.name;
+      opt.textContent = `${g.name} (${g.members.length})`;
+      select.appendChild(opt);
+    });
+  }
+  wrap.appendChild(select);
+
+  const loadBtn = document.createElement('button');
+  loadBtn.type = 'button';
+  loadBtn.className = 'btn groups-load';
+  loadBtn.textContent = t('groups.load');
+  loadBtn.disabled = groups.length === 0;
+  loadBtn.addEventListener('click', () => loadGroupByName(select.value));
+  wrap.appendChild(loadBtn);
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'btn btn-danger groups-delete';
+  delBtn.textContent = t('groups.delete');
+  delBtn.disabled = groups.length === 0;
+  delBtn.addEventListener('click', () => {
+    if (!select.value) return;
+    deleteGroup(select.value);
+    showToast(t('groups.deleted'), 'info');
+    render();
+  });
+  wrap.appendChild(delBtn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'btn btn-primary groups-save';
+  saveBtn.textContent = t('groups.save');
+  saveBtn.addEventListener('click', () => {
+    if (participants.length === 0) {
+      showToast(t('groups.saveEmpty'), 'warning');
+      return;
+    }
+    const name = window.prompt(t('groups.namePrompt'));
+    if (!name || !name.trim()) return;
+    saveGroup(name, participants);
+    showToast(t('groups.saved'), 'success');
+    render();
+  });
+  wrap.appendChild(saveBtn);
+
+  return wrap;
+}
+
+/**
+ * Load a saved group, merging its members into the current list
+ * (case-insensitive, skipping duplicates).
+ * @param {string} name
+ */
+function loadGroupByName(name) {
+  const group = loadGroups().find((g) => g.name === name);
+  if (!group) return;
+  let added = 0;
+  group.members.forEach((member) => {
+    if (!participants.some((p) => p.toLowerCase() === member.toLowerCase())) {
+      participants.push(member);
+      added += 1;
+    }
+  });
+  render();
+  if (onChangeCallback) {
+    onChangeCallback(getParticipants());
+  }
+  if (added > 0) {
+    showToast(t('groups.loaded').replace('{n}', added), 'success');
+  } else {
+    showToast(t('groups.loadedNone'), 'info');
+  }
+}
+
 function showError(errorEl, inputEl, message) {
   errorEl.textContent = message;
   inputEl.classList.add('input-error');
@@ -165,14 +266,8 @@ function clearError(errorEl, inputEl) {
 }
 
 /**
- * Update translated text in the participants component without resetting state.
+ * Re-render translated labels without losing the participant list.
  */
 export function updateTranslations() {
-  if (!containerEl) return;
-  const label = containerEl.querySelector('label[for="participant-name"]');
-  if (label) label.textContent = t('section.participants');
-  const input = containerEl.querySelector('#participant-name');
-  if (input) input.placeholder = t('placeholder.addParticipant');
-  const addBtn = containerEl.querySelector('.btn.btn-primary');
-  if (addBtn) addBtn.textContent = t('btn.add');
+  if (containerEl) render();
 }
