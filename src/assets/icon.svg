@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>BagiAdil</title>
+  <rect width="512" height="512" fill="#f59e0b" />
+  <!-- A circle split down the middle: "bagi" = divide / share fairly. -->
+  <path d="M246 136 A120 120 0 0 0 246 376 Z" fill="#1a1a1a" />
+  <path d="M266 136 A120 120 0 0 1 266 376 Z" fill="#1a1a1a" />
+</svg>

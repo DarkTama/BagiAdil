@@ -27,6 +27,8 @@ import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
 import { putReceipt, pruneReceipts } from './image-store.js';
 import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
+import { showToast } from './toast.js';
+import { initGuide } from './guide.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
 
 let currentResult = null;
@@ -37,6 +39,8 @@ let currentHistoryId = null;
 let pendingReceiptBlob = null;
 // Receipt image to attach to the next saved split (set once a scan is used).
 let currentReceiptBlob = null;
+// Map of participant name -> true for those marked as paid.
+let currentPaid = {};
 
 /**
  * Initialize the entire app UI.
@@ -64,6 +68,9 @@ export function initApp() {
 
   // Initialize language toggle
   initLangToggle();
+
+  // Initialize in-app guide (help button + first-run popup)
+  initGuide();
 
   // Initialize components
   initParticipants(participantsEl, {
@@ -158,7 +165,10 @@ function updateAllTranslations() {
   if (currentResult) {
     const resultsEl = document.querySelector('#results .section-content');
     if (resultsEl) {
-      renderResults(currentResult, resultsEl, currentItemsMap);
+      renderResults(currentResult, resultsEl, currentItemsMap, {
+        paid: currentPaid,
+        onTogglePaid: handleTogglePaid,
+      });
     }
   }
 }
@@ -190,28 +200,24 @@ function setMode(mode) {
 }
 
 function handleTableStateChange(state) {
-  const calculateBtn = document.querySelector('#calculate');
+  // The Calculate button stays clickable at all times - clicking it while the
+  // split is incomplete surfaces a toast explaining what is missing, rather
+  // than silently doing nothing (a disabled button gives no feedback).
   const statusEl = document.querySelector('#calculate-status');
-
-  if (!calculateBtn || !statusEl) return;
+  if (!statusEl) return;
 
   if (state.itemCount === 0) {
-    calculateBtn.disabled = true;
     statusEl.textContent = '';
     statusEl.className = '';
     return;
   }
 
   if (state.allAssigned) {
-    calculateBtn.disabled = false;
     statusEl.textContent = t('table.allAssigned');
     statusEl.className = 'status-success';
-    statusEl.id = 'calculate-status';
   } else {
-    calculateBtn.disabled = true;
     statusEl.textContent = t('table.itemsRemaining').replace('{n}', state.remainingCount);
     statusEl.className = 'status-warning';
-    statusEl.id = 'calculate-status';
   }
 }
 
@@ -241,6 +247,7 @@ function populateFromOCR(data) {
   // A freshly scanned receipt starts a new split, not an edit of a saved one.
   currentHistoryId = null;
   currentReceiptBlob = pendingReceiptBlob;
+  currentPaid = {};
 
   // Clear existing items before adding OCR items (prevents duplicates on re-confirm)
   tableClearItems();
@@ -277,6 +284,7 @@ function handleCalculate(resultsEl) {
 
   if (errors.length > 0) {
     showValidationErrors(errors);
+    showToast(errors[0].message, 'warning');
     return;
   }
 
@@ -315,8 +323,16 @@ function handleCalculate(resultsEl) {
   });
   currentItemsMap = itemsMap;
 
+  // A brand-new split (not yet saved) starts with a clean paid state.
+  if (!currentHistoryId) {
+    currentPaid = {};
+  }
+
   // Render results
-  renderResults(result, resultsEl, itemsMap);
+  renderResults(result, resultsEl, itemsMap, {
+    paid: currentPaid,
+    onTogglePaid: handleTogglePaid,
+  });
   updateExportVisibility(true);
 
   // Save participants
@@ -331,6 +347,7 @@ function handleCalculate(resultsEl) {
   } else {
     historyEntry.label = defaultHistoryLabel();
   }
+  historyEntry.paid = currentPaid;
   currentHistoryId = saveHistoryEntry(historyEntry);
 
   // Attach the scanned receipt image to this split. Consumed once, so a later
@@ -354,6 +371,30 @@ function defaultHistoryLabel() {
 }
 
 /**
+ * Toggle a participant's paid status, persist it to history, and re-render.
+ * @param {string} name
+ * @param {boolean} isPaid
+ */
+function handleTogglePaid(name, isPaid) {
+  if (isPaid) {
+    currentPaid[name] = true;
+  } else {
+    delete currentPaid[name];
+  }
+  if (currentHistoryId) {
+    saveHistoryEntry({ id: currentHistoryId, paid: currentPaid });
+    refreshHistory();
+  }
+  const resultsEl = document.querySelector('#results .section-content');
+  if (currentResult && resultsEl) {
+    renderResults(currentResult, resultsEl, currentItemsMap, {
+      paid: currentPaid,
+      onTogglePaid: handleTogglePaid,
+    });
+  }
+}
+
+/**
  * Restore a saved split into the editor and recalculate it.
  * @param {object} entry - history entry (snapshot + id/label)
  */
@@ -365,6 +406,7 @@ function loadSplit(entry) {
   currentHistoryId = entry.id || null;
   // Loading a saved split is not a new scan - keep its stored receipt as-is.
   currentReceiptBlob = null;
+  currentPaid = entry.paid || {};
 
   // Switch to manual mode so the editor is visible.
   setMode('manual');
