@@ -105,13 +105,18 @@ function renderEntry(entry) {
   let summary = '';
   try {
     const { result } = computeSplit(entry);
-    const count = (entry.participants || []).length;
+    // Count only the people actually in the split (those with items / a
+    // non-zero order) - matches the results view. Participants who were
+    // added but assigned nothing do not owe and are not counted.
+    const payers = result.participants;
+    const count = payers.length;
+    const paid = entry.paid || {};
+    const paidCount = payers.filter((p) => paid[p.name]).length;
     summary =
       ' · ' +
       t('history.peopleCount').replace('{n}', count) +
       ' · ' +
       formatCurrency(result.grandTotal);
-    const paidCount = Object.values(entry.paid || {}).filter(Boolean).length;
     if (count > 0 && paidCount > 0) {
       summary +=
         ' · ' +

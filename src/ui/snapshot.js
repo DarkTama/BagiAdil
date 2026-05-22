@@ -12,6 +12,10 @@
  */
 
 import { splitBill } from '../engine/calculator.js';
+import {
+  compressToEncodedURIComponent,
+  decompressFromEncodedURIComponent,
+} from 'lz-string';
 
 /**
  * Build a snapshot from the current editor state.
@@ -84,17 +88,7 @@ export function computeSplit(snapshot) {
   return { result, itemsMap };
 }
 
-/** UTF-8-safe string -> URL-safe base64. */
-function toBase64Url(str) {
-  const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  bytes.forEach((b) => {
-    binary += String.fromCharCode(b);
-  });
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-/** URL-safe base64 -> UTF-8 string. */
+/** Legacy URL-safe base64 -> UTF-8 string (decodes pre-compression links). */
 function fromBase64Url(str) {
   let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
   while (b64.length % 4) b64 += '=';
@@ -104,16 +98,18 @@ function fromBase64Url(str) {
 }
 
 /**
- * Encode a snapshot into a compact URL-safe string.
- * Uses a positional-array form with assignment persons referenced by index
- * into the participants list, so names are not repeated per assignment:
- *   [ participants, totalDiscount, totalShipping,
+ * Encode a snapshot into a compact, compressed, URL-safe string.
+ * Positional-array form with assignment persons referenced by index:
+ *   [ persons, totalDiscount, totalShipping,
  *     [ [name, unitPrice, totalQty, [ [personIdx, qty], ... ]], ... ] ]
+ * Only participants referenced by an item assignment are included (people
+ * who ordered nothing never appear in the shared result), then the JSON is
+ * compressed with lz-string to keep share links short.
  * @param {object} snapshot
  * @returns {string}
  */
 export function encodeSnapshot(snapshot) {
-  const persons = [...(snapshot.participants || [])];
+  const persons = [];
   const personIndex = (name) => {
     let i = persons.indexOf(name);
     if (i === -1) {
@@ -135,37 +131,64 @@ export function encodeSnapshot(snapshot) {
     params.totalShipping || 0,
     items,
   ];
-  return toBase64Url(JSON.stringify(compact));
+  return compressToEncodedURIComponent(JSON.stringify(compact));
 }
 
 /**
- * Decode a compact share string back into a snapshot.
+ * Rebuild a snapshot object from the compact-array JSON string.
+ * @param {string} json
+ * @returns {object|null}
+ */
+function rebuildFromCompact(json) {
+  let compact;
+  try {
+    compact = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(compact) || compact.length < 4) return null;
+  const [persons, totalDiscount, totalShipping, items] = compact;
+  if (!Array.isArray(persons) || !Array.isArray(items)) return null;
+  return {
+    participants: persons,
+    params: {
+      totalDiscount: totalDiscount || 0,
+      totalShipping: totalShipping || 0,
+    },
+    items: items.map((item) => ({
+      name: item[0],
+      unitPrice: item[1],
+      totalQty: item[2],
+      assignments: (item[3] || []).map((a) => ({
+        person: persons[a[0]],
+        qty: a[1],
+      })),
+    })),
+  };
+}
+
+/**
+ * Decode a share string back into a snapshot. Accepts the current
+ * lz-string-compressed form, and falls back to the legacy base64 form so
+ * older share links keep working.
  * @param {string} str
  * @returns {object|null} snapshot, or null if malformed
  */
 export function decodeSnapshot(str) {
+  if (!str) return null;
+  // Current format: lz-string compressed.
   try {
-    if (!str) return null;
-    const compact = JSON.parse(fromBase64Url(str));
-    if (!Array.isArray(compact) || compact.length < 4) return null;
-    const [persons, totalDiscount, totalShipping, items] = compact;
-    if (!Array.isArray(persons) || !Array.isArray(items)) return null;
-    return {
-      participants: persons,
-      params: {
-        totalDiscount: totalDiscount || 0,
-        totalShipping: totalShipping || 0,
-      },
-      items: items.map((item) => ({
-        name: item[0],
-        unitPrice: item[1],
-        totalQty: item[2],
-        assignments: (item[3] || []).map((a) => ({
-          person: persons[a[0]],
-          qty: a[1],
-        })),
-      })),
-    };
+    const json = decompressFromEncodedURIComponent(str);
+    if (json) {
+      const snap = rebuildFromCompact(json);
+      if (snap) return snap;
+    }
+  } catch {
+    // not a compressed string - fall through to the legacy decoder
+  }
+  // Legacy format: URL-safe base64 of JSON.
+  try {
+    return rebuildFromCompact(fromBase64Url(str));
   } catch {
     return null;
   }

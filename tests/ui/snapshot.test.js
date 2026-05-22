@@ -34,13 +34,18 @@ describe('snapshot encode/decode', () => {
     ],
   };
 
-  it('round-trips a snapshot through encode/decode', () => {
+  it('round-trips items and params through encode/decode', () => {
     const decoded = decodeSnapshot(encodeSnapshot(sample));
-    expect(decoded).toEqual(sample);
+    expect(decoded.items).toEqual(sample.items);
+    expect(decoded.params).toEqual(sample.params);
+    // Participants are re-derived from item assignments; order may differ.
+    expect([...decoded.participants].sort()).toEqual(
+      [...sample.participants].sort(),
+    );
   });
 
-  it('produces a URL-safe string with no padding', () => {
-    expect(encodeSnapshot(sample)).toMatch(/^[A-Za-z0-9_-]+$/);
+  it('produces a compressed URL-safe string', () => {
+    expect(encodeSnapshot(sample)).toMatch(/^[A-Za-z0-9+\-$]+$/);
   });
 
   it('encodes more compactly than the raw snapshot JSON', () => {
@@ -49,20 +54,47 @@ describe('snapshot encode/decode', () => {
     );
   });
 
-  it('handles non-ASCII participant and item names', () => {
+  it('omits participants who were not assigned any item', () => {
     const snap = {
-      participants: ['Café', '日本語'],
+      participants: ['Alice', 'Bob', 'Carol'],
       params: { totalDiscount: 0, totalShipping: 0 },
       items: [
         {
-          name: 'Té manis',
+          name: 'Soup',
+          unitPrice: 10000,
+          totalQty: 1,
+          assignments: [{ person: 'Alice', qty: 1 }],
+        },
+      ],
+    };
+    expect(decodeSnapshot(encodeSnapshot(snap)).participants).toEqual(['Alice']);
+  });
+
+  it('handles non-ASCII participant and item names', () => {
+    const snap = {
+      participants: ['Café'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [
+        {
+          name: 'Té manis 日本語',
           unitPrice: 5000,
           totalQty: 1,
           assignments: [{ person: 'Café', qty: 1 }],
         },
       ],
     };
-    expect(decodeSnapshot(encodeSnapshot(snap))).toEqual(snap);
+    expect(decodeSnapshot(encodeSnapshot(snap)).items).toEqual(snap.items);
+  });
+
+  it('still decodes legacy (pre-compression) base64 links', () => {
+    const compact = [['Alice', 'Bob'], 0, 0, [['Soup', 10000, 1, [[0, 1]]]]];
+    const legacy = btoa(JSON.stringify(compact))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const decoded = decodeSnapshot(legacy);
+    expect(decoded.items[0].name).toBe('Soup');
+    expect(decoded.items[0].assignments[0].person).toBe('Alice');
   });
 
   it('returns null for malformed input', () => {

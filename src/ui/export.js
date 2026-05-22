@@ -62,11 +62,20 @@ function render() {
   containerEl.appendChild(wrapper);
 }
 
+/**
+ * Build the read-only share URL for a snapshot.
+ * @param {object} snapshot
+ * @returns {string}
+ */
+function buildShareUrl(snapshot) {
+  return `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
+}
+
 async function handleShareLink() {
   const snapshot = getSnapshotFn ? getSnapshotFn() : null;
   if (!snapshot) return;
 
-  const url = `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
+  const url = buildShareUrl(snapshot);
   const btn = containerEl.querySelector('.export-share-btn');
 
   try {
@@ -225,7 +234,9 @@ async function handleWhatsAppCopy() {
   if (!results) return;
 
   const params = getParamsFn ? getParamsFn() : {};
-  const text = generateWhatsAppText(results, params);
+  const snapshot = getSnapshotFn ? getSnapshotFn() : null;
+  const shareUrl = snapshot ? buildShareUrl(snapshot) : '';
+  const text = generateWhatsAppText(results, params, shareUrl);
   const btn = containerEl.querySelector('.export-wa-btn');
 
   try {
@@ -281,9 +292,10 @@ export function updateTranslations() {
  * Generate a WhatsApp-formatted text summary from results.
  * @param {object} results - Result from splitBill()
  * @param {object} [params] - Optional params (discount, shipping)
+ * @param {string} [shareUrl] - Optional share link, appended at the end
  * @returns {string}
  */
-export function generateWhatsAppText(results, params = {}) {
+export function generateWhatsAppText(results, params = {}, shareUrl = '') {
   const { participants, grandTotal, verification } = results;
 
   const totalDiscount = params.totalDiscount || 0;
@@ -304,6 +316,10 @@ export function generateWhatsAppText(results, params = {}) {
 
   const balancedText = verification.balanced ? t('results.balanced') : t('results.unbalanced');
   text += `\n_Total: ${formatCurrency(grandTotal)} (${balancedText})_`;
+
+  if (shareUrl) {
+    text += `\n\n${t('export.wa.detail')}: ${shareUrl}`;
+  }
 
   return text;
 }
