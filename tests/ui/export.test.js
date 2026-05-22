@@ -65,6 +65,17 @@ describe('Export - WhatsApp Text Generation', () => {
       });
       expect(text).toMatch(/_(Total: .+ \((Seimbang|Tidak Seimbang)\))_/);
     });
+
+    it('appends the share link only when one is provided', () => {
+      const params = { totalDiscount: 10000, totalShipping: 12000 };
+      const withLink = generateWhatsAppText(
+        sampleResult,
+        params,
+        'https://bagiadil.test/#share=abc123',
+      );
+      expect(withLink).toContain('https://bagiadil.test/#share=abc123');
+      expect(generateWhatsAppText(sampleResult, params)).not.toContain('#share=');
+    });
   });
 
   describe('participant names and amounts', () => {

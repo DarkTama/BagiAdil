@@ -65,6 +65,16 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
     nameEl.textContent = p.name;
     card.appendChild(nameEl);
 
+    // Colour-coded paid status badge (paid tracker only).
+    if (onTogglePaid) {
+      const status = document.createElement('span');
+      status.className = isPaid
+        ? 'result-status result-status--paid'
+        : 'result-status result-status--unpaid';
+      status.textContent = isPaid ? t('results.paid') : t('results.unpaid');
+      card.appendChild(status);
+    }
+
     if (itemsMap && itemsMap[p.name] && itemsMap[p.name].length > 0) {
       const itemsList = document.createElement('ul');
       itemsList.className = 'result-card-items';
