@@ -21,10 +21,11 @@ export function parseGoFoodReceipt(text) {
   let discount = 0;
   let deliveryFee = 0;
 
-  // Pattern 1: @ or similar prefix before unit price (@ misread as a or ©)
+  // Pattern 1: @ or similar prefix before unit price (@ misread as a, ©, or G),
+  // optionally one short junk token before the line total ("GRp20300 — Rp81.200")
   // e.g. "4  L Original Pot Besar  @Rp20.300  Rp81.200"
   const patternAtPrefix =
-    /^(\d+)\s+(.+?)\s+[@a©]\s*[Rr]p[\d.,]+\s+([Rr]p[\d.,]+)\s*$/;
+    /^(\d+)\s+(.+?)\s+[@a©G]\s*[Rr]p[\d.,]+(?:\s+\S{1,2})?\s+([Rr]p[\d.,]+)\s*$/;
   // Pattern 2: Two Rp values on the line (no @ at all)
   // e.g. "4  L Original Pot Besar  Rp20.300  Rp81.200"
   const patternTwoRp =

@@ -285,6 +285,24 @@ Total harga Rp145.600`;
     expect(result.items[1].total).toBe(64400);
   });
 
+  it('handles OCR noise where @ is read as "G" plus stray junk tokens', () => {
+    // Real scan output: "@Rp20.300" read as "GRp20300", stray "—" before total
+    const text = `gofood
+4 LOriginal Pot Besar GRp20300 — Rp81.200
+4 Original Pot Kecil GRp16.100 Rp64.400
+Total harga Rp145.600`;
+
+    const result = parseGoFoodReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('LOriginal Pot Besar');
+    expect(result.items[0].quantity).toBe(4);
+    expect(result.items[0].total).toBe(81200);
+    expect(result.items[0].price).toBe(20300);
+    expect(result.items[1].name).toBe('Original Pot Kecil');
+    expect(result.items[1].total).toBe(64400);
+    expect(result.items[1].price).toBe(16100);
+  });
+
   it('handles single Rp value per line (total only)', () => {
     const text = `gofood
 4 L Original Pot Besar Rp81.200
