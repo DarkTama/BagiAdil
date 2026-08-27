@@ -175,12 +175,13 @@ Biaya Pengemasan  Rp3.000`;
   });
 
   it('treats the Rp value as line total when qty > 1', () => {
-    // Real receipt: 3 x Paket Original B at Rp25.700/unit shows Rp77.100
+    // Real receipt: 3 x Paket Original B at Rp25.700/unit shows Rp77.100.
+    // Thumbnails OCR as short letter junk before the qty ("dl", "d").
     const text = `Rincian Pesanan
-3 x  Paket Original B  Rp77.100
+dl 3x  Paket Original B  Rp77.100
 Nasi
 Catatan Tambahan: Dada
-1 x  Hot Chicken Pasta  Rp27.800
+d 1x  Hot Chicken Pasta  Rp27.800
 Subtotal Pesanan (4 menu)  Rp104.900
 Voucher Diskon  -Rp41.960
 Biaya Pengiriman  Rp6.400 Rp0
