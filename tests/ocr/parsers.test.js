@@ -173,6 +173,59 @@ Biaya Pengemasan  Rp3.000`;
     expect(result.discount).toBe(38601);
     expect(result.deliveryFee).toBe(20000); // 13000 + 4000 + 3000
   });
+
+  it('treats the Rp value as line total when qty > 1', () => {
+    // Real receipt: 3 x Paket Original B at Rp25.700/unit shows Rp77.100
+    const text = `Rincian Pesanan
+3 x  Paket Original B  Rp77.100
+Nasi
+Catatan Tambahan: Dada
+1 x  Hot Chicken Pasta  Rp27.800
+Subtotal Pesanan (4 menu)  Rp104.900
+Voucher Diskon  -Rp41.960
+Biaya Pengiriman  Rp6.400 Rp0
+Biaya Layanan  Rp3.500
+Biaya Pengemasan  Rp4.000`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('Paket Original B');
+    expect(result.items[0].quantity).toBe(3);
+    expect(result.items[0].price).toBe(25700);
+    expect(result.items[0].total).toBe(77100);
+    expect(result.items[1].name).toBe('Hot Chicken Pasta');
+    expect(result.items[1].quantity).toBe(1);
+    expect(result.items[1].price).toBe(27800);
+    expect(result.subtotal).toBe(104900);
+    expect(result.discount).toBe(41960);
+    expect(result.deliveryFee).toBe(7500); // 0 (struck-through) + 3500 + 4000
+  });
+
+  it('strips OCR junk prefixes and folds driver tip into delivery fee', () => {
+    // Real receipt: item thumbnails OCR'd as "—." / "=" prefixes, plus a tip line
+    const text = `Rincian Pesanan
+—. 1 x  Paket Geprek B  Rp32.700
+Nasi
+= 1 x  Paket Original B  Rp25.700
+Nasi
+Subtotal Pesanan (2 menu)  Rp58.400
+Voucher Diskon  -Rp20.440
+Biaya Pengiriman  Rp8.000 Rp3.000
+Biaya Layanan  Rp3.500
+Biaya Pengemasan  Rp4.000
+Tip untuk Driver  Rp2.000`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].name).toBe('Paket Geprek B');
+    expect(result.items[0].quantity).toBe(1);
+    expect(result.items[0].price).toBe(32700);
+    expect(result.items[1].name).toBe('Paket Original B');
+    expect(result.items[1].price).toBe(25700);
+    expect(result.subtotal).toBe(58400);
+    expect(result.discount).toBe(20440);
+    expect(result.deliveryFee).toBe(12500); // 3000 + 3500 + 4000 + 2000 tip
+  });
 });
 
 describe('GoFood real receipt parser', () => {

@@ -256,6 +256,19 @@ function renderUnassignedTable() {
       });
       tdAction.appendChild(assignBtn);
     }
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn btn-delete-item';
+    deleteBtn.textContent = '✕';
+    deleteBtn.title = t('table.remove');
+    deleteBtn.setAttribute('aria-label', t('table.remove'));
+    deleteBtn.addEventListener('click', () => {
+      items = items.filter((i) => i.id !== item.id);
+      if (activePopupItemId === item.id) activePopupItemId = null;
+      render();
+      notifyChange();
+    });
+    tdAction.appendChild(deleteBtn);
     tr.appendChild(tdAction);
 
     tbody.appendChild(tr);

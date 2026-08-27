@@ -63,6 +63,39 @@ describe('Table Assigner UI', () => {
     });
   });
 
+  describe('delete item', () => {
+    it('should remove only the deleted row', () => {
+      setup();
+      addItems([
+        { name: 'Wrong Item', unitPrice: 2000, qty: 1 },
+        { name: 'Nasi Goreng', unitPrice: 25000, qty: 2 },
+      ]);
+
+      containerEl.querySelector('.btn-delete-item').click();
+
+      const state = getTableState();
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].name).toBe('Nasi Goreng');
+    });
+
+    it('should drop assignments along with the deleted item', () => {
+      setup();
+      addItems([{ name: 'Wrong Item', unitPrice: 2000, qty: 1 }]);
+
+      // Assign it to Alice first
+      containerEl.querySelector('.btn-assign').click();
+      const popup = containerEl.querySelector('.assign-popup');
+      popup.querySelector('.popup-person-select').value = 'Alice';
+      popup.querySelector('.btn-popup-confirm').click();
+
+      containerEl.querySelector('.btn-delete-item').click();
+
+      const state = getTableState();
+      expect(state.items.length).toBe(0);
+      expect(state.assignments['Alice'].items.length).toBe(0);
+    });
+  });
+
   describe('assignment popup', () => {
     it('should show inline popup when assign button is clicked', () => {
       setup();

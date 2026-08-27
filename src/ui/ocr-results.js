@@ -33,6 +33,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
             <label>${t('label.price')}</label>
             <input type="number" class="ocr-item-price" value="${item.price}" min="0" data-field="price" />
           </div>
+          <button type="button" class="btn ocr-item-remove" title="${t('table.remove')}" aria-label="${t('table.remove')}">✕</button>
         </div>
       `;
     });
@@ -68,6 +69,11 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
       </button>
     </div>
   `;
+
+  // Wire up remove buttons - collectCorrectedData reads surviving rows from the DOM
+  containerEl.querySelectorAll('.ocr-item-remove').forEach((btn) => {
+    btn.addEventListener('click', () => btn.closest('.ocr-item-row').remove());
+  });
 
   // Wire up confirm button
   const confirmBtn = containerEl.querySelector('#ocr-confirm');

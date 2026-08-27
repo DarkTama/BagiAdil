@@ -67,9 +67,9 @@ export function parseGoFoodReceipt(text) {
       continue;
     }
 
-    // Check for delivery/service fees - accumulate "Biaya" lines (not totals or discounts)
+    // Check for delivery/service fees - accumulate "Biaya" and "Tip" lines (not totals or discounts)
     if (
-      /biaya/i.test(line) &&
+      /biaya|^tip\b/i.test(line) &&
       !/total/i.test(line) &&
       !/pembayaran/i.test(line) &&
       !/diskon/i.test(line)
@@ -164,7 +164,7 @@ export function parseGoFoodReceipt(text) {
 }
 
 function isKnownLabel(text) {
-  return /^(subtotal|total|diskon|promo|potongan|ongkos\s*kirim|biaya|delivery\s*fee)/i.test(
+  return /^(subtotal|total|diskon|promo|potongan|ongkos\s*kirim|biaya|delivery\s*fee|tip\b)/i.test(
     text,
   );
 }

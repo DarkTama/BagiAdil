@@ -1022,13 +1022,35 @@ label {
 
 .ocr-item-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 2fr;
+  grid-template-columns: 2fr 1fr 2fr auto;
   gap: var(--space-sm);
   margin-bottom: var(--space-sm);
   padding: var(--space-sm);
   background-color: var(--bg-tertiary);
   border-radius: var(--border-radius-sm);
   border: 1px solid var(--border-color);
+}
+
+.ocr-item-remove,
+.btn-delete-item {
+  align-self: end;
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.ocr-item-remove:hover,
+.btn-delete-item:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+  border-color: var(--error);
+}
+
+.btn-delete-item {
+  min-height: 32px;
+  margin-left: var(--space-xs);
 }
 
 .ocr-item-field label {

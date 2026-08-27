@@ -77,6 +77,7 @@ const id = {
   'table.qty': 'Jumlah',
   'table.cancel': 'Batal',
   'table.undo': 'Undo',
+  'table.remove': 'Hapus',
   'table.done': 'Selesai',
   'table.subtotal': 'Subtotal',
   'table.allAssigned': 'Semua item sudah ditetapkan',

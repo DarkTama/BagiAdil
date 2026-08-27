@@ -13,7 +13,9 @@ import { parsePrice } from './common.js';
 export function parseShopeeReceipt(text) {
   const lines = text
     .split('\n')
-    .map((l) => l.trim())
+    // Strip leading OCR junk (thumbnails read as "—.", "=", etc.) but keep "["
+    // so topping lines stay detectable.
+    .map((l) => l.trim().replace(/^[^\w[]+/, '').trim())
     .filter(Boolean);
 
   const items = [];
@@ -58,8 +60,8 @@ export function parseShopeeReceipt(text) {
       continue;
     }
 
-    // Check for delivery/service fees - accumulate "Biaya" lines (not totals)
-    if (/biaya/i.test(line) && !/total/i.test(line)) {
+    // Check for delivery/service fees - accumulate "Biaya" and "Tip" lines (not totals)
+    if (/biaya|^tip\b/i.test(line) && !/total/i.test(line)) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         deliveryFee += parsePrice(priceMatch[1]);
@@ -85,13 +87,15 @@ export function parseShopeeReceipt(text) {
       continue;
     }
 
-    // Try primary real receipt pattern: "1 x  Item Name  Rp47.600"
+    // Try primary real receipt pattern: "3 x  Item Name  Rp77.100"
+    // The Rp value on Shopee receipts is the LINE TOTAL, not the unit price.
     const realMatch = realItemPattern.exec(line);
     if (realMatch) {
       const qty = parseInt(realMatch[1], 10);
       const name = realMatch[2].trim();
-      const price = parsePrice(realMatch[3]);
-      items.push({ name, quantity: qty, price, total: qty * price });
+      const total = parsePrice(realMatch[3]);
+      const price = Math.round(total / qty);
+      items.push({ name, quantity: qty, price, total });
       continue;
     }
 

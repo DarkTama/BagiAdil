@@ -77,6 +77,7 @@ const en = {
   'table.qty': 'Quantity',
   'table.cancel': 'Cancel',
   'table.undo': 'Undo',
+  'table.remove': 'Remove',
   'table.done': 'Done',
   'table.subtotal': 'Subtotal',
   'table.allAssigned': 'All items assigned',

@@ -59,6 +59,12 @@ export function parseGrabReceipt(text) {
         } else if (i + 1 < lines.length) {
           deliveryFee = parsePrice(lines[i + 1]);
         }
+      } else if (/^tip\b/i.test(line)) {
+        // "Tip for driver" / "Tip untuk driver" - fold into delivery fee
+        const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
+        if (priceMatch) {
+          deliveryFee += parsePrice(priceMatch[1]);
+        }
       }
       continue;
     }
@@ -99,5 +105,5 @@ export function parseGrabReceipt(text) {
 }
 
 function isKnownLabel(text) {
-  return /^(subtotal|total\s*harga|promo|discount|grabfood\s*discount|delivery\s*fee|biaya\s*antar)/i.test(text);
+  return /^(subtotal|total\s*harga|promo|discount|grabfood\s*discount|delivery\s*fee|biaya\s*antar|tip\b)/i.test(text);
 }
