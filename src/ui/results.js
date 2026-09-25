@@ -36,6 +36,51 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
   totalEl.className = 'grand-total';
   totalEl.innerHTML = `<span class="grand-total-label">${t('results.grandTotal')}</span> <span class="grand-total-amount">${formatCurrency(grandTotal)}</span>`;
   containerEl.appendChild(totalEl);
+  // Payment destination
+  const payment = options.payment || null;
+  if (payment && (payment.bank || payment.accountNumber)) {
+    const payBox = document.createElement('div');
+    payBox.className = 'payment-info-box';
+
+    const payHeader = document.createElement('div');
+    payHeader.className = 'payment-info-header';
+    payHeader.textContent = `\u{1F4B3} ${t('payment.payTo')}:`;
+    payBox.appendChild(payHeader);
+
+    const payDetails = document.createElement('div');
+    payDetails.className = 'payment-info-details';
+
+    const accountLine = document.createElement('span');
+    accountLine.className = 'payment-account-text';
+    const textParts = [];
+    if (payment.bank) textParts.push(payment.bank);
+    if (payment.accountNumber) textParts.push(payment.accountNumber);
+    if (payment.accountName) textParts.push(`(${t('export.wa.accountHolder')} ${payment.accountName})`);
+    accountLine.textContent = textParts.join(' ');
+    payDetails.appendChild(accountLine);
+
+    if (payment.accountNumber) {
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn btn-secondary btn-copy-account';
+      copyBtn.textContent = `\u{1F4CB} ${t('payment.copyAccount')}`;
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(payment.accountNumber);
+          copyBtn.textContent = `\u2705 ${t('payment.accountCopied')}`;
+          setTimeout(() => {
+            copyBtn.textContent = `\u{1F4CB} ${t('payment.copyAccount')}`;
+          }, 2000);
+        } catch {
+          // fallback
+        }
+      });
+      payDetails.appendChild(copyBtn);
+    }
+
+    payBox.appendChild(payDetails);
+    containerEl.appendChild(payBox);
+  }
 
   // Paid summary (only when the paid tracker is enabled)
   if (onTogglePaid) {

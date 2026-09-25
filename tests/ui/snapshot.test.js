@@ -153,4 +153,57 @@ describe('computeSplit', () => {
     expect(itemsMap.Alice).toHaveLength(1);
     expect(itemsMap.Bob[0].name).toBe('B');
   });
+
+  it('passes through payment info when present', () => {
+    const snap = {
+      participants: ['Alice'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [
+        {
+          name: 'A',
+          unitPrice: 10000,
+          totalQty: 1,
+          assignments: [{ person: 'Alice', qty: 1 }],
+        },
+      ],
+      payment: { bank: 'BCA', accountNumber: '1234567890', accountName: 'Budi' },
+    };
+    const { payment } = computeSplit(snap);
+    expect(payment).toEqual({ bank: 'BCA', accountNumber: '1234567890', accountName: 'Budi' });
+  });
+
+  it('round-trips payment info through encode/decode', () => {
+    const snap = {
+      participants: ['Alice'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [
+        {
+          name: 'A',
+          unitPrice: 10000,
+          totalQty: 1,
+          assignments: [{ person: 'Alice', qty: 1 }],
+        },
+      ],
+      payment: { bank: 'BCA', accountNumber: '1234567890', accountName: 'Budi' },
+    };
+    const decoded = decodeSnapshot(encodeSnapshot(snap));
+    expect(decoded.payment).toEqual({ bank: 'BCA', accountNumber: '1234567890', accountName: 'Budi' });
+  });
+
+  it('handles snapshots without payment gracefully in decode', () => {
+    const snap = {
+      participants: ['Alice'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [
+        {
+          name: 'A',
+          unitPrice: 10000,
+          totalQty: 1,
+          assignments: [{ person: 'Alice', qty: 1 }],
+        },
+      ],
+    };
+    const decoded = decodeSnapshot(encodeSnapshot(snap));
+    expect(decoded.payment).toBeUndefined();
+  });
 });

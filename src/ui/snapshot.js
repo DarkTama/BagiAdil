@@ -25,8 +25,8 @@ import {
  * @param {Array} items - table-assigner items
  * @returns {object} snapshot
  */
-export function buildSnapshot(participants, params, items) {
-  return {
+export function buildSnapshot(participants, params, items, payment = null) {
+  const snap = {
     participants: [...participants],
     params: {
       totalDiscount: params.totalDiscount || 0,
@@ -42,6 +42,14 @@ export function buildSnapshot(participants, params, items) {
       })),
     })),
   };
+  if (payment && (payment.bank || payment.accountNumber || payment.accountName)) {
+    snap.payment = {
+      bank: payment.bank || '',
+      accountNumber: payment.accountNumber || '',
+      accountName: payment.accountName || '',
+    };
+  }
+  return snap;
 }
 
 /**
@@ -85,7 +93,7 @@ export function computeSplit(snapshot) {
     totalShipping: params.totalShipping || 0,
   });
 
-  return { result, itemsMap };
+  return { result, itemsMap, payment: snapshot.payment || null };
 }
 
 /** Legacy URL-safe base64 -> UTF-8 string (decodes pre-compression links). */
@@ -131,6 +139,13 @@ export function encodeSnapshot(snapshot) {
     params.totalShipping || 0,
     items,
   ];
+  if (snapshot.payment && (snapshot.payment.bank || snapshot.payment.accountNumber || snapshot.payment.accountName)) {
+    compact.push([
+      snapshot.payment.bank || '',
+      snapshot.payment.accountNumber || '',
+      snapshot.payment.accountName || '',
+    ]);
+  }
   return compressToEncodedURIComponent(JSON.stringify(compact));
 }
 
@@ -149,7 +164,7 @@ function rebuildFromCompact(json) {
   if (!Array.isArray(compact) || compact.length < 4) return null;
   const [persons, totalDiscount, totalShipping, items] = compact;
   if (!Array.isArray(persons) || !Array.isArray(items)) return null;
-  return {
+  const res = {
     participants: persons,
     params: {
       totalDiscount: totalDiscount || 0,
@@ -165,6 +180,17 @@ function rebuildFromCompact(json) {
       })),
     })),
   };
+  if (Array.isArray(compact[4]) && compact[4].length >= 3) {
+    const [bank, accountNumber, accountName] = compact[4];
+    if (bank || accountNumber || accountName) {
+      res.payment = {
+        bank: bank || '',
+        accountNumber: accountNumber || '',
+        accountName: accountName || '',
+      };
+    }
+  }
+  return res;
 }
 
 /**

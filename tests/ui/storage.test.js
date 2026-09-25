@@ -12,6 +12,9 @@ import {
   deleteHistoryEntry,
   renameHistoryEntry,
   clearHistory,
+  savePaymentInfo,
+  loadPaymentInfo,
+  clearPaymentInfo,
 } from '../../src/ui/storage.js';
 
 describe('Storage - localStorage integration', () => {
@@ -163,6 +166,32 @@ describe('Storage - localStorage integration', () => {
 
     it('should return an empty array when no history exists', () => {
       expect(loadHistory()).toEqual([]);
+    });
+  });
+
+  describe('payment info', () => {
+    it('should save and load payment info', () => {
+      savePaymentInfo({ bank: 'BCA', accountNumber: '1234567890', accountName: 'Budi' });
+      expect(loadPaymentInfo()).toEqual({
+        bank: 'BCA',
+        accountNumber: '1234567890',
+        accountName: 'Budi',
+      });
+    });
+
+    it('should return null when no payment info is stored', () => {
+      expect(loadPaymentInfo()).toBeNull();
+    });
+
+    it('should return null when all fields are empty or whitespace', () => {
+      savePaymentInfo({ bank: '  ', accountNumber: '', accountName: ' ' });
+      expect(loadPaymentInfo()).toBeNull();
+    });
+
+    it('should clear payment info', () => {
+      savePaymentInfo({ bank: 'GoPay', accountNumber: '08123456789', accountName: 'Budi' });
+      clearPaymentInfo();
+      expect(loadPaymentInfo()).toBeNull();
     });
   });
 });

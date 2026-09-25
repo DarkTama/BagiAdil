@@ -5,6 +5,7 @@
 import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
 import { encodeSnapshot } from './snapshot.js';
+import { loadPaymentInfo, savePaymentInfo } from './storage.js';
 
 let containerEl = null;
 let getResultsFn = null;
@@ -32,6 +33,96 @@ export function initExport(el, resultsFn, paramsFn, itemsMapFn, snapshotFn) {
 function render() {
   containerEl.innerHTML = '';
 
+  // Payment destination form
+  const payCard = document.createElement('div');
+  payCard.className = 'payment-card';
+
+  const payHeader = document.createElement('div');
+  payHeader.className = 'payment-card-header';
+  const payTitle = document.createElement('strong');
+  payTitle.setAttribute('data-i18n', 'payment.title');
+  payTitle.textContent = t('payment.title');
+  payHeader.appendChild(payTitle);
+  payCard.appendChild(payHeader);
+
+  const payBody = document.createElement('div');
+  payBody.className = 'payment-card-body';
+
+  const storedPayment = loadPaymentInfo() || {};
+
+  // Bank field
+  const bankGroup = document.createElement('div');
+  bankGroup.className = 'input-group';
+  const bankLabel = document.createElement('label');
+  bankLabel.setAttribute('for', 'pay-bank');
+  bankLabel.setAttribute('data-i18n', 'payment.bank');
+  bankLabel.textContent = t('payment.bank');
+  const bankInput = document.createElement('input');
+  bankInput.type = 'text';
+  bankInput.id = 'pay-bank';
+  bankInput.setAttribute('list', 'banks-list');
+  bankInput.placeholder = t('payment.bankPlaceholder');
+  bankInput.value = storedPayment.bank || '';
+  bankGroup.appendChild(bankLabel);
+  bankGroup.appendChild(bankInput);
+
+  // Bank datalist
+  const datalist = document.createElement('datalist');
+  datalist.id = 'banks-list';
+  ['BCA', 'Mandiri', 'BRI', 'BNI', 'BSI', 'GoPay', 'OVO', 'DANA', 'ShopeePay'].forEach((b) => {
+    const opt = document.createElement('option');
+    opt.value = b;
+    datalist.appendChild(opt);
+  });
+  bankGroup.appendChild(datalist);
+
+  // Account number field
+  const numGroup = document.createElement('div');
+  numGroup.className = 'input-group';
+  const numLabel = document.createElement('label');
+  numLabel.setAttribute('for', 'pay-account-number');
+  numLabel.setAttribute('data-i18n', 'payment.accountNumber');
+  numLabel.textContent = t('payment.accountNumber');
+  const numInput = document.createElement('input');
+  numInput.type = 'text';
+  numInput.id = 'pay-account-number';
+  numInput.placeholder = '1234567890';
+  numInput.value = storedPayment.accountNumber || '';
+  numGroup.appendChild(numLabel);
+  numGroup.appendChild(numInput);
+
+  // Account holder name field
+  const nameGroup = document.createElement('div');
+  nameGroup.className = 'input-group';
+  const nameLabel = document.createElement('label');
+  nameLabel.setAttribute('for', 'pay-account-name');
+  nameLabel.setAttribute('data-i18n', 'payment.accountName');
+  nameLabel.textContent = t('payment.accountName');
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.id = 'pay-account-name';
+  nameInput.placeholder = 'Budi';
+  nameInput.value = storedPayment.accountName || '';
+  nameGroup.appendChild(nameLabel);
+  nameGroup.appendChild(nameInput);
+
+  const saveCurrentPayment = () => {
+    savePaymentInfo({
+      bank: bankInput.value,
+      accountNumber: numInput.value,
+      accountName: nameInput.value,
+    });
+  };
+  bankInput.addEventListener('input', saveCurrentPayment);
+  numInput.addEventListener('input', saveCurrentPayment);
+  nameInput.addEventListener('input', saveCurrentPayment);
+
+  payBody.appendChild(bankGroup);
+  payBody.appendChild(numGroup);
+  payBody.appendChild(nameGroup);
+  payCard.appendChild(payBody);
+
+  containerEl.appendChild(payCard);
   const wrapper = document.createElement('div');
   wrapper.className = 'export-buttons';
 
@@ -94,7 +185,7 @@ async function handleShareLink() {
  * @param {object|null} itemsMap - Map of participant name -> assigned items
  * @returns {HTMLElement}
  */
-export function buildPdfContent(results, itemsMap) {
+export function buildPdfContent(results, itemsMap, payment = null) {
   const pdfContainer = document.createElement('div');
   pdfContainer.style.cssText =
     'position:absolute;top:0;left:0;width:210mm;z-index:-1;background:#ffffff;color:#1a1a2e;font-family:system-ui,-apple-system,sans-serif;padding:20px;';
@@ -173,6 +264,20 @@ export function buildPdfContent(results, itemsMap) {
 
     pdfContainer.appendChild(card);
   });
+  if (payment && (payment.bank || payment.accountNumber)) {
+    const payDiv = document.createElement('div');
+    payDiv.style.cssText =
+      'margin-top:15px;padding:10px;border-top:1px dashed #ccc;font-size:13px;color:#333;';
+    const payTitle = document.createElement('strong');
+    payTitle.textContent = `${t('export.wa.payment')}: `;
+    payDiv.appendChild(payTitle);
+    const parts = [];
+    if (payment.bank) parts.push(payment.bank);
+    if (payment.accountNumber) parts.push(payment.accountNumber);
+    if (payment.accountName) parts.push(`(${t('export.wa.accountHolder')} ${payment.accountName})`);
+    payDiv.appendChild(document.createTextNode(parts.join(' ')));
+    pdfContainer.appendChild(payDiv);
+  }
 
   return pdfContainer;
 }
@@ -193,7 +298,8 @@ async function handlePdfExport() {
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
 
     const itemsMap = getItemsMapFn ? getItemsMapFn() : null;
-    const pdfContainer = buildPdfContent(results, itemsMap);
+    const payment = getPaymentInfo();
+    const pdfContainer = buildPdfContent(results, itemsMap, payment);
     document.body.appendChild(pdfContainer);
 
     // Allow browser to render the container before capturing
@@ -236,7 +342,8 @@ async function handleWhatsAppCopy() {
   const params = getParamsFn ? getParamsFn() : {};
   const snapshot = getSnapshotFn ? getSnapshotFn() : null;
   const shareUrl = snapshot ? buildShareUrl(snapshot) : '';
-  const text = generateWhatsAppText(results, params, shareUrl);
+  const payment = getPaymentInfo();
+  const text = generateWhatsAppText(results, params, shareUrl, payment);
   const btn = containerEl.querySelector('.export-wa-btn');
 
   try {
@@ -276,6 +383,37 @@ function showCopySuccess(btn) {
 }
 
 /**
+ * Get current payment destination from inputs or storage.
+ * @returns {{bank: string, accountNumber: string, accountName: string}|null}
+ */
+export function getPaymentInfo() {
+  if (!containerEl) return loadPaymentInfo();
+  const bankInput = containerEl.querySelector('#pay-bank');
+  const numInput = containerEl.querySelector('#pay-account-number');
+  const nameInput = containerEl.querySelector('#pay-account-name');
+  if (!bankInput || !numInput || !nameInput) return loadPaymentInfo();
+  const bank = bankInput.value.trim();
+  const accountNumber = numInput.value.trim();
+  const accountName = nameInput.value.trim();
+  if (!bank && !accountNumber && !accountName) return null;
+  return { bank, accountNumber, accountName };
+}
+
+/**
+ * Set payment destination inputs programmatically.
+ * @param {{bank?: string, accountNumber?: string, accountName?: string}|null} info
+ */
+export function setPaymentInfo(info) {
+  if (!containerEl) return;
+  const bankInput = containerEl.querySelector('#pay-bank');
+  const numInput = containerEl.querySelector('#pay-account-number');
+  const nameInput = containerEl.querySelector('#pay-account-name');
+  if (bankInput) bankInput.value = (info && info.bank) || '';
+  if (numInput) numInput.value = (info && info.accountNumber) || '';
+  if (nameInput) nameInput.value = (info && info.accountName) || '';
+  if (info) savePaymentInfo(info);
+}
+/**
  * Update translated text in the export component without resetting state.
  */
 export function updateTranslations() {
@@ -286,8 +424,17 @@ export function updateTranslations() {
   if (waBtn) waBtn.innerHTML = `\u{1F4CB} ${t('export.whatsapp')}`;
   const shareBtn = containerEl.querySelector('.export-share-btn');
   if (shareBtn) shareBtn.innerHTML = `\u{1F517} ${t('export.shareLink')}`;
+  const payTitle = containerEl.querySelector('.payment-card-header strong');
+  if (payTitle) payTitle.textContent = t('payment.title');
+  const bankLabel = containerEl.querySelector('label[for="pay-bank"]');
+  if (bankLabel) bankLabel.textContent = t('payment.bank');
+  const bankInput = containerEl.querySelector('#pay-bank');
+  if (bankInput) bankInput.placeholder = t('payment.bankPlaceholder');
+  const numLabel = containerEl.querySelector('label[for="pay-account-number"]');
+  if (numLabel) numLabel.textContent = t('payment.accountNumber');
+  const nameLabel = containerEl.querySelector('label[for="pay-account-name"]');
+  if (nameLabel) nameLabel.textContent = t('payment.accountName');
 }
-
 /**
  * Generate a WhatsApp-formatted text summary from results.
  * @param {object} results - Result from splitBill()
@@ -295,7 +442,7 @@ export function updateTranslations() {
  * @param {string} [shareUrl] - Optional share link, appended at the end
  * @returns {string}
  */
-export function generateWhatsAppText(results, params = {}, shareUrl = '') {
+export function generateWhatsAppText(results, params = {}, shareUrl = '', payment = null) {
   const { participants, grandTotal, verification } = results;
 
   const totalDiscount = params.totalDiscount || 0;
@@ -317,6 +464,19 @@ export function generateWhatsAppText(results, params = {}, shareUrl = '') {
   const balancedText = verification.balanced ? t('results.balanced') : t('results.unbalanced');
   text += `\n_Total: ${formatCurrency(grandTotal)} (${balancedText})_`;
 
+  if (payment && (payment.bank || payment.accountNumber)) {
+    text += `\n\n*${t('export.wa.payment')}:*`;
+    if (payment.bank && payment.accountNumber) {
+      text += `\n${payment.bank}: ${payment.accountNumber}`;
+    } else if (payment.accountNumber) {
+      text += `\n${payment.accountNumber}`;
+    } else if (payment.bank) {
+      text += `\n${payment.bank}`;
+    }
+    if (payment.accountName) {
+      text += `\n${t('export.wa.accountHolder')} ${payment.accountName}`;
+    }
+  }
   if (shareUrl) {
     text += `\n\n${t('export.wa.detail')}: ${shareUrl}`;
   }

@@ -22,7 +22,7 @@ import {
   clearItems as tableClearItems,
   loadItems as tableLoadItems,
 } from './table-assigner.js';
-import { initExport, updateTranslations as updateExportTranslations } from './export.js';
+import { initExport, updateTranslations as updateExportTranslations, getPaymentInfo, setPaymentInfo } from './export.js';
 import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './storage.js';
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
 import { putReceipt, pruneReceipts } from './image-store.js';
@@ -329,9 +329,11 @@ function handleCalculate(resultsEl) {
   }
 
   // Render results
+  const payment = getPaymentInfo();
   renderResults(result, resultsEl, itemsMap, {
     paid: currentPaid,
     onTogglePaid: handleTogglePaid,
+    payment,
   });
   updateExportVisibility(true);
 
@@ -340,7 +342,7 @@ function handleCalculate(resultsEl) {
 
   // Auto-save this split to history. Reusing currentHistoryId means a
   // reload-then-recalculate updates the same entry instead of duplicating it.
-  currentSnapshot = buildSnapshot(participants, params, state.items);
+  currentSnapshot = buildSnapshot(participants, params, state.items, payment);
   const historyEntry = { ...currentSnapshot };
   if (currentHistoryId) {
     historyEntry.id = currentHistoryId;
@@ -403,6 +405,9 @@ function loadSplit(entry) {
   setParticipants(entry.participants || []);
   tableLoadItems(entry.items || []);
   setParams(entry.params || { totalDiscount: 0, totalShipping: 0 });
+  if (entry.payment) {
+    setPaymentInfo(entry.payment);
+  }
   currentHistoryId = entry.id || null;
   // Loading a saved split is not a new scan - keep its stored receipt as-is.
   currentReceiptBlob = null;
@@ -453,8 +458,8 @@ function renderSharedView(snapshot) {
     const resultsContainer = document.createElement('div');
     resultsEl.appendChild(resultsContainer);
     try {
-      const { result, itemsMap } = computeSplit(snapshot);
-      renderResults(result, resultsContainer, itemsMap);
+      const { result, itemsMap, payment } = computeSplit(snapshot);
+      renderResults(result, resultsContainer, itemsMap, { payment });
     } catch {
       resultsContainer.textContent = t('share.invalid');
     }

@@ -78,6 +78,28 @@ describe('Export - WhatsApp Text Generation', () => {
     });
   });
 
+    it('includes payment destination when provided', () => {
+      const text = generateWhatsAppText(
+        sampleResult,
+        { totalDiscount: 10000, totalShipping: 12000 },
+        '',
+        { bank: 'BCA', accountNumber: '1234567890', accountName: 'Budi' },
+      );
+      expect(text).toContain('*Pembayaran:*');
+      expect(text).toContain('BCA: 1234567890');
+      expect(text).toContain('a.n. Budi');
+    });
+
+    it('omits payment destination when null or empty', () => {
+      const text = generateWhatsAppText(
+        sampleResult,
+        { totalDiscount: 10000, totalShipping: 12000 },
+        '',
+        null,
+      );
+      expect(text).not.toContain('*Pembayaran:*');
+    });
+
   describe('participant names and amounts', () => {
     it('should contain all participant names', () => {
       const text = generateWhatsAppText(sampleResult, {
@@ -194,5 +216,21 @@ describe('Export - PDF content is XSS-safe', () => {
     expect(node.querySelectorAll('h3').length).toBe(2);
     expect(node.textContent).toContain('Alice');
     expect(node.textContent).toContain('Bob');
+  });
+
+  it('includes payment destination in PDF when provided', () => {
+    const result = splitBill({
+      orders: [{ name: 'Alice', amount: 25000 }],
+      totalDiscount: 0,
+      totalShipping: 0,
+    });
+    const node = buildPdfContent(result, null, {
+      bank: 'Mandiri',
+      accountNumber: '987654321',
+      accountName: 'Siti',
+    });
+    expect(node.textContent).toContain('Mandiri');
+    expect(node.textContent).toContain('987654321');
+    expect(node.textContent).toContain('Siti');
   });
 });

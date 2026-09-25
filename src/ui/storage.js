@@ -7,6 +7,7 @@ const STORAGE_KEY = 'bagiadil_participants';
 const HISTORY_KEY = 'bagiadil_history';
 const HISTORY_LIMIT = 50;
 const GROUPS_KEY = 'bagiadil_groups';
+const PAYMENT_KEY = 'bagiadil_payment';
 
 /**
  * Initialize storage module. No-op currently, but provides a hook for future setup.
@@ -241,6 +242,64 @@ export function deleteGroup(name) {
       (g) => g.name.toLowerCase() !== String(name).toLowerCase(),
     );
     localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
+  } catch {
+    // silently fail
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Payment destination
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Save host payment info to localStorage.
+ * @param {{bank?: string, accountNumber?: string, accountName?: string}|null} info
+ */
+export function savePaymentInfo(info) {
+  try {
+    if (!info) {
+      localStorage.removeItem(PAYMENT_KEY);
+      return;
+    }
+    const bank = (info.bank || '').trim();
+    const accountNumber = (info.accountNumber || '').trim();
+    const accountName = (info.accountName || '').trim();
+    if (!bank && !accountNumber && !accountName) {
+      localStorage.removeItem(PAYMENT_KEY);
+      return;
+    }
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify({ bank, accountNumber, accountName }));
+  } catch {
+    // silently fail
+  }
+}
+
+/**
+ * Load host payment info from localStorage.
+ * @returns {{bank: string, accountNumber: string, accountName: string}|null}
+ */
+export function loadPaymentInfo() {
+  try {
+    const data = localStorage.getItem(PAYMENT_KEY);
+    if (!data) return null;
+    const parsed = JSON.parse(data);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const bank = (parsed.bank || '').trim();
+    const accountNumber = (parsed.accountNumber || '').trim();
+    const accountName = (parsed.accountName || '').trim();
+    if (!bank && !accountNumber && !accountName) return null;
+    return { bank, accountNumber, accountName };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear saved payment info.
+ */
+export function clearPaymentInfo() {
+  try {
+    localStorage.removeItem(PAYMENT_KEY);
   } catch {
     // silently fail
   }
