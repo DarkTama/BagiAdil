@@ -39,6 +39,7 @@ const en = {
   'export.shareLink': 'Copy Share Link',
   'privacy.text':
     'All calculations are done in your browser. No data is sent to any server.',
+  'footer.credit': 'Made by DarkTama',
   'label.item': 'Item',
   'label.price': 'Price',
   'label.for': 'For',

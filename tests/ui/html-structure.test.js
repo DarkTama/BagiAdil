@@ -44,4 +44,19 @@ describe('index.html structure', () => {
     );
     expect(modes).toEqual(['manual', 'ocr', 'history']);
   });
+
+  it('contains footer author credit links with target="_blank" and rel containing noopener', () => {
+    const footer = doc.querySelector('footer');
+    expect(footer).toBeTruthy();
+
+    const githubLink = footer.querySelector('a[href="https://github.com/DarkTama"]');
+    expect(githubLink).toBeTruthy();
+    expect(githubLink.getAttribute('target')).toBe('_blank');
+    expect(githubLink.getAttribute('rel')).toContain('noopener');
+
+    const portfolioLink = footer.querySelector('a[href="https://darktama.dev"]');
+    expect(portfolioLink).toBeTruthy();
+    expect(portfolioLink.getAttribute('target')).toBe('_blank');
+    expect(portfolioLink.getAttribute('rel')).toContain('noopener');
+  });
 });

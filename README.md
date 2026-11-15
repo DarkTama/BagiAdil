@@ -140,3 +140,7 @@ The project has comprehensive tests covering the calculation engine, OCR parsers
 ## License
 
 This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+## Author
+
+- **DarkTama** - [GitHub](https://github.com/DarkTama) &bull; [darktama.dev](https://darktama.dev)

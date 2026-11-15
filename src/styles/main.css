@@ -136,6 +136,40 @@ footer {
   font-size: var(--font-size-sm);
 }
 
+.footer-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: var(--space-xs);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.footer-credit a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--transition-fast);
+}
+
+.footer-credit a:hover,
+.footer-credit a:focus-visible {
+  color: var(--text-primary);
+}
+
+.footer-credit a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.footer-credit-sep {
+  color: var(--text-muted);
+  user-select: none;
+}
+
 /* Form inputs - mobile touch targets */
 input,
 select {
