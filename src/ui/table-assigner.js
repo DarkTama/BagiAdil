@@ -6,6 +6,12 @@
 import { t } from '../i18n/index.js';
 import { formatCurrency } from '../engine/formatter.js';
 import { showToast } from './toast.js';
+import { attachCurrencyInput, getCurrencyValue, setCurrencyValue } from './currency-input.js';
+
+// Accepts plain digits ("25000") or Rupiah-grouped text ("Rp 25.000", "25.000").
+// Anything with decimals or other separators ("15000.75") is rejected.
+const RUPIAH_PRICE_PATTERN = /^(?:Rp\s?)?(?:\d+|\d{1,3}(?:\.\d{3})+)$/;
+const PLAIN_INTEGER_PATTERN = /^\d+$/;
 
 let containerEl = null;
 let items = []; // [{id, name, unitPrice, totalQty, assignments: [{person, qty}]}]
@@ -354,13 +360,13 @@ function createEditRow(item) {
   tdPrice.className = 'td-edit-price';
   tdPrice.dataset.label = t('table.unitPrice');
   const priceInput = document.createElement('input');
-  priceInput.type = 'number';
   priceInput.className = 'edit-item-price';
-  priceInput.value = String(item.unitPrice);
-  priceInput.min = '0';
-  priceInput.step = '1';
   priceInput.placeholder = t('label.price');
   priceInput.setAttribute('aria-label', t('table.unitPrice'));
+  attachCurrencyInput(priceInput);
+  setCurrencyValue(priceInput, item.unitPrice);
+  // setCurrencyValue renders 0 as blank; show "Rp 0" so a free item stays visible and savable.
+  if (!priceInput.value) priceInput.value = formatCurrency(0);
   tdPrice.appendChild(priceInput);
   tr.appendChild(tdPrice);
 
@@ -387,69 +393,40 @@ function createEditRow(item) {
   tdAction.appendChild(cancelBtn);
   tr.appendChild(tdAction);
 
+  // Shows an error toast and moves focus to the offending field.
+  const rejectField = (input, messageKey) => {
+    showToast(t(messageKey), 'error');
+    try {
+      input.focus();
+    } catch {
+      // ignore
+    }
+  };
+
   const handleSave = () => {
-    const rawName = nameInput.value;
-    const trimmedName = rawName.trim();
+    const trimmedName = nameInput.value.trim();
     if (!trimmedName) {
-      showToast(t('table.errorItemName'), 'error');
-      try {
-        nameInput.focus();
-      } catch {
-        // ignore
-      }
+      rejectField(nameInput, 'table.errorItemName');
       return;
     }
 
     const rawPrice = priceInput.value.trim();
-    if (rawPrice === '' || !/^\d+$/.test(rawPrice)) {
-      showToast(t('table.errorItemPrice'), 'error');
-      try {
-        priceInput.focus();
-      } catch {
-        // ignore
-      }
+    if (!RUPIAH_PRICE_PATTERN.test(rawPrice)) {
+      rejectField(priceInput, 'table.errorItemPrice');
       return;
     }
-    const priceNum = parseInt(rawPrice, 10);
-    if (priceNum < 0) {
-      showToast(t('table.errorItemPrice'), 'error');
-      try {
-        priceInput.focus();
-      } catch {
-        // ignore
-      }
-      return;
-    }
+    const priceNum = getCurrencyValue(priceInput);
 
     const rawQty = qtyInput.value.trim();
-    if (rawQty === '' || !/^\d+$/.test(rawQty)) {
-      showToast(t('table.errorItemQty'), 'error');
-      try {
-        qtyInput.focus();
-      } catch {
-        // ignore
-      }
+    if (!PLAIN_INTEGER_PATTERN.test(rawQty) || parseInt(rawQty, 10) < 1) {
+      rejectField(qtyInput, 'table.errorItemQty');
       return;
     }
     const qtyNum = parseInt(rawQty, 10);
-    if (qtyNum < 1) {
-      showToast(t('table.errorItemQty'), 'error');
-      try {
-        qtyInput.focus();
-      } catch {
-        // ignore
-      }
-      return;
-    }
 
     const assignedQty = (item.assignments || []).reduce((sum, a) => sum + a.qty, 0);
     if (qtyNum < assignedQty) {
-      showToast(t('table.qtyBelowAssigned'), 'error');
-      try {
-        qtyInput.focus();
-      } catch {
-        // ignore
-      }
+      rejectField(qtyInput, 'table.qtyBelowAssigned');
       return;
     }
 

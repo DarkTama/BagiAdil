@@ -346,9 +346,69 @@ describe('Table Assigner UI', () => {
 
       expect(nameInput.value).toBe('Nasi Goreng');
       expect(qtyInput.value).toBe('2');
-      expect(priceInput.value).toBe('25000');
+      expect(priceInput.value).toBe('Rp 25.000');
+      expect(priceInput.getAttribute('inputmode')).toBe('numeric');
       expect(saveBtn).not.toBeNull();
       expect(cancelBtn).not.toBeNull();
+    });
+
+    it('should format price as Rupiah while typing and store an integer on save', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+      containerEl.querySelector('.btn-edit-item').click();
+
+      const priceInput = containerEl.querySelector('.edit-item-price');
+      priceInput.value = '30000';
+      priceInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+      expect(priceInput.value).toBe('Rp 30.000');
+
+      containerEl.querySelector('.btn-save-item').click();
+
+      expect(containerEl.querySelector('.edit-row')).toBeNull();
+      expect(getTableState().items[0].unitPrice).toBe(30000);
+    });
+
+    it('should accept a typed formatted price such as "Rp 30.000"', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+      containerEl.querySelector('.btn-edit-item').click();
+
+      containerEl.querySelector('.edit-item-price').value = 'Rp 30.000';
+      containerEl.querySelector('.btn-save-item').click();
+
+      expect(getTableState().items[0].unitPrice).toBe(30000);
+    });
+
+    it('should reject an empty price and keep edit mode', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+      containerEl.querySelector('.btn-edit-item').click();
+
+      containerEl.querySelector('.edit-item-price').value = '';
+      containerEl.querySelector('.btn-save-item').click();
+
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].unitPrice).toBe(25000);
+    });
+
+    it('should accept a price of 0 (free item)', () => {
+      setup();
+      addItems([{ name: 'Kerupuk', unitPrice: 5000, qty: 1 }]);
+      containerEl.querySelector('.btn-edit-item').click();
+
+      containerEl.querySelector('.edit-item-price').value = '0';
+      containerEl.querySelector('.btn-save-item').click();
+
+      expect(containerEl.querySelector('.edit-row')).toBeNull();
+      expect(getTableState().items[0].unitPrice).toBe(0);
+    });
+
+    it('should show "Rp 0" for an existing free item in edit mode', () => {
+      setup();
+      addItems([{ name: 'Kerupuk', unitPrice: 0, qty: 1 }]);
+      containerEl.querySelector('.btn-edit-item').click();
+
+      expect(containerEl.querySelector('.edit-item-price').value).toBe('Rp 0');
     });
 
     it('should edit name/price/qty of an unassigned item and reflect in getTableState', () => {
