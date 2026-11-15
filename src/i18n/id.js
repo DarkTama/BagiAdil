@@ -39,6 +39,7 @@ const id = {
   'export.shareLink': 'Salin Tautan Bagikan',
   'privacy.text':
     'Semua perhitungan dilakukan di browser Anda. Tidak ada data yang dikirim ke server manapun.',
+  'footer.credit': 'Dibuat oleh DarkTama',
   'label.item': 'Item',
   'label.price': 'Harga',
   'label.for': 'Untuk',
