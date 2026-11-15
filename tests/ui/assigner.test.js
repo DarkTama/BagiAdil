@@ -8,7 +8,13 @@ import {
   addItemsFromOCR,
   updateParticipants,
   clearItems,
+  loadItems,
 } from '../../src/ui/table-assigner.js';
+import {
+  buildSnapshot,
+  encodeSnapshot,
+  decodeSnapshot,
+} from '../../src/ui/snapshot.js';
 
 describe('Table Assigner UI', () => {
   let containerEl;
@@ -313,6 +319,347 @@ describe('Table Assigner UI', () => {
       const hint = containerEl.querySelector('.table-hint');
       expect(hint).not.toBeNull();
       expect(containerEl.querySelector('.assignment-table')).toBeNull();
+    });
+  });
+
+  describe('in-place editing of items', () => {
+    it('should switch row into edit mode when edit button is clicked', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+
+      const editBtn = containerEl.querySelector('.btn-edit-item');
+      expect(editBtn).not.toBeNull();
+      expect(editBtn.textContent).toBe('✎');
+      expect(editBtn.getAttribute('aria-label')).toBeTruthy();
+      expect(editBtn.getAttribute('title')).toBeTruthy();
+
+      editBtn.click();
+
+      const editRow = containerEl.querySelector('.edit-row');
+      expect(editRow).not.toBeNull();
+
+      const nameInput = editRow.querySelector('.edit-item-name');
+      const qtyInput = editRow.querySelector('.edit-item-qty');
+      const priceInput = editRow.querySelector('.edit-item-price');
+      const saveBtn = editRow.querySelector('.btn-save-item');
+      const cancelBtn = editRow.querySelector('.btn-cancel-item');
+
+      expect(nameInput.value).toBe('Nasi Goreng');
+      expect(qtyInput.value).toBe('2');
+      expect(priceInput.value).toBe('25000');
+      expect(saveBtn).not.toBeNull();
+      expect(cancelBtn).not.toBeNull();
+    });
+
+    it('should edit name/price/qty of an unassigned item and reflect in getTableState', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+
+      containerEl.querySelector('.btn-edit-item').click();
+
+      const editRow = containerEl.querySelector('.edit-row');
+      const nameInput = editRow.querySelector('.edit-item-name');
+      const qtyInput = editRow.querySelector('.edit-item-qty');
+      const priceInput = editRow.querySelector('.edit-item-price');
+
+      nameInput.value = 'Nasi Goreng Spesial';
+      qtyInput.value = '3';
+      priceInput.value = '30000';
+
+      editRow.querySelector('.btn-save-item').click();
+
+      // Edit row closed
+      expect(containerEl.querySelector('.edit-row')).toBeNull();
+
+      // State updated
+      const state = getTableState();
+      expect(state.items[0].name).toBe('Nasi Goreng Spesial');
+      expect(state.items[0].unitPrice).toBe(30000);
+      expect(state.items[0].totalQty).toBe(3);
+
+      // DOM updated
+      const row = containerEl.querySelector('.assignment-table tbody tr');
+      expect(row.textContent).toContain('Nasi Goreng Spesial');
+      expect(row.textContent).toContain('3/3');
+      expect(row.textContent).toContain('30.000');
+
+      // notifyChange called
+      expect(stateChanges.length).toBeGreaterThan(1);
+    });
+
+    it('should edit price of an item with assignments, keep assignments and recompute subtotals', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+
+      // Assign 1 to Alice, 1 to Bob
+      containerEl.querySelector('.btn-assign').click();
+      let popup = containerEl.querySelector('.assign-popup');
+      popup.querySelector('.popup-person-select').value = 'Alice';
+      popup.querySelector('.popup-qty-input').value = '1';
+      popup.querySelector('.btn-popup-confirm').click();
+
+      containerEl.querySelector('.btn-assign').click();
+      popup = containerEl.querySelector('.assign-popup');
+      popup.querySelector('.popup-person-select').value = 'Bob';
+      popup.querySelector('.popup-qty-input').value = '1';
+      popup.querySelector('.btn-popup-confirm').click();
+
+      // Row is now completed (0/2 remaining)
+      const completedRow = containerEl.querySelector('.row-completed');
+      expect(completedRow).not.toBeNull();
+
+      // Edit button must be clickable even on completed row
+      completedRow.querySelector('.btn-edit-item').click();
+
+      const editRow = containerEl.querySelector('.edit-row');
+      expect(editRow).not.toBeNull();
+      // While editing, completed styling is not applied
+      expect(editRow.classList.contains('row-completed')).toBe(false);
+
+      // Change price from 25000 to 35000
+      editRow.querySelector('.edit-item-price').value = '35000';
+      editRow.querySelector('.btn-save-item').click();
+
+      const state = getTableState();
+      expect(state.items[0].unitPrice).toBe(35000);
+      expect(state.items[0].assignments).toHaveLength(2);
+      expect(state.assignments['Alice'].subtotal).toBe(35000);
+      expect(state.assignments['Alice'].items[0].unitPrice).toBe(35000);
+      expect(state.assignments['Bob'].subtotal).toBe(35000);
+      expect(state.assignments['Bob'].items[0].unitPrice).toBe(35000);
+
+      // DOM assigned section updated
+      const assignedCards = containerEl.querySelectorAll('.assigned-person-card');
+      expect(assignedCards[0].textContent).toContain('35.000');
+      expect(assignedCards[1].textContent).toContain('35.000');
+    });
+
+    it('should change name keeping existing assignments intact', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+
+      containerEl.querySelector('.btn-assign').click();
+      const popup = containerEl.querySelector('.assign-popup');
+      popup.querySelector('.popup-person-select').value = 'Alice';
+      popup.querySelector('.popup-qty-input').value = '1';
+      popup.querySelector('.btn-popup-confirm').click();
+
+      containerEl.querySelector('.btn-edit-item').click();
+      containerEl.querySelector('.edit-item-name').value = 'Nasi Uduk';
+      containerEl.querySelector('.btn-save-item').click();
+
+      const state = getTableState();
+      expect(state.items[0].name).toBe('Nasi Uduk');
+      expect(state.items[0].assignments).toHaveLength(1);
+      expect(state.assignments['Alice'].items[0].name).toBe('Nasi Uduk');
+      expect(state.assignments['Alice'].subtotal).toBe(25000);
+    });
+
+    it('should block save and keep state unchanged when qty is reduced below assigned amount', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 3 }]);
+
+      // Assign 2 to Alice
+      containerEl.querySelector('.btn-assign').click();
+      const popup = containerEl.querySelector('.assign-popup');
+      popup.querySelector('.popup-person-select').value = 'Alice';
+      popup.querySelector('.popup-qty-input').value = '2';
+      popup.querySelector('.btn-popup-confirm').click();
+
+      // Edit item qty to 1 (assigned is 2)
+      containerEl.querySelector('.btn-edit-item').click();
+      const editRow = containerEl.querySelector('.edit-row');
+      editRow.querySelector('.edit-item-qty').value = '1';
+      editRow.querySelector('.btn-save-item').click();
+
+      // State unchanged
+      const state = getTableState();
+      expect(state.items[0].totalQty).toBe(3);
+
+      // Still in edit mode
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+
+      // Error toast shown
+      const toast = document.querySelector('.toast--error');
+      expect(toast).not.toBeNull();
+      expect(toast.textContent).toBeTruthy();
+    });
+
+    it('should reject invalid inputs and keep edit mode', () => {
+      setup();
+      addItems([{ name: 'Ayam Goreng', unitPrice: 20000, qty: 2 }]);
+      containerEl.querySelector('.btn-edit-item').click();
+
+      const editRow = containerEl.querySelector('.edit-row');
+      const nameInput = editRow.querySelector('.edit-item-name');
+      const priceInput = editRow.querySelector('.edit-item-price');
+      const qtyInput = editRow.querySelector('.edit-item-qty');
+      const saveBtn = editRow.querySelector('.btn-save-item');
+
+      // 1. Empty name
+      nameInput.value = '   ';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].name).toBe('Ayam Goreng');
+
+      // 2. Negative price
+      nameInput.value = 'Ayam Bakar';
+      priceInput.value = '-500';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].unitPrice).toBe(20000);
+
+      // 3. Non-integer price
+      priceInput.value = '15000.75';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].unitPrice).toBe(20000);
+
+      // 4. Empty price
+      priceInput.value = '';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].unitPrice).toBe(20000);
+
+      // 5. Qty 0
+      priceInput.value = '22000';
+      qtyInput.value = '0';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].totalQty).toBe(2);
+
+      // 6. Negative qty
+      qtyInput.value = '-2';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].totalQty).toBe(2);
+
+      // 7. Non-integer qty
+      qtyInput.value = '2.5';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].totalQty).toBe(2);
+
+      // 8. Empty qty
+      qtyInput.value = '';
+      saveBtn.click();
+      expect(containerEl.querySelector('.edit-row')).not.toBeNull();
+      expect(getTableState().items[0].totalQty).toBe(2);
+    });
+
+    it('should revert state when Cancel button is clicked', () => {
+      setup();
+      addItems([{ name: 'Teh Manis', unitPrice: 5000, qty: 1 }]);
+
+      containerEl.querySelector('.btn-edit-item').click();
+      const editRow = containerEl.querySelector('.edit-row');
+
+      editRow.querySelector('.edit-item-name').value = 'Kopi Susu';
+      editRow.querySelector('.edit-item-price').value = '15000';
+      editRow.querySelector('.edit-item-qty').value = '4';
+
+      editRow.querySelector('.btn-cancel-item').click();
+
+      // Edit row closed
+      expect(containerEl.querySelector('.edit-row')).toBeNull();
+
+      // State unchanged
+      const state = getTableState();
+      expect(state.items[0].name).toBe('Teh Manis');
+      expect(state.items[0].unitPrice).toBe(5000);
+      expect(state.items[0].totalQty).toBe(1);
+    });
+
+    it('should cancel on Escape key and save on Enter key', () => {
+      setup();
+      addItems([{ name: 'Teh Manis', unitPrice: 5000, qty: 1 }]);
+
+      // Test Escape
+      containerEl.querySelector('.btn-edit-item').click();
+      let editRow = containerEl.querySelector('.edit-row');
+      editRow.querySelector('.edit-item-name').value = 'Kopi Susu';
+
+      editRow.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+      expect(containerEl.querySelector('.edit-row')).toBeNull();
+      expect(getTableState().items[0].name).toBe('Teh Manis');
+
+      // Test Enter
+      containerEl.querySelector('.btn-edit-item').click();
+      editRow = containerEl.querySelector('.edit-row');
+      editRow.querySelector('.edit-item-name').value = 'Kopi Susu';
+
+      editRow.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(containerEl.querySelector('.edit-row')).toBeNull();
+      expect(getTableState().items[0].name).toBe('Kopi Susu');
+    });
+
+    it('should allow only one row in edit mode at a time', () => {
+      setup();
+      addItems([
+        { name: 'Item 1', unitPrice: 10000, qty: 1 },
+        { name: 'Item 2', unitPrice: 20000, qty: 2 },
+      ]);
+
+      const editBtns = containerEl.querySelectorAll('.btn-edit-item');
+      expect(editBtns).toHaveLength(2);
+
+      // Open edit mode on Item 1
+      editBtns[0].click();
+      let editRows = containerEl.querySelectorAll('.edit-row');
+      expect(editRows).toHaveLength(1);
+      expect(editRows[0].querySelector('.edit-item-name').value).toBe('Item 1');
+
+      // Now click edit on Item 2
+      const item2EditBtn = containerEl.querySelector('.btn-edit-item');
+      item2EditBtn.click();
+
+      editRows = containerEl.querySelectorAll('.edit-row');
+      expect(editRows).toHaveLength(1);
+      expect(editRows[0].querySelector('.edit-item-name').value).toBe('Item 2');
+    });
+
+    it('should round-trip edited items through snapshot encode and decode, and reload with loadItems', () => {
+      setup();
+      addItems([{ name: 'Mie Ayam', unitPrice: 15000, qty: 2 }]);
+
+      // Assign 1 to Alice
+      containerEl.querySelector('.btn-assign').click();
+      const popup = containerEl.querySelector('.assign-popup');
+      popup.querySelector('.popup-person-select').value = 'Alice';
+      popup.querySelector('.popup-qty-input').value = '1';
+      popup.querySelector('.btn-popup-confirm').click();
+
+      // Edit item
+      containerEl.querySelector('.btn-edit-item').click();
+      const editRow = containerEl.querySelector('.edit-row');
+      editRow.querySelector('.edit-item-name').value = 'Mie Ayam Bakso';
+      editRow.querySelector('.edit-item-price').value = '22000';
+      editRow.querySelector('.edit-item-qty').value = '3';
+      editRow.querySelector('.btn-save-item').click();
+
+      // Build snapshot from current state
+      const state = getTableState();
+      const snapshot = buildSnapshot(['Alice', 'Bob'], { totalDiscount: 2000, totalShipping: 5000 }, state.items);
+
+      // Encode and decode
+      const encoded = encodeSnapshot(snapshot);
+      const decoded = decodeSnapshot(encoded);
+
+      expect(decoded.items).toHaveLength(1);
+      expect(decoded.items[0].name).toBe('Mie Ayam Bakso');
+      expect(decoded.items[0].unitPrice).toBe(22000);
+      expect(decoded.items[0].totalQty).toBe(3);
+      expect(decoded.items[0].assignments).toEqual([{ person: 'Alice', qty: 1 }]);
+
+      // Load decoded items back into assigner (simulating history load)
+      loadItems(decoded.items);
+      const reloadedState = getTableState();
+      expect(reloadedState.items[0].name).toBe('Mie Ayam Bakso');
+      expect(reloadedState.items[0].unitPrice).toBe(22000);
+      expect(reloadedState.items[0].totalQty).toBe(3);
+      expect(reloadedState.assignments['Alice'].subtotal).toBe(22000);
     });
   });
 });

@@ -5,6 +5,7 @@
 
 import { t } from '../i18n/index.js';
 import { formatCurrency } from '../engine/formatter.js';
+import { showToast } from './toast.js';
 
 let containerEl = null;
 let items = []; // [{id, name, unitPrice, totalQty, assignments: [{person, qty}]}]
@@ -12,6 +13,7 @@ let participants = [];
 let onStateChange = null;
 let nextId = 1;
 let activePopupItemId = null;
+let editingItemId = null;
 
 /**
  * Initialize the table assigner component.
@@ -27,6 +29,7 @@ export function initTableAssigner(el, options) {
   items = [];
   nextId = 1;
   activePopupItemId = null;
+  editingItemId = null;
   render();
 }
 
@@ -125,6 +128,7 @@ export function clearItems() {
   items = [];
   nextId = 1;
   activePopupItemId = null;
+  editingItemId = null;
   render();
   notifyChange();
 }
@@ -137,6 +141,7 @@ export function clearItems() {
 export function loadItems(itemsArray) {
   nextId = 1;
   activePopupItemId = null;
+  editingItemId = null;
   items = (itemsArray || []).map((item) => ({
     id: nextId++,
     name: item.name,
@@ -172,6 +177,8 @@ function render() {
   containerEl.innerHTML = '';
 
   if (items.length === 0) {
+    editingItemId = null;
+    activePopupItemId = null;
     const hint = document.createElement('p');
     hint.className = 'table-hint';
     hint.textContent = t('table.addItemsHint');
@@ -212,6 +219,11 @@ function renderUnassignedTable() {
   // Tbody
   const tbody = document.createElement('tbody');
   items.forEach((item) => {
+    if (editingItemId === item.id) {
+      tbody.appendChild(createEditRow(item));
+      return;
+    }
+
     const remaining = getRemainingQty(item);
     const tr = document.createElement('tr');
     tr.dataset.itemId = item.id;
@@ -252,10 +264,24 @@ function renderUnassignedTable() {
       assignBtn.textContent = '+ ' + t('table.assign');
       assignBtn.addEventListener('click', () => {
         activePopupItemId = item.id;
+        editingItemId = null;
         render();
       });
       tdAction.appendChild(assignBtn);
     }
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn btn-edit-item';
+    editBtn.textContent = '✎';
+    editBtn.title = t('table.edit');
+    editBtn.setAttribute('aria-label', t('table.edit'));
+    editBtn.addEventListener('click', () => {
+      editingItemId = item.id;
+      activePopupItemId = null;
+      render();
+    });
+    tdAction.appendChild(editBtn);
+
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-delete-item';
@@ -265,6 +291,7 @@ function renderUnassignedTable() {
     deleteBtn.addEventListener('click', () => {
       items = items.filter((i) => i.id !== item.id);
       if (activePopupItemId === item.id) activePopupItemId = null;
+      if (editingItemId === item.id) editingItemId = null;
       render();
       notifyChange();
     });
@@ -287,6 +314,173 @@ function renderUnassignedTable() {
 
   table.appendChild(tbody);
   containerEl.appendChild(table);
+}
+
+function createEditRow(item) {
+  const tr = document.createElement('tr');
+  tr.className = 'edit-row';
+  tr.dataset.itemId = item.id;
+
+  // Item name
+  const tdName = document.createElement('td');
+  tdName.className = 'td-item-name td-edit-name';
+  tdName.dataset.label = t('label.item');
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'edit-item-name';
+  nameInput.value = item.name;
+  nameInput.placeholder = t('placeholder.itemName');
+  nameInput.setAttribute('aria-label', t('label.item'));
+  tdName.appendChild(nameInput);
+  tr.appendChild(tdName);
+
+  // Qty
+  const tdQty = document.createElement('td');
+  tdQty.className = 'td-edit-qty';
+  tdQty.dataset.label = t('table.qty');
+  const qtyInput = document.createElement('input');
+  qtyInput.type = 'number';
+  qtyInput.className = 'edit-item-qty';
+  qtyInput.value = String(item.totalQty);
+  qtyInput.min = '1';
+  qtyInput.step = '1';
+  qtyInput.placeholder = t('table.qty');
+  qtyInput.setAttribute('aria-label', t('table.qty'));
+  tdQty.appendChild(qtyInput);
+  tr.appendChild(tdQty);
+
+  // Unit price
+  const tdPrice = document.createElement('td');
+  tdPrice.className = 'td-edit-price';
+  tdPrice.dataset.label = t('table.unitPrice');
+  const priceInput = document.createElement('input');
+  priceInput.type = 'number';
+  priceInput.className = 'edit-item-price';
+  priceInput.value = String(item.unitPrice);
+  priceInput.min = '0';
+  priceInput.step = '1';
+  priceInput.placeholder = t('label.price');
+  priceInput.setAttribute('aria-label', t('table.unitPrice'));
+  tdPrice.appendChild(priceInput);
+  tr.appendChild(tdPrice);
+
+  // Action
+  const tdAction = document.createElement('td');
+  tdAction.className = 'td-edit-action';
+  tdAction.dataset.label = t('table.action');
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'btn btn-primary btn-save-item';
+  saveBtn.textContent = t('table.save');
+  saveBtn.title = t('table.save');
+  saveBtn.setAttribute('aria-label', t('table.save'));
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn btn-cancel-item';
+  cancelBtn.textContent = t('table.cancel');
+  cancelBtn.title = t('table.cancel');
+  cancelBtn.setAttribute('aria-label', t('table.cancel'));
+
+  tdAction.appendChild(saveBtn);
+  tdAction.appendChild(cancelBtn);
+  tr.appendChild(tdAction);
+
+  const handleSave = () => {
+    const rawName = nameInput.value;
+    const trimmedName = rawName.trim();
+    if (!trimmedName) {
+      showToast(t('table.errorItemName'), 'error');
+      try {
+        nameInput.focus();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    const rawPrice = priceInput.value.trim();
+    if (rawPrice === '' || !/^\d+$/.test(rawPrice)) {
+      showToast(t('table.errorItemPrice'), 'error');
+      try {
+        priceInput.focus();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    const priceNum = parseInt(rawPrice, 10);
+    if (priceNum < 0) {
+      showToast(t('table.errorItemPrice'), 'error');
+      try {
+        priceInput.focus();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    const rawQty = qtyInput.value.trim();
+    if (rawQty === '' || !/^\d+$/.test(rawQty)) {
+      showToast(t('table.errorItemQty'), 'error');
+      try {
+        qtyInput.focus();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    const qtyNum = parseInt(rawQty, 10);
+    if (qtyNum < 1) {
+      showToast(t('table.errorItemQty'), 'error');
+      try {
+        qtyInput.focus();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    const assignedQty = (item.assignments || []).reduce((sum, a) => sum + a.qty, 0);
+    if (qtyNum < assignedQty) {
+      showToast(t('table.qtyBelowAssigned'), 'error');
+      try {
+        qtyInput.focus();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    item.name = trimmedName;
+    item.unitPrice = priceNum;
+    item.totalQty = qtyNum;
+    editingItemId = null;
+
+    render();
+    notifyChange();
+  };
+
+  const handleCancel = () => {
+    editingItemId = null;
+    render();
+  };
+
+  saveBtn.addEventListener('click', handleSave);
+  cancelBtn.addEventListener('click', handleCancel);
+
+  tr.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    }
+  });
+
+  return tr;
 }
 
 function createAssignPopup(item, maxQty) {

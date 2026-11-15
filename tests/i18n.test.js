@@ -12,4 +12,26 @@ describe('i18n translations', () => {
     expect(typeof en['footer.credit']).toBe('string');
     expect(en['footer.credit'].length).toBeGreaterThan(0);
   });
+
+  it('has item inline editing keys defined in both id and en', () => {
+    const keys = [
+      'table.edit',
+      'table.save',
+      'table.cancel',
+      'table.errorItemName',
+      'table.errorItemPrice',
+      'table.errorItemQty',
+      'table.qtyBelowAssigned',
+    ];
+
+    keys.forEach((key) => {
+      expect(id[key], `Missing ${key} in id`).toBeDefined();
+      expect(typeof id[key]).toBe('string');
+      expect(id[key].length).toBeGreaterThan(0);
+
+      expect(en[key], `Missing ${key} in en`).toBeDefined();
+      expect(typeof en[key]).toBe('string');
+      expect(en[key].length).toBeGreaterThan(0);
+    });
+  });
 });
