@@ -63,7 +63,7 @@ describe('UI Integration', () => {
 
       expect(getParticipants()).toEqual([]);
       const error = participantsEl.querySelector('#participant-error');
-      expect(error.textContent).toBe('Name cannot be empty');
+      expect(error.textContent).toBe('Nama tidak boleh kosong');
     });
 
     it('should not add duplicate name', () => {
@@ -82,7 +82,7 @@ describe('UI Integration', () => {
 
       expect(getParticipants()).toEqual(['Alice']);
       const error = participantsEl.querySelector('#participant-error');
-      expect(error.textContent).toBe('This name already exists');
+      expect(error.textContent).toBe('Nama ini sudah ada');
     });
 
     it('should remove a participant', () => {

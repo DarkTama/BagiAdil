@@ -8,7 +8,7 @@ import { t } from '../i18n/index.js';
 /**
  * Render OCR results with editable fields and confidence badges.
  * @param {{items: Array<{name: string, quantity: number, price: number, total: number}>, subtotal: number, discount: number, deliveryFee: number, platform: string}} parsedData
- * @param {{overall: number, level: string, issues: string[]}} confidence
+ * @param {{overall: number, level: string, issues: Array<{key: string, n?: number}>}} confidence
  * @param {HTMLElement} containerEl
  * @param {function} onConfirm - Callback receiving confirmed/corrected data
  */
@@ -26,7 +26,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
             <input type="text" class="ocr-item-name" value="${escapeHtml(item.name)}" data-field="name" />
           </div>
           <div class="ocr-item-field ocr-item-qty">
-            <label>Qty</label>
+            <label>${t('table.qty')}</label>
             <input type="number" class="ocr-item-quantity" value="${item.quantity}" min="1" data-field="quantity" />
           </div>
           <div class="ocr-item-field">
@@ -43,12 +43,12 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
     <div class="ocr-results">
       <div class="ocr-confidence">
         <span class="confidence-badge ${badgeClass}">
-          Confidence: ${confidence.overall}% (${confidenceLabel})
+          ${t('ocr.confidence').replace('{n}', confidence.overall).replace('{level}', confidenceLabel)}
         </span>
-        ${confidence.issues.length > 0 ? `<ul class="confidence-issues">${confidence.issues.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
+        ${confidence.issues.length > 0 ? `<ul class="confidence-issues">${confidence.issues.map((i) => `<li>${escapeHtml(t(i.key).replace('{n}', i.n))}</li>`).join('')}</ul>` : ''}
       </div>
       <div class="ocr-platform">
-        <span>Platform: <strong>${escapeHtml(parsedData.platform)}</strong></span>
+        <span>${t('ocr.platform')}: <strong>${escapeHtml(parsedData.platform)}</strong></span>
       </div>
       <div class="ocr-items-list">
         <h3>${t('ocr.detectedItems')}</h3>

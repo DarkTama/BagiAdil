@@ -7,7 +7,18 @@ import id from './id.js';
 import en from './en.js';
 
 const translations = { id, en };
-let currentLocale = localStorage.getItem('bagiadil-lang') || 'id';
+let currentLocale = 'id';
+try {
+  currentLocale = localStorage.getItem('bagiadil-lang') || 'id';
+} catch {
+  // storage unavailable (private mode, non-DOM test env): stay on the default
+}
+if (!translations[currentLocale]) currentLocale = 'id';
+
+function syncDocumentLang() {
+  if (typeof document !== 'undefined') document.documentElement.lang = currentLocale;
+}
+syncDocumentLang();
 
 /**
  * Get translation for a key in the current locale.
@@ -26,7 +37,12 @@ export function t(key) {
 export function setLocale(locale) {
   if (translations[locale]) {
     currentLocale = locale;
-    localStorage.setItem('bagiadil-lang', locale);
+    syncDocumentLang();
+    try {
+      localStorage.setItem('bagiadil-lang', locale);
+    } catch {
+      // ignore: the choice just won't persist
+    }
     document.dispatchEvent(new CustomEvent('locale-changed', { detail: { locale } }));
   }
 }

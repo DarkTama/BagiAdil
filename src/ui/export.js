@@ -329,7 +329,7 @@ async function handlePdfExport() {
     await lib().from(pdfContainer).set(opt).save();
     document.body.removeChild(pdfContainer);
   } catch {
-    alert('PDF export is not available in this environment.');
+    alert(t('export.pdfUnavailable'));
   } finally {
     const btn = containerEl.querySelector('.export-pdf-btn');
     if (btn) btn.disabled = false;
@@ -367,7 +367,7 @@ function fallbackCopy(text, btn) {
     document.execCommand('copy');
     showCopySuccess(btn);
   } catch {
-    alert('Failed to copy to clipboard');
+    alert(t('export.copyFailed'));
   }
   document.body.removeChild(textarea);
 }
@@ -375,7 +375,7 @@ function fallbackCopy(text, btn) {
 function showCopySuccess(btn) {
   if (!btn) return;
   const originalText = btn.innerHTML;
-  btn.innerHTML = '\u2705 Copied!';
+  btn.innerHTML = `\u2705 ${t('export.copied')}`;
   btn.classList.add('export-btn-success');
   setTimeout(() => {
     btn.innerHTML = originalText;
