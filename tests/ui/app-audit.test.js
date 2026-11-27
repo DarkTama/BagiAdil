@@ -373,3 +373,63 @@ describe('stale results (W3 H4)', () => {
     expect(q('#results .paid-toggle').disabled).toBe(false);
   });
 });
+
+describe('new split and auto new entry (W1 H2)', () => {
+  const deleteItem = () => q('#table-assigner .btn-delete-item').click();
+  const removePerson = (i) => qa('.chip-remove')[i].click();
+  const hist = loadHistoryRaw;
+
+  const probe = (removeBeforeDelete) => {
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    q('#results .paid-toggle').click();
+    if (removeBeforeDelete) {
+      removePerson(0);
+      deleteItem();
+    } else {
+      deleteItem();
+      removePerson(0);
+    }
+    addPerson('Budi');
+    addItem('Bakso', 15000, 1);
+    assign(0, 'Budi', 1);
+    q('#calculate').click();
+    const entries = hist();
+    expect(entries.length).toBe(2);
+    const fresh = entries.find((e) => e.items[0].name === 'Bakso');
+    const old = entries.find((e) => e.items[0].name === 'Nasi');
+    expect(fresh.paid).toEqual({});
+    expect(old.paid).toEqual({ Ani: true });
+  };
+
+  it('items deleted, then person removed: second bill gets its own entry', () => probe(false));
+  it('person removed, then items deleted: second bill gets its own entry', () => probe(true));
+
+  it('Split baru after a fresh saved calculation does not confirm and blanks the editor', () => {
+    let asked = 0;
+    window.confirm = () => { asked++; return true; };
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    q('#new-split').click();
+    expect(asked).toBe(0);
+    expect(qa('.chip').length).toBe(0);
+    expect(qa('#table-assigner tbody tr[data-item-id]').length).toBe(0);
+    expect(cardNames()).toEqual([]);
+    expect(q('#export-section').hidden).toBe(true);
+    expect(hist().length).toBe(1);
+  });
+
+  it('Split baru asks first when the work is unsaved, and keeps it on cancel', () => {
+    let asked = 0;
+    window.confirm = () => { asked++; return false; };
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    q('#new-split').click();
+    expect(asked).toBe(1);
+    expect(qa('.chip').length).toBe(1);
+  });
+});

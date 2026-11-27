@@ -116,6 +116,7 @@ export function initApp() {
 
   // Wire up calculate button
   calculateBtn.addEventListener('click', handleCalculate);
+  document.querySelector('#new-split')?.addEventListener('click', newSplit);
 
   // Listen for locale changes
   document.addEventListener('locale-changed', () => {
@@ -262,7 +263,30 @@ function applySnapshot(snap) {
 
 function onEditorChange() {
   if (applying) return;
-  editorChanged(readEditor());
+  const snapshot = readEditor();
+  const { historyId, calc } = getSession();
+  // Items emptied out of a split that was saved or calculated: whatever comes
+  // next is a different bill and must get its own history entry.
+  if (snapshot.items.length === 0 && (historyId || calc)) {
+    resetSession();
+    return;
+  }
+  editorChanged(snapshot);
+}
+
+/** "Split baru": blank editor and a fresh session. History keeps the old entry. */
+function newSplit() {
+  const { participants, items } = readEditor();
+  const { historyId, calc, stale } = getSession();
+  const blank = participants.length === 0 && items.length === 0;
+  const unsaved = !historyId || stale || calc === null;
+  if (!blank && unsaved && !window.confirm(t('split.newConfirm'))) return;
+
+  applySnapshot({ participants: [], items: [], params: { totalDiscount: 0, totalShipping: 0 } });
+  resetSession();
+  const ocrResults = document.querySelector('#ocr-results-section');
+  if (ocrResults) ocrResults.hidden = true;
+  setMode('manual');
 }
 
 function handleOCRResult(ocrResult) {
@@ -459,7 +483,7 @@ function renderSharedView(snapshot) {
   // #split-workflow and #results stay visible so the result can render.
   [
     '.mode-tabs', '#manual-section', '#ocr-section', '#history',
-    '#table-assigner', '#calculate-status', '#calculate',
+    '#table-assigner', '#calculate-status', '#calculate', '#new-split',
     '#validation-errors', '#export-section',
   ].forEach((sel) => {
     const el = document.querySelector(sel);

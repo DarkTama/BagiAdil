@@ -10,6 +10,8 @@ const en = {
   'section.discountShipping': 'Discount & Shipping',
   'section.results': 'Results',
   'btn.calculate': 'Calculate Split',
+  'btn.newSplit': 'New split',
+  'split.newConfirm': 'Discard this split and start a new one? Unsaved results will be lost.',
   'upload.dragDrop': 'Drag & drop receipt image here',
   'upload.chooseImage': 'Choose Image',
   'upload.optimizing': 'Optimizing image...',
