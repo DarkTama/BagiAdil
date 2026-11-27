@@ -30,7 +30,12 @@ export function formatCurrency(amount) {
 export function parseRupiah(str) {
   if (typeof str === 'number') return Math.round(str) || 0;
   if (!str) return 0;
-  // Drop a trailing 2-digit decimal part ("12.500,00") so it is not read as x100.
-  const digits = String(str).trim().replace(/[.,]\d{2}$/, '').replace(/\D/g, '');
+  // Drop a trailing 2-digit decimal part ("12.500,00" or "12,500.00") so it is
+  // not read as x100. A bare ".dd" is a thousands group mid-edit ("Rp 12.50"
+  // after deleting a digit), so only strip "." decimals when a comma precedes.
+  const digits = String(str)
+    .trim()
+    .replace(/,\d{2}$|(,.*)\.\d{2}$/, '$1')
+    .replace(/\D/g, '');
   return digits ? parseInt(digits, 10) : 0;
 }
