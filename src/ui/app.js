@@ -458,6 +458,7 @@ function renderSharedView(snapshot) {
     resultsEl.appendChild(resultsContainer);
     try {
       const { result, itemsMap, payment } = computeSplit(snapshot);
+      if (!result) throw new Error('nothing to split');
       renderResults(result, resultsContainer, itemsMap, { payment });
     } catch {
       resultsContainer.textContent = t('share.invalid');

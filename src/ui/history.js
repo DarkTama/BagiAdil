@@ -91,6 +91,7 @@ function renderEntry(entry) {
   let summary = '';
   try {
     const { result } = computeSplit(entry);
+    if (!result) throw new Error('no summary');
     // Count only the people actually in the split (those with items / a
     // non-zero order) - matches the results view. Participants who were
     // added but assigned nothing do not owe and are not counted.

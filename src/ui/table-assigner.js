@@ -6,6 +6,7 @@
 import { t } from '../i18n/index.js';
 import { formatCurrency } from '../engine/formatter.js';
 import { showToast } from './toast.js';
+import { aggregateByPerson } from './snapshot.js';
 import { attachCurrencyInput, getCurrencyValue, setCurrencyValue } from './currency-input.js';
 
 // Accepts plain digits ("25000") or Rupiah-grouped text ("Rp 25.000", "25.000").
@@ -44,24 +45,7 @@ export function initTableAssigner(el, options) {
  * @returns {object} {items, allAssigned, remainingCount, assignments}
  */
 export function getTableState() {
-  const assignments = {};
-  participants.forEach((p) => {
-    assignments[p] = { items: [], subtotal: 0 };
-  });
-
-  items.forEach((item) => {
-    item.assignments.forEach((a) => {
-      if (!assignments[a.person]) {
-        assignments[a.person] = { items: [], subtotal: 0 };
-      }
-      assignments[a.person].items.push({
-        name: item.name,
-        qty: a.qty,
-        unitPrice: item.unitPrice,
-      });
-      assignments[a.person].subtotal += a.qty * item.unitPrice;
-    });
-  });
+  const assignments = aggregateByPerson(participants, items);
 
   const remainingCount = items.filter((item) => getRemainingQty(item) > 0).length;
 
@@ -530,23 +514,10 @@ function createAssignPopup(item, maxQty) {
 }
 
 function renderAssignedSection() {
-  // Build per-person assignment data
-  const personData = {};
-  items.forEach((item) => {
-    item.assignments.forEach((a) => {
-      if (!personData[a.person]) {
-        personData[a.person] = { items: [], subtotal: 0 };
-      }
-      personData[a.person].items.push({
-        itemId: item.id,
-        name: item.name,
-        qty: a.qty,
-        unitPrice: item.unitPrice,
-        total: a.qty * item.unitPrice,
-      });
-      personData[a.person].subtotal += a.qty * item.unitPrice;
-    });
-  });
+  // Only people who actually have assigned items get a card.
+  const personData = Object.fromEntries(
+    Object.entries(aggregateByPerson(participants, items)).filter(([, d]) => d.items.length > 0),
+  );
 
   const hasAssignments = Object.keys(personData).length > 0;
   if (!hasAssignments) return;
@@ -572,7 +543,7 @@ function renderAssignedSection() {
       line.className = 'assigned-item-line';
 
       const desc = document.createElement('span');
-      desc.textContent = assignedItem.qty + 'x ' + assignedItem.name + ' @ ' + formatCurrency(assignedItem.unitPrice) + ' = ' + formatCurrency(assignedItem.total);
+      desc.textContent = assignedItem.qty + 'x ' + assignedItem.name + ' @ ' + formatCurrency(assignedItem.unitPrice) + ' = ' + formatCurrency(assignedItem.price);
       line.appendChild(desc);
 
       const undoBtn = document.createElement('button');
