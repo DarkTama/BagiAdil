@@ -2,7 +2,7 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['dist/**', 'dist-bridge/**', 'node_modules/**'],
+    ignores: ['dist/**', 'dist-bridge/**', 'node_modules/**', '.wrangler/**'],
   },
   {
     languageOptions: {
