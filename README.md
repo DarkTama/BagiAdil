@@ -134,13 +134,15 @@ The project has comprehensive tests covering the calculation engine, OCR parsers
 
 ## Deployment
 
-BagiAdil is deployed on [Cloudflare Pages](https://pages.cloudflare.com/) at [https://bagiadil.darktama.dev](https://bagiadil.darktama.dev) via its Git integration:
+BagiAdil is deployed as a static-assets [Cloudflare Worker](https://developers.cloudflare.com/workers/static-assets/) at [https://bagiadil.darktama.dev](https://bagiadil.darktama.dev) via Workers Builds (Git integration):
 
 - **Build command:** `npm run build`
-- **Build output directory:** `dist`
+- **Deploy command:** `npx wrangler deploy` (serves `dist`, see `wrangler.json`)
 - **Node version:** `22` (pinned in `.nvmrc`)
 
 Static cache rules are configured in `public/_headers`.
+
+The old URL `https://darktama.github.io/BagiAdil/` serves the bridge in `bridge/` (deployed manually with the `deploy.yml` workflow), which hands each user's saved data over to the new domain.
 
 ## Design Principles
 
