@@ -17,11 +17,7 @@ export function updateTranslations() {
   const uploadSubtext = uploadContainerEl.querySelector('.upload-subtext');
   if (uploadSubtext) uploadSubtext.textContent = t('upload.or');
   const uploadBtn = uploadContainerEl.querySelector('.upload-btn');
-  if (uploadBtn) {
-    const input = uploadBtn.querySelector('input');
-    uploadBtn.textContent = t('upload.chooseImage');
-    if (input) uploadBtn.appendChild(input);
-  }
+  if (uploadBtn) uploadBtn.textContent = t('upload.chooseImage');
 }
 
 /**
@@ -37,10 +33,8 @@ export function initUpload(containerEl, onComplete) {
         <p class="upload-icon">\u{1F4F7}</p>
         <p class="upload-text">${t('upload.dragDrop')}</p>
         <p class="upload-subtext">${t('upload.or')}</p>
-        <label class="btn btn-primary upload-btn">
-          Choose Image
-          <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" capture="environment" hidden />
-        </label>
+        <button type="button" class="btn btn-primary upload-btn" id="upload-btn">${t('upload.chooseImage')}</button>
+        <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" hidden />
       </div>
     </div>
     <div class="upload-preview" id="upload-preview" hidden>
@@ -65,6 +59,15 @@ export function initUpload(containerEl, onComplete) {
   const progressBar = containerEl.querySelector('#progress-bar');
 
   let currentObjectURL = null;
+
+  // Real button = keyboard reachable. No `capture` attribute, so the picker
+  // offers camera, gallery and files (receipts are usually screenshots).
+  const uploadBtn = containerEl.querySelector('#upload-btn');
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  // Clicking the empty part of the zone opens the picker too.
+  zone.addEventListener('click', (e) => {
+    if (e.target !== uploadBtn) fileInput.click();
+  });
 
   // File input change
   fileInput.addEventListener('change', (e) => {
