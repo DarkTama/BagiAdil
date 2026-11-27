@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+/* global Storage */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   saveParticipants,
   loadParticipants,
@@ -166,6 +167,61 @@ describe('Storage - localStorage integration', () => {
 
     it('should return an empty array when no history exists', () => {
       expect(loadHistory()).toEqual([]);
+    });
+  });
+
+  describe('history safety', () => {
+    const entry = (label) => ({
+      label,
+      participants: ['A'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [{ name: 'X', unitPrice: 1000, totalQty: 1, assignments: [{ person: 'A', qty: 1 }] }],
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('returns null when the write fails', () => {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+      expect(saveHistoryEntry(entry('x'))).toBeNull();
+    });
+
+    it('backs up an unparsable history value once before it is overwritten', () => {
+      localStorage.setItem('bagiadil_history', '[{"id":"a"');
+      saveHistoryEntry(entry('fresh'));
+      expect(localStorage.getItem('bagiadil_history_corrupt')).toBe('[{"id":"a"');
+      expect(loadHistory().length).toBe(1);
+      // A second corrupt read must not overwrite the first backup.
+      localStorage.setItem('bagiadil_history', 'garbage');
+      loadHistory();
+      expect(localStorage.getItem('bagiadil_history_corrupt')).toBe('[{"id":"a"');
+    });
+
+    it('evicts by updatedAt, so an edited old entry survives the 50 cap', () => {
+      let now = 1000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now++);
+      const ids = [];
+      for (let i = 0; i < 50; i++) ids.push(saveHistoryEntry(entry(`e${i}`)));
+      saveHistoryEntry({ ...entry('e0 edited'), id: ids[0] }); // oldest, now freshest
+      saveHistoryEntry(entry('newest'));
+      const kept = loadHistory();
+      expect(kept.length).toBe(50);
+      expect(kept.some((e) => e.id === ids[0])).toBe(true);
+      expect(kept.some((e) => e.id === ids[1])).toBe(false);
+    });
+
+    it('does not create a ghost entry for a partial update of an unknown id', () => {
+      saveHistoryEntry(entry('real'));
+      expect(saveHistoryEntry({ id: 'nope', paid: { A: true } })).toBeNull();
+      expect(loadHistory().length).toBe(1);
+    });
+
+    it('delete and rename report success as a boolean', () => {
+      const id = saveHistoryEntry(entry('x'));
+      expect(renameHistoryEntry(id, 'y')).toBe(true);
+      expect(renameHistoryEntry('nope', 'y')).toBe(false);
+      expect(deleteHistoryEntry(id)).toBe(true);
     });
   });
 
