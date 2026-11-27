@@ -1,55 +1,56 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { preprocessForOCR } from '../../src/ocr/image-preprocess.js';
+import { preprocessForOCR, upscaleForOCRRetry } from '../../src/ocr/image-preprocess.js';
 
-describe('preprocessForOCR', () => {
-  const originalCreateImageBitmap = globalThis.createImageBitmap;
+const originalCreateImageBitmap = globalThis.createImageBitmap;
 
-  afterEach(() => {
-    if (originalCreateImageBitmap === undefined) {
-      delete globalThis.createImageBitmap;
-    } else {
-      globalThis.createImageBitmap = originalCreateImageBitmap;
-    }
-    vi.restoreAllMocks();
+afterEach(() => {
+  if (originalCreateImageBitmap === undefined) {
+    delete globalThis.createImageBitmap;
+  } else {
+    globalThis.createImageBitmap = originalCreateImageBitmap;
+  }
+  vi.restoreAllMocks();
+});
+
+function mockCanvasAndBitmap({ width, height, pixels = [0, 0, 0, 255, 255, 255, 255, 255] }) {
+  const closeSpy = vi.fn();
+  globalThis.createImageBitmap = vi.fn().mockResolvedValue({
+    width,
+    height,
+    close: closeSpy,
   });
 
-  function mockCanvasAndBitmap({ width, height, pixels }) {
-    const closeSpy = vi.fn();
-    globalThis.createImageBitmap = vi.fn().mockResolvedValue({
-      width,
-      height,
-      close: closeSpy,
-    });
+  const data = new Uint8ClampedArray(pixels);
+  const drawImage = vi.fn();
+  const putImageData = vi.fn();
+  const ctx = {
+    drawImage,
+    getImageData: vi.fn(() => ({ data })),
+    putImageData,
+  };
 
-    const data = new Uint8ClampedArray(pixels);
-    const drawImage = vi.fn();
-    const putImageData = vi.fn();
-    const ctx = {
-      drawImage,
-      getImageData: vi.fn(() => ({ data })),
-      putImageData,
-    };
+  const outputBlob = new Blob(['processed'], { type: 'image/jpeg' });
+  const toBlob = vi.fn((cb) => cb(outputBlob));
 
-    const outputBlob = new Blob(['processed'], { type: 'image/jpeg' });
-    const toBlob = vi.fn((cb) => cb(outputBlob));
+  const origCreateElement = document.createElement.bind(document);
+  vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+    if (tag === 'canvas') {
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ctx,
+        toBlob,
+      };
+    }
+    return origCreateElement(tag);
+  });
 
-    const origCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      if (tag === 'canvas') {
-        return {
-          width: 0,
-          height: 0,
-          getContext: () => ctx,
-          toBlob,
-        };
-      }
-      return origCreateElement(tag);
-    });
+  return { ctx, data, drawImage, putImageData, toBlob, outputBlob, closeSpy };
+}
 
-    return { data, drawImage, putImageData, toBlob, outputBlob, closeSpy };
-  }
+describe('preprocessForOCR', () => {
 
   it('returns non-image files unchanged', async () => {
     const pdf = new File(['%PDF-1.4'], 'receipt.pdf', {
@@ -128,5 +129,71 @@ describe('preprocessForOCR', () => {
     expect(data[4]).toBe(255);
     expect(data[5]).toBe(255);
     expect(data[6]).toBe(255);
+  });
+});
+
+describe('upscaleForOCRRetry', () => {
+  it('returns non-image, falsy, and unsupported-env inputs unchanged', async () => {
+    const pdf = new File(['%PDF-1.4'], 'receipt.pdf', { type: 'application/pdf' });
+    expect(await upscaleForOCRRetry(pdf)).toBe(pdf);
+    expect(await upscaleForOCRRetry(null)).toBe(null);
+    expect(await upscaleForOCRRetry(undefined)).toBe(undefined);
+
+    const img = new File([new Uint8Array([1, 2, 3, 4])], 'receipt.jpg', {
+      type: 'image/jpeg',
+    });
+    expect(await upscaleForOCRRetry(img)).toBe(img);
+  });
+
+  it('upscales low-res WhatsApp screenshot 2x as lossless PNG with high-quality smoothing', async () => {
+    const img = new File([new Uint8Array([1, 2, 3, 4])], 'wa-receipt.jpg', {
+      type: 'image/jpeg',
+    });
+    const { ctx, drawImage, toBlob, outputBlob, closeSpy } = mockCanvasAndBitmap({
+      width: 709,
+      height: 1600,
+    });
+
+    const result = await upscaleForOCRRetry(img);
+
+    expect(result).toBe(outputBlob);
+    expect(ctx.imageSmoothingEnabled).toBe(true);
+    expect(ctx.imageSmoothingQuality).toBe('high');
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1418, 3200);
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png');
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it('caps upscaling at maxDimension=3200 for medium-resolution screenshots', async () => {
+    const img = new File([new Uint8Array([1, 2, 3, 4])], 'med-receipt.png', {
+      type: 'image/png',
+    });
+    const { drawImage, toBlob, outputBlob } = mockCanvasAndBitmap({
+      width: 1080,
+      height: 2400,
+    });
+
+    const result = await upscaleForOCRRetry(img);
+
+    expect(result).toBe(outputBlob);
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1440, 3200);
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png');
+  });
+
+  it('returns already-large images unchanged without shrinking or re-encoding', async () => {
+    const img = new File([new Uint8Array([1, 2, 3, 4])], 'large-receipt.png', {
+      type: 'image/png',
+    });
+    const { drawImage, toBlob, closeSpy } = mockCanvasAndBitmap({
+      width: 2000,
+      height: 3600,
+    });
+
+    const result = await upscaleForOCRRetry(img);
+
+    expect(result).toBe(img);
+    expect(drawImage).not.toHaveBeenCalled();
+    expect(toBlob).not.toHaveBeenCalled();
+    expect(closeSpy).toHaveBeenCalled();
   });
 });

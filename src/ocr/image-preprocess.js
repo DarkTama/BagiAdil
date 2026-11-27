@@ -93,3 +93,59 @@ export async function preprocessForOCR(file, { maxDimension = 2800 } = {}) {
     return file;
   }
 }
+
+/**
+ * Upscale a low-resolution image as a lossless PNG for a second-pass OCR retry.
+ * Small/WhatsApp-compressed screenshots often misread thin digits until
+ * upscaled for Tesseract's LSTM recognizer.
+ * @param {File|Blob} file - The image to upscale.
+ * @param {object} [options]
+ * @param {number} [options.scale=2] - Target upscale multiplier.
+ * @param {number} [options.maxDimension=3200] - Longest-edge cap in pixels.
+ * @returns {Promise<File|Blob>} The upscaled PNG blob, or the original file.
+ */
+export async function upscaleForOCRRetry(
+  file,
+  { scale = 2, maxDimension = 3200 } = {},
+) {
+  if (!file || !file.type || !file.type.startsWith('image/')) {
+    return file;
+  }
+  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const longest = Math.max(bitmap.width, bitmap.height);
+    const effectiveScale = Math.min(scale, maxDimension / longest);
+    if (effectiveScale <= 1) {
+      bitmap.close?.();
+      return file;
+    }
+
+    const width = Math.max(1, Math.round(bitmap.width * effectiveScale));
+    const height = Math.max(1, Math.round(bitmap.height * effectiveScale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close?.();
+      return file;
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/png');
+    });
+    return blob || file;
+  } catch {
+    return file;
+  }
+}
