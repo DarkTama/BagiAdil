@@ -30,3 +30,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Build bridge
+        run: npm run build:bridge
