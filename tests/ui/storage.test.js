@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   saveParticipants,
   loadParticipants,
+  loadQuickPickParticipants,
+  hideQuickPickParticipant,
   getSuggestions,
   clearStorage,
   saveHistoryEntry,
@@ -266,6 +268,70 @@ describe('Storage - localStorage integration', () => {
       savePaymentInfo({ bank: 'GoPay', accountNumber: '08123456789', accountName: 'Budi' });
       clearPaymentInfo();
       expect(loadPaymentInfo()).toBeNull();
+    });
+  });
+
+  describe('quick-pick participants', () => {
+    it('ranks by frequency then recency, seeds saved & legacy group names, and keeps newest casing', () => {
+      localStorage.setItem(
+        'bagiadil_history',
+        JSON.stringify([
+          {
+            id: '1',
+            participants: ['budi', 'Sari', 'budi'], // dup within single split counts once
+            items: [],
+            updatedAt: 1000,
+          },
+          {
+            id: '2',
+            participants: ['Budi', 'Dimas'],
+            items: [],
+            updatedAt: 3000,
+          },
+          {
+            id: '3',
+            participants: ['Eka'],
+            items: [],
+            updatedAt: 2000,
+          },
+        ]),
+      );
+      saveParticipants(['Zaki', 'Budi']);
+      localStorage.setItem(
+        'bagiadil_groups',
+        JSON.stringify([{ name: 'Kantor', members: ['Rina', 'Sari'] }]),
+      );
+
+      // Budi: 2 splits (newest casing 'Budi' from updatedAt=3000)
+      // Dimas: 1 split, updatedAt=3000
+      // Eka: 1 split, updatedAt=2000
+      // Sari: 1 split, updatedAt=1000
+      // Seeded (0 splits, alphabetical): Rina, Zaki
+      expect(loadQuickPickParticipants()).toEqual([
+        'Budi',
+        'Dimas',
+        'Eka',
+        'Sari',
+        'Rina',
+        'Zaki',
+      ]);
+    });
+
+    it('hides dismissed names even when present in history, and un-hides when explicitly saved again', () => {
+      localStorage.setItem(
+        'bagiadil_history',
+        JSON.stringify([
+          { id: '1', participants: ['Typoo', 'Budi'], items: [], updatedAt: 2000 },
+        ]),
+      );
+      saveParticipants(['Typoo', 'Budi']);
+
+      hideQuickPickParticipant('typoo');
+      expect(loadQuickPickParticipants()).toEqual(['Budi']);
+      expect(loadParticipants()).toEqual(['Budi']);
+
+      saveParticipants(['Typoo']);
+      expect(loadQuickPickParticipants()).toEqual(['Budi', 'Typoo']);
     });
   });
 });
