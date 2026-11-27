@@ -32,24 +32,38 @@ import { buildSnapshot, computeSplit, decodeSnapshot, validateSnapshot } from '.
 import { getSession, getPayment, subscribe, update, setCalculated, resetSession, editorChanged } from './session.js';
 import { showToast } from './toast.js';
 import { initGuide } from './guide.js';
-import { importMigrationFromHash } from './migration.js';
+import {
+  importMigrationFromHash,
+  initMigrationNotice,
+  updateMigrationNoticeTranslations,
+} from './migration.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
 
 // Re-entrancy guard (not state): true while applySnapshot / OCR populate write
 // the editor programmatically, so their intermediate states are not tracked.
 let applying = false;
 
+const LOCALE_LISTENER_KEY = Symbol.for('bagiadil.localeListener');
+
+function setLocaleListener(handler) {
+  if (document[LOCALE_LISTENER_KEY]) {
+    document.removeEventListener('locale-changed', document[LOCALE_LISTENER_KEY]);
+  }
+  document[LOCALE_LISTENER_KEY] = handler;
+  document.addEventListener('locale-changed', handler);
+}
+
 /**
  * Initialize the entire app UI.
  */
 export function initApp() {
   // Import data carried from the old GitHub Pages origin before reading share links or drafts.
-  importMigrationFromHash();
+  const migration = importMigrationFromHash();
 
   // Shared link: if the URL carries a split snapshot, show a read-only result.
   const sharedSnapshot = getSharedSnapshot();
   if (sharedSnapshot) {
-    renderSharedView(sharedSnapshot);
+    renderSharedView(sharedSnapshot, migration);
     return;
   }
   // A share link that cannot be decoded: drop it and open the normal editor.
@@ -131,12 +145,15 @@ export function initApp() {
   document.querySelector('#new-split')?.addEventListener('click', newSplit);
 
   // Listen for locale changes
-  document.addEventListener('locale-changed', () => {
+  setLocaleListener(() => {
     updateAllTranslations();
   });
 
   // Reopen the last in-progress split (after every component exists).
   restoreDraft();
+
+  // Show bridge migration banner if applicable.
+  initMigrationNotice(migration);
 
   // Apply initial translations
   updateAllTranslations();
@@ -173,6 +190,7 @@ function updateAllTranslations() {
   updateExportTranslations();
   updateTableTranslations();
   updateHistoryTranslations();
+  updateMigrationNoticeTranslations();
 
   render();
 }
@@ -528,7 +546,7 @@ function getSharedSnapshot() {
  * Render a read-only shared split result, hiding all editor controls.
  * @param {object} snapshot
  */
-function renderSharedView(snapshot) {
+function renderSharedView(snapshot, migration = null) {
   // Hide every editor control. Use inline display:none rather than the hidden
   // attribute - .mode-tabs has display:flex, which would override [hidden].
   // #split-workflow and #results stay visible so the result can render.
@@ -542,6 +560,7 @@ function renderSharedView(snapshot) {
   });
 
   initLangToggle();
+  initMigrationNotice(migration);
 
   const resultsEl = document.querySelector('#results .section-content');
 
@@ -569,10 +588,11 @@ function renderSharedView(snapshot) {
     resultsEl.appendChild(newBtn);
   }
 
-  document.addEventListener('locale-changed', () => {
+  setLocaleListener(() => {
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       el.textContent = t(el.dataset.i18n);
     });
+    updateMigrationNoticeTranslations();
     renderShared();
   });
 

@@ -145,7 +145,11 @@ const en = {
   'export.copyFailed': 'Failed to copy to clipboard',
   'export.pdfUnavailable': 'PDF export is not available in this environment.',
   'guide.close': 'Got it',
-  'migration.success': 'Your data from the old version has been moved',
+  'migration.bannerImported':
+    'BagiAdil now lives at bagiadil.darktama.dev. Your data from the old address has been moved. Bookmark the new address!',
+  'migration.bannerNothing':
+    'BagiAdil now lives at bagiadil.darktama.dev. Bookmark the new address!',
+  'migration.dismiss': 'Dismiss notice',
   'migration.invalid': 'Migration data is invalid and was ignored.',
 };
 

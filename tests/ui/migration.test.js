@@ -66,7 +66,7 @@ beforeEach(() => {
 });
 
 describe('origin migration import', () => {
-  it('imports allowed keys into empty storage when referrer and payload.from match, cleans URL, shows toast, and renders history without receipts', async () => {
+  it('imports allowed keys into empty storage when referrer and payload.from match, cleans URL, shows move banner, and renders history without receipts', async () => {
     const entry1 = makeHistoryEntry('h1', 2000, 'Dinner');
     const entry2 = makeHistoryEntry('h2', 3000, 'Coffee');
     const payload = {
@@ -92,10 +92,19 @@ describe('origin migration import', () => {
     // URL cleaned
     expect(location.hash).toBe('');
 
-    // Success toast in imported locale (en)
-    const toast = q('.toast.toast--success');
-    expect(toast).toBeTruthy();
-    expect(toast.textContent).toBe('Your data from the old version has been moved');
+    // Banner shown in imported locale (en), no success toast
+    expect(q('.toast.toast--success')).toBeNull();
+    const banner = q('.migration-banner[role="status"]');
+    expect(banner).toBeTruthy();
+    expect(banner.querySelector('.migration-notice-text').textContent).toBe(
+      'BagiAdil now lives at bagiadil.darktama.dev. Your data from the old address has been moved. Bookmark the new address!',
+    );
+    expect(banner.querySelector('.migration-notice-text strong')?.textContent).toBe(
+      'bagiadil.darktama.dev',
+    );
+    const closeBtn = banner.querySelector('.migration-notice-close');
+    expect(closeBtn).toBeTruthy();
+    expect(closeBtn.getAttribute('aria-label')).toBeTruthy();
 
     // Guide was marked seen before initGuide ran, so no modal popped up
     expect(q('.guide-modal')).toBeNull();
@@ -138,8 +147,10 @@ describe('origin migration import', () => {
 
     await bootApp(`migrate=${encodeMigrate(payload)}`, '');
 
+    // Crafted #migrate= without bridge referrer: no toast, no banner, nothing written
     expect(location.hash).toBe('');
     expect(q('.toast')).toBeNull();
+    expect(q('.migration-banner')).toBeNull();
     expect(localStorage.getItem('bagiadil_payment')).toBeNull();
     expect(localStorage.getItem('bagiadil_participants')).toBeNull();
   });
@@ -382,13 +393,127 @@ describe('origin migration import', () => {
     expect(JSON.parse(localStorage.getItem('bagiadil_participants'))).toEqual(['Ani', 'Budi']);
     expect(localStorage.getItem('bagiadil-lang')).toBe('en');
 
-    // Toast shown AND shared view rendered
-    expect(q('.toast.toast--success')?.textContent).toBe(
-      'Your data from the old version has been moved',
+    // Banner shown AND shared view rendered, no success toast
+    expect(q('.toast.toast--success')).toBeNull();
+    const banner = q('.migration-banner[role="status"]');
+    expect(banner).toBeTruthy();
+    expect(banner.querySelector('.migration-notice-text').textContent).toBe(
+      'BagiAdil now lives at bagiadil.darktama.dev. Your data from the old address has been moved. Bookmark the new address!',
     );
     expect(qa('#results .result-card .result-card-name').map((e) => e.textContent)).toEqual([
       'Zed',
     ]);
     expect(q('#manual-section').style.display).toBe('none');
+  });
+
+  it('shows the "nothing" banner when arriving from the bridge without migrate= and writes nothing', async () => {
+    await bootApp('');
+
+    expect(q('.toast')).toBeNull();
+    const banner = q('.migration-banner[role="status"]');
+    expect(banner).toBeTruthy();
+    expect(banner.querySelector('.migration-notice-text').textContent).toBe(
+      'BagiAdil sekarang ada di bagiadil.darktama.dev. Simpan alamat baru ini ya!',
+    );
+    expect(banner.querySelector('.migration-notice-text strong')?.textContent).toBe(
+      'bagiadil.darktama.dev',
+    );
+    expect(localStorage.getItem('bagiadil_participants')).toBeNull();
+    expect(localStorage.getItem('bagiadil_history')).toBeNull();
+  });
+
+  it('shows the "nothing" banner in shared view when arriving from the bridge without migrate=', async () => {
+    const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
+    const shareEncoded = encodeSnapshot({
+      participants: ['Zed'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [
+        { name: 'Soto', unitPrice: 20000, totalQty: 1, assignments: [{ person: 'Zed', qty: 1 }] },
+      ],
+    });
+
+    await bootApp(`share=${shareEncoded}`);
+
+    const banner = q('.migration-banner[role="status"]');
+    expect(banner).toBeTruthy();
+    expect(banner.querySelector('.migration-notice-text').textContent).toBe(
+      'BagiAdil sekarang ada di bagiadil.darktama.dev. Simpan alamat baru ini ya!',
+    );
+    expect(qa('#results .result-card .result-card-name').map((e) => e.textContent)).toEqual([
+      'Zed',
+    ]);
+  });
+
+  it('closing the banner hides it for this page load only and shows again on next bridge arrival', async () => {
+    await bootApp('');
+
+    const banner = q('.migration-banner[role="status"]');
+    expect(banner).toBeTruthy();
+    banner.querySelector('.migration-notice-close').click();
+
+    expect(q('.migration-banner')).toBeNull();
+    expect(q('#migration-notice').hidden).toBe(true);
+
+    // Switching language after closing must not bring the dismissed banner back
+    q('.lang-btn:not(.active)').click();
+    expect(q('.migration-banner')).toBeNull();
+
+    // Next arrival from the bridge shows the banner again
+    await bootApp('');
+    expect(q('.migration-banner[role="status"]')).toBeTruthy();
+  });
+
+  it('updates banner language when toggling locale', async () => {
+    await bootApp('');
+    expect(q('.migration-banner .migration-notice-text').textContent).toBe(
+      'BagiAdil sekarang ada di bagiadil.darktama.dev. Simpan alamat baru ini ya!',
+    );
+
+    q('.lang-btn[data-lang="en"]').click();
+    expect(q('.migration-banner .migration-notice-text').textContent).toBe(
+      'BagiAdil now lives at bagiadil.darktama.dev. Bookmark the new address!',
+    );
+    expect(q('.migration-banner .migration-notice-text strong')?.textContent).toBe(
+      'bagiadil.darktama.dev',
+    );
+  });
+
+  it('returns { fromBridge, outcome } for all importMigrationFromHash paths', async () => {
+    const check = async (hash, referrer) => {
+      vi.resetModules();
+      loadDom();
+      setReferrer(referrer);
+      window.history.replaceState(null, '', '/' + (hash ? `#${hash}` : ''));
+      const { importMigrationFromHash } = await import('../../src/ui/migration.js');
+      return importMigrationFromHash();
+    };
+
+    expect(await check('', '')).toEqual({ fromBridge: false, outcome: 'none' });
+    expect(await check('', `${ALLOWED_ORIGIN}/BagiAdil/`)).toEqual({
+      fromBridge: true,
+      outcome: 'nothing',
+    });
+    expect(
+      await check(
+        `migrate=${encodeMigrate({ v: 1, from: ALLOWED_ORIGIN, data: { bagiadil_participants: '["Ani"]' } })}`,
+        '',
+      ),
+    ).toEqual({ fromBridge: false, outcome: 'rejected' });
+    expect(
+      await check(
+        `migrate=${encodeMigrate({ v: 1, from: 'https://evil.example', data: {} })}`,
+        `${ALLOWED_ORIGIN}/BagiAdil/`,
+      ),
+    ).toEqual({ fromBridge: true, outcome: 'rejected' });
+    expect(await check('migrate=corrupt!!!', `${ALLOWED_ORIGIN}/BagiAdil/`)).toEqual({
+      fromBridge: true,
+      outcome: 'invalid',
+    });
+    expect(
+      await check(
+        `migrate=${encodeMigrate({ v: 1, from: ALLOWED_ORIGIN, data: { bagiadil_participants: '["Budi"]' } })}`,
+        `${ALLOWED_ORIGIN}/BagiAdil/`,
+      ),
+    ).toEqual({ fromBridge: true, outcome: 'imported' });
   });
 });

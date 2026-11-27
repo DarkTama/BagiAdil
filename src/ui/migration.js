@@ -33,6 +33,11 @@ function parseOrigin(url) {
 const ALLOWED_BRIDGE_ORIGIN = parseOrigin(
   import.meta.env.VITE_MIGRATE_FROM || 'https://darktama.github.io',
 );
+const NEW_DOMAIN_LABEL = 'bagiadil.darktama.dev';
+
+// Per-page-load state for the migration banner (not persisted across reloads).
+let activeBannerKey = null;
+let noticeDismissed = false;
 
 function isAllowedKey(key) {
   return key.startsWith('bagiadil_') || key === LOCALE_KEY;
@@ -124,24 +129,27 @@ function applyMigratedData(data) {
 /**
  * Inspect `location.hash` for a `migrate=` payload, verify it originated from
  * the configured bridge origin, merge allowed keys into localStorage, remove
- * `migrate=...` from the URL while preserving `#share=...`, and notify the user.
+ * `migrate=...` from the URL while preserving `#share=...`, and warn on invalid
+ * payloads.
  *
- * @returns {'none'|'imported'|'invalid'|'rejected'}
+ * @returns {{ fromBridge: boolean, outcome: 'imported'|'nothing'|'invalid'|'rejected'|'none' }}
  */
 export function importMigrationFromHash() {
-  const rawHash = (location.hash || '').replace(/^#/, '');
-  if (!rawHash) return 'none';
+  const referrerOrigin = parseOrigin(typeof document !== 'undefined' ? document.referrer : '');
+  const fromBridge = Boolean(ALLOWED_BRIDGE_ORIGIN && referrerOrigin === ALLOWED_BRIDGE_ORIGIN);
 
-  const parts = rawHash.split('&').filter(Boolean);
+  const rawHash = (location.hash || '').replace(/^#/, '');
+  const parts = rawHash ? rawHash.split('&').filter(Boolean) : [];
   const migratePart = parts.find((part) => part.startsWith('migrate='));
-  if (!migratePart) return 'none';
+  if (!migratePart) {
+    return { fromBridge, outcome: fromBridge ? 'nothing' : 'none' };
+  }
 
   const encoded = migratePart.slice('migrate='.length);
   stripMigrateFromHash();
 
-  const referrerOrigin = parseOrigin(typeof document !== 'undefined' ? document.referrer : '');
-  if (!ALLOWED_BRIDGE_ORIGIN || referrerOrigin !== ALLOWED_BRIDGE_ORIGIN) {
-    return 'rejected';
+  if (!fromBridge) {
+    return { fromBridge: false, outcome: 'rejected' };
   }
 
   let payload = null;
@@ -156,14 +164,115 @@ export function importMigrationFromHash() {
 
   if (!validatePayload(payload)) {
     showToast(t('migration.invalid'), 'warning');
-    return 'invalid';
+    return { fromBridge: true, outcome: 'invalid' };
   }
 
   if (typeof payload.from !== 'string' || payload.from !== ALLOWED_BRIDGE_ORIGIN) {
-    return 'rejected';
+    return { fromBridge: true, outcome: 'rejected' };
   }
 
   applyMigratedData(payload.data);
-  showToast(t('migration.success'), 'success');
-  return 'imported';
+  return { fromBridge: true, outcome: 'imported' };
+}
+
+function getNoticeSlot() {
+  if (typeof document === 'undefined') return null;
+  let slot = document.querySelector('#migration-notice');
+  if (!slot) {
+    const main = document.querySelector('main');
+    if (!main) return null;
+    slot = document.createElement('div');
+    slot.id = 'migration-notice';
+    slot.className = 'migration-notice';
+    slot.hidden = true;
+    main.prepend(slot);
+  }
+  return slot;
+}
+
+function appendTextWithBoldDomain(el, message) {
+  const idx = message.indexOf(NEW_DOMAIN_LABEL);
+  if (idx === -1) {
+    el.textContent = message;
+    return;
+  }
+  if (idx > 0) {
+    el.appendChild(document.createTextNode(message.slice(0, idx)));
+  }
+  const strong = document.createElement('strong');
+  strong.textContent = NEW_DOMAIN_LABEL;
+  el.appendChild(strong);
+  const tail = message.slice(idx + NEW_DOMAIN_LABEL.length);
+  if (tail) {
+    el.appendChild(document.createTextNode(tail));
+  }
+}
+
+function renderNotice() {
+  const slot = getNoticeSlot();
+  if (!slot) return;
+  slot.innerHTML = '';
+
+  if (noticeDismissed || !activeBannerKey) {
+    slot.hidden = true;
+    return;
+  }
+
+  const banner = document.createElement('div');
+  banner.className = 'migration-banner';
+  banner.setAttribute('role', 'status');
+
+  const body = document.createElement('div');
+  body.className = 'migration-notice-body';
+
+  const text = document.createElement('p');
+  text.className = 'migration-notice-text';
+  appendTextWithBoldDomain(text, t(activeBannerKey));
+  body.appendChild(text);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'migration-notice-close';
+  closeBtn.setAttribute('aria-label', t('migration.dismiss'));
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', () => {
+    noticeDismissed = true;
+    renderNotice();
+  });
+
+  banner.appendChild(body);
+  banner.appendChild(closeBtn);
+  slot.appendChild(banner);
+  slot.hidden = false;
+}
+
+/**
+ * Initialize the top-of-page migration notice from `importMigrationFromHash` result.
+ * @param {{ fromBridge: boolean, outcome: string }} migrationResult
+ */
+export function initMigrationNotice(migrationResult) {
+  noticeDismissed = false;
+  activeBannerKey = null;
+
+  if (
+    migrationResult &&
+    migrationResult.fromBridge &&
+    (migrationResult.outcome === 'imported' || migrationResult.outcome === 'nothing')
+  ) {
+    activeBannerKey =
+      migrationResult.outcome === 'imported'
+        ? 'migration.bannerImported'
+        : 'migration.bannerNothing';
+  }
+
+  renderNotice();
+}
+
+/**
+ * Re-render the active migration notice in the current locale.
+ */
+export function updateMigrationNoticeTranslations() {
+  if (!noticeDismissed && activeBannerKey) {
+    renderNotice();
+  }
 }
