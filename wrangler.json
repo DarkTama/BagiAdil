@@ -7,6 +7,6 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*", "/s/*"]
   },
-  "kv_namespaces": [{ "binding": "SHARES" }],
+  "kv_namespaces": [{ "binding": "SHARES", "id": "86041b345cec4d549aaa820b35de9268" }],
   "previews": {}
 }
