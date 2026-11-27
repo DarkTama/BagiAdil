@@ -46,7 +46,7 @@ select {
 
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
-  --text-muted: #666666;
+  --text-muted: #909090; /* >= 4.5:1 on every card background */
 
   --accent-primary: #ffffff;
   --accent-secondary: #cccccc;
@@ -78,6 +78,7 @@ select {
   --space-2xl: 3rem;
 
   /* Typography */
+  --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.25rem;
@@ -186,9 +187,13 @@ select {
     box-shadow var(--transition-fast);
 }
 
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 input:focus,
 select:focus {
-  outline: none;
   border-color: rgba(255, 255, 255, 0.3);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
@@ -606,7 +611,6 @@ label {
 
 .assignment-table .edit-row input:focus {
   border-color: var(--accent-primary);
-  outline: none;
 }
 
 .assignment-table input.edit-item-name {
@@ -1324,7 +1328,6 @@ label {
 .history-label:focus {
   border-color: var(--border-color);
   background-color: var(--bg-tertiary);
-  outline: none;
 }
 
 .history-meta {
@@ -1458,7 +1461,7 @@ label {
 }
 
 .result-card--paid {
-  opacity: 0.65;
+  border-color: rgba(16, 185, 129, 0.4);
 }
 
 .paid-toggle {
@@ -1470,14 +1473,14 @@ label {
 .paid-toggle--on {
   background-color: var(--success);
   border-color: var(--success);
-  color: #ffffff;
-  opacity: 1;
+  color: #000000;
 }
 
 .result-status {
   display: inline-block;
   margin-bottom: var(--space-sm);
   padding: 2px 10px;
+  border: 1px solid transparent;
   border-radius: 999px;
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -1485,12 +1488,12 @@ label {
 
 .result-status--paid {
   background-color: var(--success);
-  color: #ffffff;
+  color: #000000;
 }
 
 .result-status--unpaid {
-  background-color: #ef4444;
-  color: #ffffff;
+  border-color: var(--border-color);
+  color: var(--text-secondary);
 }
 
 /* In-app guide */
