@@ -190,3 +190,13 @@ describe('shared view matches the host screen (audit H1 rounding order)', () => 
     expect(shared).toEqual(local);
   });
 });
+
+describe('item names are not HTML (audit XSS)', () => {
+  it('renders a fully-assigned item name as text', () => {
+    addPerson('Ani');
+    addItem('<img src=x id=pwn>', 1000, 1);
+    assign(0, 'Ani', 1);
+    expect(document.getElementById('pwn')).toBeNull();
+    expect(q('#table-assigner .td-item-name').textContent).toContain('<img src=x id=pwn>');
+  });
+});

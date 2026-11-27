@@ -247,10 +247,7 @@ function renderUnassignedTable() {
     const tdName = document.createElement('td');
     tdName.className = 'td-item-name';
     tdName.dataset.label = t('label.item');
-    tdName.textContent = item.name;
-    if (remaining === 0) {
-      tdName.innerHTML = '\u2713 ' + item.name;
-    }
+    tdName.textContent = (remaining === 0 ? '\u2713 ' : '') + item.name;
     tr.appendChild(tdName);
 
     // Remaining
