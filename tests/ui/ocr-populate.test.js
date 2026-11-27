@@ -186,7 +186,7 @@ describe('OCR Populate', () => {
   });
 
   describe('renderOCRResults confidence issues', () => {
-    it('formats subtotalMismatch placeholders as Rupiah amounts', () => {
+    it('formats subtotalUnder placeholders as Rupiah amounts', () => {
       const container = document.createElement('div');
       renderOCRResults(
         {
@@ -205,7 +205,7 @@ describe('OCR Populate', () => {
           level: 'medium',
           issues: [
             {
-              key: 'confidence.subtotalMismatch',
+              key: 'confidence.subtotalUnder',
               itemsTotal: 91800,
               subtotal: 101400,
               diff: 9600,
@@ -217,8 +217,50 @@ describe('OCR Populate', () => {
       );
 
       const issuesText = container.querySelector('.confidence-issues')?.textContent || '';
+      expect(issuesText).toContain('kurang');
       expect(issuesText).toContain('Rp 91.800');
       expect(issuesText).toContain('Rp 9.600');
+      expect(issuesText).toContain('Rp 101.400');
+      expect(issuesText).not.toContain('{itemsTotal}');
+      expect(issuesText).not.toContain('{diff}');
+      expect(issuesText).not.toContain('{subtotal}');
+    });
+
+    it('formats subtotalOver placeholders as Rupiah amounts', () => {
+      const container = document.createElement('div');
+      renderOCRResults(
+        {
+          items: [
+            { name: 'Paket Geprek Mentai B', quantity: 1, price: 34100, total: 34100 },
+            { name: 'Cream Soup', quantity: 1, price: 39600, total: 39600 },
+            { name: 'Paket Geprek B', quantity: 1, price: 32700, total: 32700 },
+            { name: 'Es Susu Kurma', quantity: 1, price: 25000, total: 25000 },
+          ],
+          subtotal: 101400,
+          discount: 50000,
+          deliveryFee: 7500,
+          platform: 'shopeefood',
+        },
+        {
+          overall: 75,
+          level: 'medium',
+          issues: [
+            {
+              key: 'confidence.subtotalOver',
+              itemsTotal: 131400,
+              subtotal: 101400,
+              diff: 30000,
+            },
+          ],
+        },
+        container,
+        () => {},
+      );
+
+      const issuesText = container.querySelector('.confidence-issues')?.textContent || '';
+      expect(issuesText).toContain('lebih');
+      expect(issuesText).toContain('Rp 131.400');
+      expect(issuesText).toContain('Rp 30.000');
       expect(issuesText).toContain('Rp 101.400');
       expect(issuesText).not.toContain('{itemsTotal}');
       expect(issuesText).not.toContain('{diff}');

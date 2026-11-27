@@ -140,8 +140,10 @@ const en = {
   'ocr.platform': 'Platform',
   'confidence.noItems': 'No items detected',
   'confidence.noSubtotal': 'Subtotal not detected',
-  'confidence.subtotalMismatch':
-    'Detected items total ({itemsTotal}) differs by {diff} from receipt subtotal ({subtotal}) — an item may be missing',
+  'confidence.subtotalUnder':
+    'Detected items total ({itemsTotal}) is {diff} below receipt subtotal ({subtotal}) — an item may be missing or misread',
+  'confidence.subtotalOver':
+    'Detected items total ({itemsTotal}) is {diff} above receipt subtotal ({subtotal}) — a price or quantity may be misread',
   'confidence.unusualPrices': '{n} item(s) have unusual prices',
   'export.copied': 'Copied!',
   'export.copyFailed': 'Failed to copy to clipboard',

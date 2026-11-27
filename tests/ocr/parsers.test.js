@@ -292,6 +292,22 @@ Subtotal Pesanan (1 menu) Rp32.700`;
       total: 32700,
     });
   });
+
+  it('strips up to two short OCR junk tokens from item thumbnails before qty', () => {
+    const text = `Rincian Pesanan
+os < 1 x Paket Geprek Mentai B Rp34.100
+ng . 1 x Cream Soup Rp9.600
+E> <4 1x Paket Geprek B Rp32.700
+Subtotal Pesanan (3 menu) Rp76.400`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items.map((item) => item.name)).toEqual([
+      'Paket Geprek Mentai B',
+      'Cream Soup',
+      'Paket Geprek B',
+    ]);
+    expect(result.items.map((item) => item.price)).toEqual([34100, 9600, 32700]);
+  });
 });
 
 describe('GoFood real receipt parser', () => {
