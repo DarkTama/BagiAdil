@@ -12,13 +12,6 @@ const GROUPS_KEY = 'bagiadil_groups';
 const PAYMENT_KEY = 'bagiadil_payment';
 
 /**
- * Initialize storage module. No-op currently, but provides a hook for future setup.
- */
-export function initStorage() {
-  // Intentionally empty - future use
-}
-
-/**
  * Save participant names to localStorage.
  * Merges with previously saved names (de-duplicated, case-insensitive).
  * @param {string[]} names

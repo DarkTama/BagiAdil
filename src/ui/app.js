@@ -23,7 +23,7 @@ import {
 } from './table-assigner.js';
 import { initExport, updateTranslations as updateExportTranslations } from './export.js';
 import {
-  initStorage, saveParticipants, saveHistoryEntry, loadHistory, getHistoryEntry,
+  saveParticipants, saveHistoryEntry, loadHistory, getHistoryEntry,
   saveDraft, loadDraft, clearDraft,
 } from './storage.js';
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
@@ -60,8 +60,6 @@ export function initApp() {
   const tableAssignerEl = document.querySelector('#table-assigner .section-content');
   const calculateBtn = document.querySelector('#calculate');
 
-  // Initialize storage
-  initStorage();
   // Session payment starts from the saved default.
   resetSession();
 
