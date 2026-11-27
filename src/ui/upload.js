@@ -203,7 +203,9 @@ export function initUpload(containerEl, onComplete) {
         receiptBlob = await compressImage(file);
 
         // Separate grayscale/contrast pass: fed to OCR for better accuracy.
-        const { preprocessForOCR } = await import('../ocr/image-preprocess.js');
+        const { preprocessForOCR, upscaleForOCRRetry } = await import(
+          '../ocr/image-preprocess.js'
+        );
         const ocrInput = await preprocessForOCR(file);
 
         const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
@@ -216,7 +218,8 @@ export function initUpload(containerEl, onComplete) {
           ]);
           const parsed1 = parseReceipt(result.text);
           if (needsOCRRetry(parsed1)) {
-            const retryInput = ocrInput !== file ? file : ocrInput;
+            const retryBase = ocrInput !== file ? file : ocrInput;
+            const retryInput = await upscaleForOCRRetry(retryBase);
             const retryResult = await processImage(retryInput, onProgress, { psm: '6' });
             if (retryResult && !retryResult.error) {
               const parsed2 = parseReceipt(retryResult.text);
