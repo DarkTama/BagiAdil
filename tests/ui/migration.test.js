@@ -637,3 +637,110 @@ describe('direct-visit migration hint and history resend link', () => {
     expect(q('#history a.history-migrate-link').textContent).toBe('Move my data');
   });
 });
+
+describe('merge safety on re-import', () => {
+  it('importing the same payload twice is idempotent without duplicate history, groups, or names', async () => {
+    const entry1 = makeHistoryEntry('h1', 2000, 'Dinner');
+    const entry2 = makeHistoryEntry('h2', 3000, 'Coffee');
+    const draft = {
+      v: 1,
+      snapshot: {
+        participants: ['Ani'],
+        params: { totalDiscount: 0, totalShipping: 0 },
+        items: [],
+      },
+      historyId: null,
+      paid: {},
+      calculated: false,
+    };
+    const payload = {
+      v: 1,
+      from: ALLOWED_ORIGIN,
+      at: 1700000000000,
+      data: {
+        bagiadil_history: JSON.stringify([entry1, entry2]),
+        bagiadil_groups: JSON.stringify([
+          { name: 'Kantor', members: ['Ani', 'Budi'] },
+          { name: 'Kuliah', members: ['Cici'] },
+        ]),
+        bagiadil_participants: JSON.stringify(['Ani', 'Budi', 'Cici']),
+        bagiadil_payment: JSON.stringify({
+          bank: 'GoPay',
+          accountNumber: '0812',
+          accountName: 'Ani',
+        }),
+        bagiadil_draft: JSON.stringify(draft),
+        'bagiadil-lang': 'en',
+        bagiadil_guide_seen: '1',
+      },
+    };
+    const hash = `migrate=${encodeMigrate(payload)}`;
+
+    await bootApp(hash);
+    const snapshotAfterFirst = {
+      history: JSON.parse(localStorage.getItem('bagiadil_history')),
+      groups: JSON.parse(localStorage.getItem('bagiadil_groups')),
+      participants: JSON.parse(localStorage.getItem('bagiadil_participants')),
+      payment: JSON.parse(localStorage.getItem('bagiadil_payment')),
+      draft: JSON.parse(localStorage.getItem('bagiadil_draft')),
+      lang: localStorage.getItem('bagiadil-lang'),
+    };
+    expect(snapshotAfterFirst.history.length).toBe(2);
+    expect(snapshotAfterFirst.groups.length).toBe(2);
+    expect(snapshotAfterFirst.participants.length).toBe(3);
+
+    // Re-import the exact same payload (e.g. via #resend)
+    await bootApp(hash);
+    expect(JSON.parse(localStorage.getItem('bagiadil_history'))).toEqual(
+      snapshotAfterFirst.history,
+    );
+    expect(JSON.parse(localStorage.getItem('bagiadil_groups'))).toEqual(snapshotAfterFirst.groups);
+    expect(JSON.parse(localStorage.getItem('bagiadil_participants'))).toEqual(
+      snapshotAfterFirst.participants,
+    );
+    expect(JSON.parse(localStorage.getItem('bagiadil_payment'))).toEqual(
+      snapshotAfterFirst.payment,
+    );
+    expect(JSON.parse(localStorage.getItem('bagiadil_draft'))).toEqual(snapshotAfterFirst.draft);
+    expect(localStorage.getItem('bagiadil-lang')).toBe(snapshotAfterFirst.lang);
+    expect(q('.migration-banner[role="status"]')).toBeTruthy();
+  });
+
+  it('re-importing after edits on the new origin preserves newer history and existing singletons without duplicates', async () => {
+    const oldEntry = makeHistoryEntry('h1', 2000, 'OldLabel');
+    const payload = {
+      v: 1,
+      from: ALLOWED_ORIGIN,
+      at: 1700000000000,
+      data: {
+        bagiadil_history: JSON.stringify([oldEntry]),
+        bagiadil_groups: JSON.stringify([{ name: 'Kantor', members: ['Ani'] }]),
+        bagiadil_participants: JSON.stringify(['Ani', 'Budi']),
+        bagiadil_payment: JSON.stringify({ bank: 'BCA', accountNumber: '111', accountName: 'Ani' }),
+      },
+    };
+    const hash = `migrate=${encodeMigrate(payload)}`;
+
+    await bootApp(hash);
+
+    // User edits h1 on the new origin (newer updatedAt) and updates payment
+    const editedEntry = makeHistoryEntry('h1', 9000, 'NewOriginEdited');
+    const extraEntry = makeHistoryEntry('h-new', 9500, 'NewOriginOnly');
+    localStorage.setItem('bagiadil_history', JSON.stringify([editedEntry, extraEntry]));
+    localStorage.setItem(
+      'bagiadil_payment',
+      JSON.stringify({ bank: 'Mandiri', accountNumber: '999', accountName: 'Budi' }),
+    );
+
+    await bootApp(hash);
+
+    const history = JSON.parse(localStorage.getItem('bagiadil_history'));
+    expect(history.map((e) => e.id)).toEqual(['h-new', 'h1']);
+    expect(history.find((e) => e.id === 'h1').label).toBe('NewOriginEdited');
+    expect(JSON.parse(localStorage.getItem('bagiadil_groups'))).toEqual([
+      { name: 'Kantor', members: ['Ani'] },
+    ]);
+    expect(JSON.parse(localStorage.getItem('bagiadil_participants'))).toEqual(['Ani', 'Budi']);
+    expect(JSON.parse(localStorage.getItem('bagiadil_payment')).bank).toBe('Mandiri');
+  });
+});
