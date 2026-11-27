@@ -49,7 +49,7 @@ describe('OCR Populate', () => {
 
       const table = tableEl.querySelector('.assignment-table');
       expect(table).not.toBeNull();
-      const rows = tableEl.querySelectorAll('.assignment-table tbody tr:not(.popup-row)');
+      const rows = tableEl.querySelectorAll('.assignment-table tbody tr[data-item-id]');
       expect(rows.length).toBe(1);
       expect(rows[0].textContent).toContain('Mie Ayam');
     });
