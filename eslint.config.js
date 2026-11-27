@@ -12,6 +12,7 @@ export default [
         window: 'readonly',
         document: 'readonly',
         navigator: 'readonly',
+        performance: 'readonly',
         console: 'readonly',
         fetch: 'readonly',
         caches: 'readonly',
