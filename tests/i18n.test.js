@@ -35,3 +35,20 @@ describe('i18n translations', () => {
     });
   });
 });
+
+describe('i18n key parity', () => {
+  it('has exactly the same keys in id and en', () => {
+    const idKeys = Object.keys(id).sort();
+    const enKeys = Object.keys(en).sort();
+    expect(enKeys).toEqual(idKeys);
+  });
+
+  it('has no empty translations', () => {
+    [id, en].forEach((dict) => {
+      Object.entries(dict).forEach(([key, value]) => {
+        expect(value, key).toBeTypeOf('string');
+        expect(value.trim().length, key).toBeGreaterThan(0);
+      });
+    });
+  });
+});
