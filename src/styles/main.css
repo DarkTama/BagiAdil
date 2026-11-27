@@ -1734,6 +1734,73 @@ header {
   }
 }
 
+/* Migration notice (bridge move banner & direct-visit hint) */
+.migration-notice[hidden] {
+  display: none;
+}
+
+.migration-notice {
+  margin-bottom: var(--space-md);
+}
+
+.migration-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-secondary);
+  border-radius: var(--border-radius);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+}
+
+.migration-notice-body {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-xs) 0;
+}
+
+.migration-notice-text {
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.migration-notice-text strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.migration-notice-close {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .migration-notice-close:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
+}
+
 /* Reduced motion: keep fades (they aid comprehension), drop movement */
 @keyframes toast-fade-in {
   from {

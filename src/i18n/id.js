@@ -145,7 +145,11 @@ const id = {
   'export.copyFailed': 'Gagal menyalin ke clipboard',
   'export.pdfUnavailable': 'Ekspor PDF tidak tersedia di lingkungan ini.',
   'guide.close': 'Mengerti',
-  'migration.success': 'Data dari versi lama sudah dipindahkan',
+  'migration.bannerImported':
+    'BagiAdil sekarang ada di bagiadil.darktama.dev. Data kamu dari alamat lama sudah ikut dipindahkan. Simpan alamat baru ini ya!',
+  'migration.bannerNothing':
+    'BagiAdil sekarang ada di bagiadil.darktama.dev. Simpan alamat baru ini ya!',
+  'migration.dismiss': 'Tutup pemberitahuan',
   'migration.invalid': 'Data migrasi tidak valid dan diabaikan.',
 };
 
