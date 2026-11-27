@@ -6,11 +6,17 @@ import fs from 'node:fs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { compressToEncodedURIComponent } from 'lz-string';
 
+const ALLOWED_ORIGIN = 'https://darktama.github.io';
+
 function loadDom() {
   const html = fs.readFileSync('index.html', 'utf8');
   document.documentElement.innerHTML = html.replace(/<!doctype html>/i, '');
   HTMLElement.prototype.scrollIntoView = () => {};
   window.confirm = () => true;
+}
+
+function setReferrer(value) {
+  Object.defineProperty(document, 'referrer', { value, configurable: true });
 }
 
 const q = (s) => document.querySelector(s);
@@ -44,9 +50,10 @@ function makeHistoryEntry(id, updatedAt, label = 'Lunch') {
   };
 }
 
-async function bootApp(hash = '') {
+async function bootApp(hash = '', referrer = `${ALLOWED_ORIGIN}/BagiAdil/`) {
   vi.resetModules();
   loadDom();
+  setReferrer(referrer);
   window.history.replaceState(null, '', '/' + (hash ? `#${hash}` : ''));
   const { initApp } = await import('../../src/ui/app.js');
   initApp();
@@ -54,16 +61,17 @@ async function bootApp(hash = '') {
 
 beforeEach(() => {
   localStorage.clear();
+  setReferrer('');
   window.history.replaceState(null, '', '/');
 });
 
 describe('origin migration import', () => {
-  it('imports all keys into empty storage, cleans URL, shows toast, and renders history without receipts', async () => {
+  it('imports allowed keys into empty storage when referrer and payload.from match, cleans URL, shows toast, and renders history without receipts', async () => {
     const entry1 = makeHistoryEntry('h1', 2000, 'Dinner');
     const entry2 = makeHistoryEntry('h2', 3000, 'Coffee');
     const payload = {
       v: 1,
-      from: 'https://darktama.github.io',
+      from: ALLOWED_ORIGIN,
       at: 1700000000000,
       data: {
         bagiadil_history: JSON.stringify([entry1, entry2]),
@@ -76,7 +84,6 @@ describe('origin migration import', () => {
         }),
         'bagiadil-lang': 'en',
         bagiadil_guide_seen: '1',
-        bagiadil_custom_extra: 'kept',
       },
     };
 
@@ -97,7 +104,7 @@ describe('origin migration import', () => {
     expect(localStorage.getItem('bagiadil-lang')).toBe('en');
     expect(document.documentElement.lang).toBe('en');
 
-    // Payment, participants, groups, unknown key persisted
+    // Payment, participants, groups persisted
     expect(JSON.parse(localStorage.getItem('bagiadil_payment')).bank).toBe('GoPay');
     expect(JSON.parse(localStorage.getItem('bagiadil_participants'))).toEqual([
       'Ani',
@@ -107,7 +114,6 @@ describe('origin migration import', () => {
     expect(JSON.parse(localStorage.getItem('bagiadil_groups'))).toEqual([
       { name: 'Kantor', members: ['Ani', 'Budi'] },
     ]);
-    expect(localStorage.getItem('bagiadil_custom_extra')).toBe('kept');
 
     // History entries render even with no receipt in IndexedDB, and opening works
     const rows = qa('#history .history-entry');
@@ -117,6 +123,80 @@ describe('origin migration import', () => {
 
     rows[0].querySelector('.history-load').click();
     expect(qa('#results .result-card').length).toBe(2);
+  });
+
+  it('rejects valid payload when document.referrer is empty (nothing written, no toast, URL cleaned)', async () => {
+    const payload = {
+      v: 1,
+      from: ALLOWED_ORIGIN,
+      at: 1700000000000,
+      data: {
+        bagiadil_payment: JSON.stringify({ bank: 'EVIL', accountNumber: '666', accountName: 'X' }),
+        bagiadil_participants: JSON.stringify(['Victim']),
+      },
+    };
+
+    await bootApp(`migrate=${encodeMigrate(payload)}`, '');
+
+    expect(location.hash).toBe('');
+    expect(q('.toast')).toBeNull();
+    expect(localStorage.getItem('bagiadil_payment')).toBeNull();
+    expect(localStorage.getItem('bagiadil_participants')).toBeNull();
+  });
+
+  it('rejects valid payload when document.referrer is from another origin', async () => {
+    const payload = {
+      v: 1,
+      from: ALLOWED_ORIGIN,
+      at: 1700000000000,
+      data: {
+        bagiadil_payment: JSON.stringify({ bank: 'EVIL', accountNumber: '666', accountName: 'X' }),
+      },
+    };
+
+    await bootApp(`migrate=${encodeMigrate(payload)}`, 'https://evil.example/phish.html');
+
+    expect(location.hash).toBe('');
+    expect(q('.toast')).toBeNull();
+    expect(localStorage.getItem('bagiadil_payment')).toBeNull();
+  });
+
+  it('rejects valid payload when referrer matches but payload.from mismatches', async () => {
+    const payload = {
+      v: 1,
+      from: 'https://evil.example',
+      at: 1700000000000,
+      data: {
+        bagiadil_payment: JSON.stringify({ bank: 'EVIL', accountNumber: '666', accountName: 'X' }),
+      },
+    };
+
+    await bootApp(`migrate=${encodeMigrate(payload)}`, `${ALLOWED_ORIGIN}/BagiAdil/`);
+
+    expect(location.hash).toBe('');
+    expect(q('.toast')).toBeNull();
+    expect(localStorage.getItem('bagiadil_payment')).toBeNull();
+  });
+
+  it('does not write unknown bagiadil_whatever or bagiadil_history_corrupt keys', async () => {
+    const payload = {
+      v: 1,
+      from: ALLOWED_ORIGIN,
+      at: 1700000000000,
+      data: {
+        bagiadil_participants: JSON.stringify(['Ani']),
+        bagiadil_whatever: 'should-not-exist',
+        bagiadil_history_corrupt: '[{"bad"',
+        bagiadil_migrated: '2026-11-27T00:00:00.000Z',
+      },
+    };
+
+    await bootApp(`migrate=${encodeMigrate(payload)}`);
+
+    expect(JSON.parse(localStorage.getItem('bagiadil_participants'))).toEqual(['Ani']);
+    expect(localStorage.getItem('bagiadil_whatever')).toBeNull();
+    expect(localStorage.getItem('bagiadil_history_corrupt')).toBeNull();
+    expect(localStorage.getItem('bagiadil_migrated')).toBeNull();
   });
 
   it('merges history (newer updatedAt wins + 50-entry cap), groups, participants, and preserves existing singletons', async () => {
@@ -141,7 +221,6 @@ describe('origin migration import', () => {
     );
     localStorage.setItem('bagiadil-lang', 'id');
     localStorage.setItem('bagiadil_guide_seen', '1');
-    localStorage.setItem('bagiadil_custom_extra', 'existing');
 
     const incomingOlder = makeHistoryEntry('shared-id', 3000, 'OldOriginOlder');
     const incomingNewer = makeHistoryEntry('override-id', 9000, 'OldOriginNewer');
@@ -161,7 +240,7 @@ describe('origin migration import', () => {
 
     const payload = {
       v: 1,
-      from: 'https://darktama.github.io',
+      from: ALLOWED_ORIGIN,
       at: 1700000000000,
       data: {
         bagiadil_history: JSON.stringify([incomingOlder, incomingNewer, incomingBrandNew]),
@@ -173,7 +252,6 @@ describe('origin migration import', () => {
         bagiadil_payment: JSON.stringify({ bank: 'BCA', accountNumber: '111', accountName: 'Old' }),
         'bagiadil-lang': 'en',
         bagiadil_draft: JSON.stringify(incomingDraft),
-        bagiadil_custom_extra: 'old',
       },
     };
 
@@ -200,10 +278,9 @@ describe('origin migration import', () => {
       'Cici',
     ]);
 
-    // Singletons & unknown keys: existing preserved, absent draft copied & restored
+    // Singletons: existing preserved, absent draft copied & restored
     expect(JSON.parse(localStorage.getItem('bagiadil_payment')).bank).toBe('Mandiri');
     expect(localStorage.getItem('bagiadil-lang')).toBe('id');
-    expect(localStorage.getItem('bagiadil_custom_extra')).toBe('existing');
     expect(JSON.parse(localStorage.getItem('bagiadil_draft')).snapshot.participants).toEqual([
       'Ani',
     ]);
@@ -236,7 +313,11 @@ describe('origin migration import', () => {
     localStorage.setItem('bagiadil_draft', JSON.stringify(existingDraft));
 
     await bootApp(
-      `migrate=${encodeMigrate({ v: 1, data: { bagiadil_draft: JSON.stringify(incomingDraft) } })}`,
+      `migrate=${encodeMigrate({
+        v: 1,
+        from: ALLOWED_ORIGIN,
+        data: { bagiadil_draft: JSON.stringify(incomingDraft) },
+      })}`,
     );
 
     expect(JSON.parse(localStorage.getItem('bagiadil_draft')).snapshot.participants).toEqual([
@@ -246,20 +327,32 @@ describe('origin migration import', () => {
 
   it.each([
     ['corrupt compressed string', 'not-valid-lz!!!'],
-    ['wrong version', encodeMigrate({ v: 2, data: { bagiadil_participants: '["A"]' } })],
-    ['non-object data', encodeMigrate({ v: 1, data: ['nope'] })],
-    ['disallowed key prefix', encodeMigrate({ v: 1, data: { evil_key: '1' } })],
-    ['non-string value', encodeMigrate({ v: 1, data: { bagiadil_participants: ['Ani'] } })],
-  ])('ignores malformed payload (%s), warns with toast, and writes nothing', async (_label, encoded) => {
-    await bootApp(`migrate=${encoded}`);
+    [
+      'wrong version',
+      encodeMigrate({ v: 2, from: ALLOWED_ORIGIN, data: { bagiadil_participants: '["A"]' } }),
+    ],
+    ['non-object data', encodeMigrate({ v: 1, from: ALLOWED_ORIGIN, data: ['nope'] })],
+    [
+      'disallowed key prefix',
+      encodeMigrate({ v: 1, from: ALLOWED_ORIGIN, data: { evil_key: '1' } }),
+    ],
+    [
+      'non-string value',
+      encodeMigrate({ v: 1, from: ALLOWED_ORIGIN, data: { bagiadil_participants: ['Ani'] } }),
+    ],
+  ])(
+    'ignores malformed payload (%s) from bridge referrer, warns with toast, and writes nothing',
+    async (_label, encoded) => {
+      await bootApp(`migrate=${encoded}`);
 
-    expect(location.hash).toBe('');
-    const toast = q('.toast.toast--warning');
-    expect(toast).toBeTruthy();
-    expect(localStorage.getItem('bagiadil_participants')).toBeNull();
-    expect(localStorage.getItem('bagiadil_history')).toBeNull();
-    expect(localStorage.getItem('evil_key')).toBeNull();
-  });
+      expect(location.hash).toBe('');
+      const toast = q('.toast.toast--warning');
+      expect(toast).toBeTruthy();
+      expect(localStorage.getItem('bagiadil_participants')).toBeNull();
+      expect(localStorage.getItem('bagiadil_history')).toBeNull();
+      expect(localStorage.getItem('evil_key')).toBeNull();
+    },
+  );
 
   it('imports data AND shows the shared view when both share= and migrate= are present', async () => {
     const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
@@ -272,7 +365,7 @@ describe('origin migration import', () => {
     });
     const migrateEncoded = encodeMigrate({
       v: 1,
-      from: 'https://darktama.github.io',
+      from: ALLOWED_ORIGIN,
       at: 1700000000000,
       data: {
         bagiadil_participants: JSON.stringify(['Ani', 'Budi']),
