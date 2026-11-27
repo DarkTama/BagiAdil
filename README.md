@@ -1,5 +1,7 @@
 # BagiAdil
 
+**Live app:** [https://bagiadil.darktama.dev](https://bagiadil.darktama.dev)
+
 BagiAdil splits **GoFood and ShopeeFood** food-delivery bills fairly and automatically — GrabFood is supported too. A privacy-first, fully client-side web app: scan a receipt with OCR (or enter items manually), assign items to each person, and get everyone's fair share with proportional discount distribution, even shipping split, and intelligent rounding to the nearest Rp 100.
 
 ## Features
@@ -129,6 +131,16 @@ G. **History & Sharing** - Every completed split is auto-saved to a local, edita
 ## Testing
 
 The project has comprehensive tests covering the calculation engine, OCR parsers, and UI components. Run with `npm test` or `npx vitest run`.
+
+## Deployment
+
+BagiAdil is deployed on [Cloudflare Pages](https://pages.cloudflare.com/) at [https://bagiadil.darktama.dev](https://bagiadil.darktama.dev) via its Git integration:
+
+- **Build command:** `npm run build`
+- **Build output directory:** `dist`
+- **Node version:** `22` (pinned in `.nvmrc`)
+
+Static cache rules are configured in `public/_headers`.
 
 ## Design Principles
 
