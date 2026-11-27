@@ -28,6 +28,7 @@ const id = {
   'results.finalPayment': 'Pembayaran Akhir',
   'results.unbalanced': 'Tidak Seimbang',
   'results.stale': 'Data berubah, hitung ulang',
+  'results.discountClamped': 'Diskon melebihi total makanan, dipakai {amount}',
   'results.paid': 'Lunas',
   'results.unpaid': 'Belum Lunas',
   'results.markPaid': 'Tandai Lunas',

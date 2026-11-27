@@ -478,7 +478,8 @@ label {
   border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
-.stale-banner {
+.stale-banner,
+.discount-clamped-notice {
   padding: var(--space-sm) var(--space-md);
   margin-bottom: var(--space-md);
   border-radius: var(--border-radius);

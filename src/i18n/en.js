@@ -28,6 +28,7 @@ const en = {
   'results.finalPayment': 'Final Payment',
   'results.unbalanced': 'Unbalanced',
   'results.stale': 'Data changed, recalculate',
+  'results.discountClamped': 'Discount exceeds food total; {amount} applied',
   'results.paid': 'Paid',
   'results.unpaid': 'Unpaid',
   'results.markPaid': 'Mark as paid',

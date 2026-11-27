@@ -555,3 +555,39 @@ describe('draft autosave and restore (W3 M5)', () => {
     expect(q('#pay-account-name').value).toBe('Budi ');
   });
 });
+
+describe('clamped discount is shown as applied', () => {
+  it('uses the effective discount in the WhatsApp text and shows a notice', async () => {
+    const { t } = await import('../../src/i18n/index.js');
+    const { formatCurrency } = await import('../../src/engine/formatter.js');
+    addPerson('Ani');
+    addItem('Nasi', 15000, 1);
+    assign(0, 'Ani', 1);
+    q('#total-discount').value = '20000';
+    q('#total-discount').dispatchEvent(new Event('input'));
+    q('#calculate').click();
+    const notice = q('#results .discount-clamped-notice');
+    expect(notice.textContent).toBe(t('results.discountClamped').replace('{amount}', formatCurrency(15000)));
+    expect(notice.textContent).toContain('15.000');
+
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (txt) => { copied = txt; } },
+      configurable: true,
+    });
+    q('.export-wa-btn').click();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(copied).toContain(`${t('export.wa.discount')}: ${formatCurrency(15000)}`);
+    expect(copied).not.toContain(formatCurrency(20000));
+  });
+
+  it('PDF content carries the same notice', async () => {
+    const { buildPdfContent } = await import('../../src/ui/export.js');
+    const { splitBill } = await import('../../src/engine/calculator.js');
+    const { t } = await import('../../src/i18n/index.js');
+    const { formatCurrency } = await import('../../src/engine/formatter.js');
+    const result = splitBill({ orders: [{ name: 'Ani', amount: 15000 }], totalDiscount: 20000, totalShipping: 0 });
+    const node = buildPdfContent(result, null);
+    expect(node.textContent).toContain(t('results.discountClamped').replace('{amount}', formatCurrency(15000)));
+  });
+});
