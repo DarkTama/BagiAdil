@@ -231,7 +231,11 @@ function handleOCRResult(ocrResult) {
 
   if (ocrResult.error) {
     ocrResultsSection.hidden = false;
-    ocrResultsEl.innerHTML = `<p class="validation-error">${ocrResult.error}</p>`;
+    ocrResultsEl.innerHTML = '';
+    const errEl = document.createElement('p');
+    errEl.className = 'validation-error';
+    errEl.textContent = ocrResult.error;
+    ocrResultsEl.appendChild(errEl);
     return;
   }
 
