@@ -154,6 +154,16 @@ function render() {
 }
 
 /**
+ * Current snapshot with the live payment form values, so the share link
+ * always matches the WhatsApp text (the snapshot itself is frozen at Calculate).
+ * @returns {object|null}
+ */
+function getLiveSnapshot() {
+  const snapshot = getSnapshotFn ? getSnapshotFn() : null;
+  return snapshot && { ...snapshot, payment: getPaymentInfo() };
+}
+
+/**
  * Build the read-only share URL for a snapshot.
  * @param {object} snapshot
  * @returns {string}
@@ -163,7 +173,7 @@ function buildShareUrl(snapshot) {
 }
 
 async function handleShareLink() {
-  const snapshot = getSnapshotFn ? getSnapshotFn() : null;
+  const snapshot = getLiveSnapshot();
   if (!snapshot) return;
 
   const url = buildShareUrl(snapshot);
@@ -340,7 +350,7 @@ async function handleWhatsAppCopy() {
   if (!results) return;
 
   const params = getParamsFn ? getParamsFn() : {};
-  const snapshot = getSnapshotFn ? getSnapshotFn() : null;
+  const snapshot = getLiveSnapshot();
   const shareUrl = snapshot ? buildShareUrl(snapshot) : '';
   const payment = getPaymentInfo();
   const text = generateWhatsAppText(results, params, shareUrl, payment);

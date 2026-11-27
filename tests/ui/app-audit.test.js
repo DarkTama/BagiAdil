@@ -105,3 +105,34 @@ describe('payment box persists across re-renders (audit C1)', () => {
     expect(q('#results .payment-info-box')).not.toBeNull();
   });
 });
+
+describe('share link uses live payment info (audit H3)', () => {
+  it('link payment matches what was edited after Calculate and the WhatsApp text', async () => {
+    q('#pay-bank').value = 'BCA';
+    q('#pay-account-number').value = '111';
+    q('#pay-bank').dispatchEvent(new Event('input'));
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    q('#pay-account-number').value = '999';
+    q('#pay-account-number').dispatchEvent(new Event('input'));
+
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (txt) => { copied = txt; } },
+      configurable: true,
+    });
+    const { decodeSnapshot } = await import('../../src/ui/snapshot.js');
+
+    q('.export-share-btn').click();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(decodeSnapshot(copied.split('#share=')[1]).payment.accountNumber).toBe('999');
+
+    q('.export-wa-btn').click();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(copied).toContain('999');
+    const waLink = copied.match(/#share=(\S+)/)[1];
+    expect(decodeSnapshot(waLink).payment.accountNumber).toBe('999');
+  });
+});
