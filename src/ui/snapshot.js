@@ -192,7 +192,8 @@ export function buildShareUrl(snapshot) {
 }
 
 const isStr = (x) => typeof x === 'string';
-const isNum = (x) => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+// Whole rupiah, like the engine requires: anything else would throw inside splitBill.
+const isNum = (x) => Number.isInteger(x) && x >= 0;
 const isPosInt = (x) => Number.isInteger(x) && x >= 1;
 
 /**
