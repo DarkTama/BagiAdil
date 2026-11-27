@@ -1835,6 +1835,7 @@ header {
 .chip-text,
 .td-item-name,
 .result-card-name,
+.assigned-person-card h4,
 .assigned-item-line > span {
   min-width: 0;
   overflow-wrap: anywhere;
