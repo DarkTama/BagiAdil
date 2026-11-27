@@ -9,6 +9,7 @@ import { getSession, getPayment, subscribe, update } from './session.js';
 import { savePaymentInfo } from './storage.js';
 
 let containerEl = null;
+let pdfBusy = false;
 
 /**
  * Initialize the export component. Results, items and the calculated snapshot
@@ -18,7 +19,8 @@ let containerEl = null;
 export function initExport(el) {
   containerEl = el;
   render();
-  subscribe(syncPaymentInputs);
+  subscribe(onSession);
+  onSession(getSession());
 }
 
 const PAYMENT_FIELDS = [
@@ -26,6 +28,15 @@ const PAYMENT_FIELDS = [
   ['accountNumber', '#pay-account-number'],
   ['accountName', '#pay-account-name'],
 ];
+
+function onSession(state) {
+  syncPaymentInputs(state);
+  // Share, WhatsApp and PDF only make sense for results that match the editor.
+  const disabled = !state.calc || state.stale;
+  containerEl.querySelector('.export-share-btn').disabled = disabled;
+  containerEl.querySelector('.export-wa-btn').disabled = disabled;
+  containerEl.querySelector('.export-pdf-btn').disabled = disabled || pdfBusy;
+}
 
 /**
  * Mirror session.payment into the inputs when it changed from outside
@@ -301,7 +312,8 @@ async function handlePdfExport() {
 
   const pdfBtn = containerEl.querySelector('.export-pdf-btn');
   if (pdfBtn.disabled) return;
-  pdfBtn.disabled = true;
+  pdfBusy = true;
+  onSession(getSession());
 
   try {
     const html2pdf = await import('html2pdf.js');
@@ -343,8 +355,8 @@ async function handlePdfExport() {
   } catch {
     alert(t('export.pdfUnavailable'));
   } finally {
-    const btn = containerEl.querySelector('.export-pdf-btn');
-    if (btn) btn.disabled = false;
+    pdfBusy = false;
+    onSession(getSession());
   }
 }
 

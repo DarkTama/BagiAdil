@@ -473,6 +473,27 @@ label {
   border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
+.stale-banner {
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+#results.is-stale .result-cards,
+#results.is-stale .grand-total {
+  opacity: 0.55;
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .grand-total {
   font-size: var(--font-size-lg);
   margin-bottom: var(--space-lg);

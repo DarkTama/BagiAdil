@@ -313,3 +313,63 @@ describe('payment lives in the session (L10)', () => {
     expect(q('#pay-account-name').value).toBe('Budi ');
   });
 });
+
+describe('stale results (W3 H4)', () => {
+  const setup2 = () => {
+    addPerson('Ani');
+    addPerson('Budi');
+    addItem('Nasi', 20000, 1);
+    addItem('Teh', 5000, 1);
+    assign(0, 'Ani', 1);
+    assign(1, 'Budi', 1);
+    q('#calculate').click();
+  };
+  const shareDisabled = () => q('.export-share-btn').disabled;
+
+  it('removing a participant marks results stale and disables export; recalc clears it', () => {
+    setup2();
+    expect(q('#results .stale-banner')).toBeNull();
+    expect(shareDisabled()).toBe(false);
+    qa('.chip-remove')[1].click(); // remove Budi, Teh goes back to remaining
+    expect(q('#results .stale-banner')).not.toBeNull();
+    expect(q('#results').classList.contains('is-stale')).toBe(true);
+    expect(shareDisabled()).toBe(true);
+    expect(q('.export-wa-btn').disabled).toBe(true);
+    expect(q('.export-pdf-btn').disabled).toBe(true);
+    assign(1, 'Ani', 1);
+    q('#calculate').click();
+    expect(q('#results .stale-banner')).toBeNull();
+    expect(q('#results').classList.contains('is-stale')).toBe(false);
+    expect(shareDisabled()).toBe(false);
+  });
+
+  it('editing payment after calculate is not stale', () => {
+    setup2();
+    q('#pay-bank').value = 'BCA';
+    q('#pay-bank').dispatchEvent(new Event('input'));
+    expect(q('#results .stale-banner')).toBeNull();
+    expect(shareDisabled()).toBe(false);
+  });
+
+  it('reverting an edit clears the banner', () => {
+    setup2();
+    const d = q('#total-discount');
+    d.value = '5000';
+    d.dispatchEvent(new Event('input'));
+    expect(q('#results .stale-banner')).not.toBeNull();
+    d.value = '';
+    d.dispatchEvent(new Event('input'));
+    expect(q('#results .stale-banner')).toBeNull();
+    expect(shareDisabled()).toBe(false);
+  });
+
+  it('paid toggles stay available while stale and are not a stale trigger', () => {
+    setup2();
+    q('#results .paid-toggle').click();
+    expect(q('#results .stale-banner')).toBeNull();
+    q('#total-shipping').value = '3000';
+    q('#total-shipping').dispatchEvent(new Event('input'));
+    expect(q('#results .stale-banner')).not.toBeNull();
+    expect(q('#results .paid-toggle').disabled).toBe(false);
+  });
+});

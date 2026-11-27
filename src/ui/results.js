@@ -15,6 +15,7 @@ import { t } from '../i18n/index.js';
  * @param {object} [options.paid] - Map of participant name -> true when paid
  * @param {function} [options.onTogglePaid] - (name, isPaid) => void. When
  *   provided, a "mark as paid" toggle is shown on each participant card.
+ * @param {boolean} [options.stale] - the editor changed since Calculate; shows a banner
  */
 export function renderResults(result, containerEl, itemsMap = null, options = {}) {
   containerEl.innerHTML = '';
@@ -24,6 +25,14 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
   const { participants, grandTotal, verification } = result;
   const paid = options.paid || {};
   const onTogglePaid = options.onTogglePaid || null;
+
+  if (options.stale) {
+    const banner = document.createElement('div');
+    banner.className = 'stale-banner';
+    banner.setAttribute('role', 'status');
+    banner.textContent = t('results.stale');
+    containerEl.appendChild(banner);
+  }
 
   // Internal arithmetic check: only worth showing when it fails.
   if (!verification.balanced) {
