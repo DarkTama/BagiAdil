@@ -136,25 +136,16 @@ describe('reconcileRounding (Step F)', () => {
     expect(result[1].equals(new Decimal(32000))).toBe(true);
   });
 
-  it('adjusts the person with highest rounding fraction', () => {
-    // Person 0: pre=24080, rounded=24100 (diff = -20, abs fraction = 20)
-    // Person 1: pre=32020, rounded=32000 (diff = +20, abs fraction = 20)
-    // Sum pre = 56100, sum rounded = 56100, difference = 0 -> no adjustment needed
-    // Let's use a case where adjustment is needed:
-    // Person 0: pre=24080, rounded=24100 (abs fraction = 20)
-    // Person 1: pre=32020, rounded=32100 (abs fraction = 80)
-    // Sum pre = 56100, sum rounded = 56200, difference = -100
-    // Person 1 has higher fraction (80 vs 20), adjust Person 1
-    // 32020 + (-100) = 31920, re-round: 31920/100 = 319.2 -> 319 -> 31900
-    // New sum: 24100 + 31900 = 56000 != 56100. Not balanced.
-    // Try Person 0: 24080 + (-100) = 23980, re-round: 23980/100 = 239.8 -> 240 -> 24000
-    // New sum: 24000 + 32100 = 56100. Balanced!
+  it('takes the Rp 100 step from the person rounded up the most', () => {
+    // Person 0: pre=24080, rounded=24100 (rounded up 20)
+    // Person 1: pre=32020, rounded=32100 (rounded up 80)
+    // Target 56100, rounded sum 56200 -> one -100 step, to Person 1 (moved furthest up).
+    // Person 1 ends 20 under their share instead of Person 0 ending 80 under.
     const preRounding = [new Decimal(24080), new Decimal(32020)];
     const rounded = [new Decimal(24100), new Decimal(32100)];
     const result = reconcileRounding(preRounding, rounded);
-    expect(result[0].equals(new Decimal(24000))).toBe(true);
-    expect(result[1].equals(new Decimal(32100))).toBe(true);
-    // Verify sum balances
+    expect(result[0].equals(new Decimal(24100))).toBe(true);
+    expect(result[1].equals(new Decimal(32000))).toBe(true);
     const sum = result.reduce((s, a) => s.plus(a), new Decimal(0));
     expect(sum.equals(new Decimal(56100))).toBe(true);
   });
@@ -173,7 +164,7 @@ describe('reconcileRounding (Step F)', () => {
     expect(result[1].equals(new Decimal(32100))).toBe(true);
   });
 
-  it('falls back to next candidate when re-rounding first candidate does not balance', () => {
+  it('puts a sub-100 negative remainder on the person who overpays the most', () => {
     // Craft a scenario where adjusting the first candidate introduces a new rounding error.
     // Person 0: pre=24949, rounded=24900 (fraction = 49)
     // Person 1: pre=25051, rounded=25100 (fraction = 49)
@@ -193,8 +184,32 @@ describe('reconcileRounding (Step F)', () => {
     const preRounding = [new Decimal(24949), new Decimal(25051), new Decimal(25050)];
     const rounded = [new Decimal(24900), new Decimal(25100), new Decimal(25100)];
     const result = reconcileRounding(preRounding, rounded);
-    const sum = result.reduce((s, a) => s.plus(a), new Decimal(0));
-    expect(sum.equals(new Decimal(75050))).toBe(true);
+    // Target 75050 rounds (half up) to 75100 = rounded sum, so no steps;
+    // remainder -50 goes to Person 2, who is +50 over their share.
+    expect(result.map((r) => r.toNumber())).toEqual([24900, 25100, 25050]);
+  });
+
+  it('puts a sub-100 positive remainder on the person who underpays the most', () => {
+    // Target 60030 -> 60000; rounded sum 60000; remainder +30.
+    // Person 1 is 40 under (pre 20040 -> 20000), Person 0 only 30 under.
+    const preRounding = [new Decimal(20030), new Decimal(20040), new Decimal(19960)];
+    const rounded = roundToNearestHundred(preRounding);
+    const result = reconcileRounding(preRounding, rounded, new Decimal(60030));
+    expect(result.map((r) => r.toNumber())).toEqual([20000, 20030, 20000]);
+  });
+
+  it('gives at most one step per person (largest remainder)', () => {
+    // 10 x 10040: rounded sum 100000, target 100400 -> four +100 steps,
+    // to the first four people (all tied), one each.
+    const preRounding = Array.from({ length: 10 }, () => new Decimal(10040));
+    const result = reconcileRounding(preRounding, roundToNearestHundred(preRounding));
+    expect(result.map((r) => r.toNumber())).toEqual([
+      10100, 10100, 10100, 10100, 10000, 10000, 10000, 10000, 10000, 10000,
+    ]);
+  });
+
+  it('returns an empty array for no participants', () => {
+    expect(reconcileRounding([], [], new Decimal(0))).toEqual([]);
   });
 });
 
@@ -323,11 +338,10 @@ describe('splitBill (main entry)', () => {
     expect(result.verification.sumOfPayments.equals(result.verification.expectedTotal)).toBe(true);
   });
 
-  it('reports balanced for a proportional-discount split with a sub-rupiah residue', () => {
-    // Splitting the discount proportionally over uneven orders leaves a tiny
-    // decimal-division residue (sumOfPayments comes out as 97000.999...999).
-    // An exact comparison wrongly flagged this as "unbalanced"; comparing to
-    // the whole rupiah does not.
+  it('balances exactly for a proportional-discount split (no sub-rupiah residue)', () => {
+    // Splitting the discount proportionally over uneven orders involves
+    // divisions decimal.js cannot represent exactly. Payments must still be
+    // whole rupiah and add up to the bill exactly.
     const result = splitBill({
       orders: [
         { name: 'Alice', amount: 25000 },
@@ -338,20 +352,14 @@ describe('splitBill (main entry)', () => {
       totalShipping: 10000,
     });
 
-    expect(result.verification.balanced).toBe(true);
-    // The residue is sub-rupiah - the payments do add up to the bill.
-    expect(
-      result.verification.sumOfPayments
-        .minus(result.verification.expectedTotal)
-        .abs()
-        .lessThan(new Decimal(1)),
-    ).toBe(true);
     expect(result.grandTotal.equals(new Decimal(97001))).toBe(true);
+    expect(result.verification.sumOfPayments.equals(new Decimal(97001))).toBe(true);
+    expect(result.verification.balanced).toBe(true);
+    result.participants.forEach((p) => expect(p.finalPayment.isInteger()).toBe(true));
   });
 
-  it('still reports unbalanced for a genuine rupiah-scale imbalance', () => {
-    // Discount far exceeds the orders: discounted orders clamp to zero, so the
-    // payments cannot add up to the (negative) expected total.
+  it('clamps a discount larger than the food subtotal', () => {
+    // Discount 30000 on 20000 of food: only 20000 can be discounted.
     const result = splitBill({
       orders: [
         { name: 'Alice', amount: 10000 },
@@ -360,7 +368,10 @@ describe('splitBill (main entry)', () => {
       totalDiscount: 30000,
       totalShipping: 5000,
     });
-    expect(result.verification.balanced).toBe(false);
+    expect(result.grandTotal.equals(new Decimal(5000))).toBe(true);
+    expect(result.verification.balanced).toBe(true);
+    expect(result.verification.discountClamped).toBe(true);
+    expect(result.participants.map((p) => p.finalPayment.toNumber())).toEqual([2500, 2500]);
   });
 
   it('tie-breaking determinism - first person in list order wins', () => {
@@ -448,5 +459,139 @@ describe('splitBill (main entry)', () => {
     // Clamped to 0
     expect(result.participants[0].discountedOrder.equals(new Decimal(0))).toBe(true);
     expect(result.participants[1].discountedOrder.equals(new Decimal(0))).toBe(true);
+  });
+});
+
+describe('splitBill fair rounding (audit cases)', () => {
+  const people = (n, amount) =>
+    Array.from({ length: n }, (_, i) => ({ name: `P${i}`, amount }));
+  const payments = (result) => result.participants.map((p) => p.finalPayment.toNumber());
+
+  it('10 x 10.040: no one pays more than Rp 100 over their rounded share', () => {
+    const result = splitBill({ orders: people(10, 10040), totalDiscount: 0, totalShipping: 0 });
+    expect(payments(result)).toEqual([
+      10100, 10100, 10100, 10100, 10000, 10000, 10000, 10000, 10000, 10000,
+    ]);
+    expect(result.verification.balanced).toBe(true);
+  });
+
+  it('3 x 20.000 + shipping 10.000: whole-rupiah payments', () => {
+    const result = splitBill({ orders: people(3, 20000), totalDiscount: 0, totalShipping: 10000 });
+    expect(payments(result)).toEqual([23400, 23300, 23300]);
+    expect(result.verification.sumOfPayments.equals(new Decimal(70000))).toBe(true);
+  });
+
+  it('7 x 18.000 + shipping 12.000: whole-rupiah payments', () => {
+    const result = splitBill({ orders: people(7, 18000), totalDiscount: 0, totalShipping: 12000 });
+    expect(payments(result)).toEqual([19800, 19700, 19700, 19700, 19700, 19700, 19700]);
+    expect(result.verification.sumOfPayments.equals(new Decimal(138000))).toBe(true);
+  });
+
+  it('single person 12.345 - 1.000 + 2.000 pays the exact odd total', () => {
+    const result = splitBill({ orders: people(1, 12345), totalDiscount: 1000, totalShipping: 2000 });
+    expect(payments(result)).toEqual([13345]);
+    expect(result.verification.balanced).toBe(true);
+  });
+
+  it('discount 20.000 on 15.000 food + 5.000 shipping is clamped', () => {
+    const result = splitBill({ orders: people(1, 15000), totalDiscount: 20000, totalShipping: 5000 });
+    expect(payments(result)).toEqual([5000]);
+    expect(result.grandTotal.equals(new Decimal(5000))).toBe(true);
+    expect(result.verification.discountClamped).toBe(true);
+    expect(result.verification.balanced).toBe(true);
+  });
+
+  it('does not flag a discount within the subtotal as clamped', () => {
+    const result = splitBill({ orders: people(2, 10000), totalDiscount: 20000, totalShipping: 0 });
+    expect(result.verification.discountClamped).toBe(false);
+    expect(payments(result)).toEqual([0, 0]);
+  });
+
+  it('returns an empty, balanced result for no orders', () => {
+    const result = splitBill({ orders: [], totalDiscount: 0, totalShipping: 0 });
+    expect(result.participants).toEqual([]);
+    expect(result.verification.balanced).toBe(true);
+  });
+});
+
+describe('splitBill input guard', () => {
+  const ok = { orders: [{ name: 'A', amount: 10000 }], totalDiscount: 0, totalShipping: 0 };
+
+  it.each([
+    ['orders not an array', { ...ok, orders: null }],
+    ['orders an object', { ...ok, orders: { name: 'A', amount: 1 } }],
+    ['NaN amount', { ...ok, orders: [{ name: 'A', amount: NaN }] }],
+    ['negative amount', { ...ok, orders: [{ name: 'A', amount: -1 }] }],
+    ['Infinity amount', { ...ok, orders: [{ name: 'A', amount: Infinity }] }],
+    ['missing amount', { ...ok, orders: [{ name: 'A' }] }],
+    ['non-integer amount', { ...ok, orders: [{ name: 'A', amount: 100.5 }] }],
+    ['NaN discount', { ...ok, totalDiscount: NaN }],
+    ['negative discount', { ...ok, totalDiscount: -500 }],
+    ['undefined discount', { ...ok, totalDiscount: undefined }],
+    ['text shipping', { ...ok, totalShipping: 'abc' }],
+    ['negative shipping', { ...ok, totalShipping: -1 }],
+    ['Infinity shipping', { ...ok, totalShipping: Infinity }],
+  ])('throws a clear Error for %s', (_label, input) => {
+    expect(() => splitBill(input)).toThrow(/splitBill: /);
+  });
+
+  it('accepts zero discount and shipping (empty UI fields)', () => {
+    expect(() => splitBill(ok)).not.toThrow();
+  });
+});
+
+describe('splitBill rounding invariants (seeded property test)', () => {
+  // mulberry32: small deterministic PRNG so failures are reproducible.
+  function mulberry32(seed) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  it('holds for 2000 random bills', () => {
+    const rand = mulberry32(20261127);
+    const int = (max) => Math.floor(rand() * (max + 1));
+    // Mix generators: raw rupiah, round (multiples of 100/500/1000), and
+    // repeated identical amounts (ties), so every branch gets exercised.
+    const money = (mode, max) => {
+      if (mode === 0) return int(max);
+      const step = [100, 500, 1000][int(2)];
+      return int(Math.floor(max / step)) * step;
+    };
+
+    for (let c = 0; c < 2000; c++) {
+      const mode = c % 3; // 0 raw, 1 round, 2 repeated
+      const n = 1 + int(29);
+      const same = money(mode === 0 ? 0 : 1, 500000);
+      const orders = Array.from({ length: n }, (_, i) => ({
+        name: `P${i}`,
+        amount: mode === 2 ? same : money(mode, 500000),
+      }));
+      const totalDiscount = money(mode === 0 ? 0 : 1, 100000);
+      const totalShipping = money(mode === 0 ? 0 : 1, 100000);
+      const ctx = JSON.stringify({ c, orders: orders.map((o) => o.amount), totalDiscount, totalShipping });
+
+      const result = splitBill({ orders, totalDiscount, totalShipping });
+      const food = orders.reduce((s, o) => s + o.amount, 0);
+      const expected = food - Math.min(totalDiscount, food) + totalShipping;
+
+      expect(result.verification.expectedTotal.toNumber(), ctx).toBe(expected);
+      expect(result.verification.discountClamped, ctx).toBe(totalDiscount > food);
+      expect(result.verification.balanced, ctx).toBe(true);
+
+      let sum = new Decimal(0);
+      let offHundred = 0;
+      for (const p of result.participants) {
+        expect(p.finalPayment.isInteger(), ctx).toBe(true);
+        if (!p.finalPayment.mod(100).isZero()) offHundred++;
+        expect(p.finalPayment.minus(p.preRoundingTotal).abs().lessThan(200), ctx).toBe(true);
+        sum = sum.plus(p.finalPayment);
+      }
+      expect(offHundred, ctx).toBeLessThanOrEqual(expected % 100 === 0 ? 0 : 1);
+      expect(sum.toNumber(), ctx).toBe(expected);
+    }
   });
 });
