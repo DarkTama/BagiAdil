@@ -1,8 +1,10 @@
-name: Deploy to GitHub Pages
+name: Deploy Bridge to GitHub Pages
 
+# Manual dispatch ONLY (no push trigger): merging to main must NOT replace the
+# live GitHub Pages app with the migration bridge until Cloudflare Pages is live
+# at https://bagiadil.darktama.dev/. Run this workflow manually once Cloudflare
+# Pages is verified and serving the root app.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -27,11 +29,11 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      - run: npm run build:bridge
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: dist-bridge
 
   deploy:
     needs: build
