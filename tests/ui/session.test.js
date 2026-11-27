@@ -39,4 +39,18 @@ describe('session', () => {
     expect(session.getSession().historyId).toBe('x');
     expect(session.getSession().calc).toBeNull();
   });
+
+  it('payment: raw strings in, trimmed or null out, default restored on reset', () => {
+    localStorage.setItem('bagiadil_payment', JSON.stringify({ bank: 'BCA', accountNumber: '1', accountName: '' }));
+    session.resetSession();
+    expect(session.getSession().payment).toEqual({ bank: 'BCA', accountNumber: '1', accountName: '' });
+    session.update({ payment: { bank: ' ', accountNumber: '', accountName: ' ' } });
+    expect(session.getPayment()).toBeNull();
+    session.update({ payment: { bank: 'Mandiri ', accountNumber: '', accountName: '' } });
+    expect(session.getPayment()).toEqual({ bank: 'Mandiri', accountNumber: '', accountName: '' });
+    session.resetSession({ payment: { bank: 'GoPay' } });
+    expect(session.getSession().payment).toEqual({ bank: 'GoPay', accountNumber: '', accountName: '' });
+    session.resetSession();
+    expect(session.getSession().payment.bank).toBe('BCA');
+  });
 });

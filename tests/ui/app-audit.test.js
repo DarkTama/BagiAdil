@@ -279,3 +279,37 @@ describe('loading history is read-only (Q6) and applies people before items', ()
     expect(after[0].updatedAt).toBe(before[0].updatedAt);
   });
 });
+
+describe('payment lives in the session (L10)', () => {
+  const type = (sel, v) => {
+    q(sel).value = v;
+    q(sel).dispatchEvent(new Event('input'));
+  };
+
+  it('loading an entry shows its payment without overwriting the saved default', () => {
+    type('#pay-bank', 'BCA');
+    type('#pay-account-number', '111');
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    // Pretend the stored entry came from another host.
+    const hist = JSON.parse(localStorage.getItem('bagiadil_history'));
+    hist[0].payment = { bank: 'Mandiri', accountNumber: '999', accountName: '' };
+    localStorage.setItem('bagiadil_history', JSON.stringify(hist));
+    q('.lang-btn:not(.active)').click(); // re-renders the history list from storage
+    q('#history .history-load').click();
+    expect(q('#pay-account-number').value).toBe('999');
+    expect(q('#pay-bank').value).toBe('Mandiri');
+    expect(JSON.parse(localStorage.getItem('bagiadil_payment')).accountNumber).toBe('111');
+    expect(q('#results .payment-account-text').textContent).toContain('999');
+    // Typing again becomes the new default.
+    type('#pay-account-number', '555');
+    expect(JSON.parse(localStorage.getItem('bagiadil_payment')).accountNumber).toBe('555');
+  });
+
+  it('keeps raw typing (trailing space) intact in the input', () => {
+    type('#pay-account-name', 'Budi ');
+    expect(q('#pay-account-name').value).toBe('Budi ');
+  });
+});

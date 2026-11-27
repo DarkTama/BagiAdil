@@ -6,8 +6,18 @@
  * One module-private object, one Set of listeners; no DOM access.
  */
 
+import { loadPaymentInfo } from './storage.js';
+
+const EMPTY_PAYMENT = { bank: '', accountNumber: '', accountName: '' };
+
+/** Raw (untrimmed) payment strings from a stored/shared payment or the saved default. */
+function rawPayment(info) {
+  return { ...EMPTY_PAYMENT, ...(info || {}) };
+}
+
 const fresh = () => ({
   historyId: null, // string|null: history entry this split saves into
+  payment: rawPayment(loadPaymentInfo()), // RAW input strings, so typing never fights a sync
   paid: {}, // { [name]: true }
   receiptBlob: null, // Blob|null: attached on the next successful history save
   calc: null, // null | { snapshot, result, itemsMap }: last successful Calculate
@@ -34,7 +44,17 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-/** Shallow-merge { historyId | paid | receiptBlob } into the session and notify. */
+/**
+ * Payment destination, trimmed, or null when every field is empty.
+ * @returns {{bank: string, accountNumber: string, accountName: string}|null}
+ */
+export function getPayment() {
+  const { bank, accountNumber, accountName } = state.payment;
+  const p = { bank: bank.trim(), accountNumber: accountNumber.trim(), accountName: accountName.trim() };
+  return p.bank || p.accountNumber || p.accountName ? p : null;
+}
+
+/** Shallow-merge { historyId | payment | paid | receiptBlob } into the session and notify. */
 export function update(patch) {
   state = { ...state, ...patch };
   notify();
@@ -46,9 +66,14 @@ export function setCalculated(snapshot, { result, itemsMap }) {
   notify();
 }
 
-/** Start a new split: clear everything, then apply an optional patch. */
+/**
+ * Start a new split: clear everything (payment returns to the saved default),
+ * then apply an optional patch. A patch `payment` may be a partial/stored
+ * payment object; it is normalised to raw strings.
+ */
 export function resetSession(patch = {}) {
-  state = { ...fresh(), ...patch };
+  const base = fresh();
+  state = { ...base, ...patch, payment: patch.payment ? rawPayment(patch.payment) : base.payment };
   notify();
 }
 
