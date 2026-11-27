@@ -10,23 +10,53 @@ const HISTORY_CORRUPT_KEY = 'bagiadil_history_corrupt';
 const DRAFT_KEY = 'bagiadil_draft';
 const GROUPS_KEY = 'bagiadil_groups';
 const PAYMENT_KEY = 'bagiadil_payment';
+const HIDDEN_PARTICIPANTS_KEY = 'bagiadil_hidden_participants';
+
+function loadHiddenSet() {
+  try {
+    const data = localStorage.getItem(HIDDEN_PARTICIPANTS_KEY);
+    if (!data) return new Set();
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed.filter((n) => typeof n === 'string' && n.trim()).map((n) => n.trim().toLowerCase()),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveHiddenSet(set) {
+  try {
+    localStorage.setItem(HIDDEN_PARTICIPANTS_KEY, JSON.stringify([...set]));
+  } catch {
+    // silently fail
+  }
+}
 
 /**
  * Save participant names to localStorage.
- * Merges with previously saved names (de-duplicated, case-insensitive).
+ * Merges with previously saved names (de-duplicated, case-insensitive) and
+ * un-hides any explicitly saved names from the quick-pick blocklist.
  * @param {string[]} names
  */
 export function saveParticipants(names) {
   try {
     const existing = loadAllNames();
     const merged = [...existing];
+    const hidden = loadHiddenSet();
+    let hiddenChanged = false;
     names.forEach((name) => {
       const lowerName = name.toLowerCase();
       if (!merged.some((n) => n.toLowerCase() === lowerName)) {
         merged.push(name);
       }
+      if (hidden.delete(lowerName)) {
+        hiddenChanged = true;
+      }
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    if (hiddenChanged) saveHiddenSet(hidden);
   } catch {
     // localStorage may be unavailable - silently fail
   }
@@ -58,6 +88,83 @@ export function getSuggestions(partial) {
 export function clearStorage() {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(HIDDEN_PARTICIPANTS_KEY);
+  } catch {
+    // silently fail
+  }
+}
+
+/**
+ * Load quick-pick participant suggestions sorted by frequency in split
+ * history, then recency, then alphabetically, seeded with saved participants
+ * and legacy group members. Hidden names are excluded.
+ * @returns {string[]}
+ */
+export function loadQuickPickParticipants() {
+  const hidden = loadHiddenSet();
+  const stats = new Map();
+
+  for (const entry of loadHistory()) {
+    if (!entry || !Array.isArray(entry.participants)) continue;
+    const timestamp = entry.updatedAt || entry.createdAt || 0;
+    const seenInEntry = new Set();
+    for (const rawName of entry.participants) {
+      if (typeof rawName !== 'string') continue;
+      const trimmed = rawName.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (hidden.has(key) || seenInEntry.has(key)) continue;
+      seenInEntry.add(key);
+
+      const current = stats.get(key);
+      if (current) {
+        current.count += 1;
+        if (timestamp > current.lastUsedAt) {
+          current.lastUsedAt = timestamp;
+        }
+      } else {
+        stats.set(key, { name: trimmed, count: 1, lastUsedAt: timestamp });
+      }
+    }
+  }
+
+  const seedNames = [
+    ...loadAllNames(),
+    ...loadGroups().flatMap((g) => g.members || []),
+  ];
+  for (const rawName of seedNames) {
+    if (typeof rawName !== 'string') continue;
+    const trimmed = rawName.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (hidden.has(key) || stats.has(key)) continue;
+    stats.set(key, { name: trimmed, count: 0, lastUsedAt: 0 });
+  }
+
+  return [...stats.values()]
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      if (b.lastUsedAt !== a.lastUsedAt) return b.lastUsedAt - a.lastUsedAt;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    })
+    .map((item) => item.name);
+}
+
+/**
+ * Hide a participant name from quick-pick suggestions without mutating history.
+ * @param {string} name
+ */
+export function hideQuickPickParticipant(name) {
+  if (typeof name !== 'string') return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const key = trimmed.toLowerCase();
+  try {
+    const filtered = loadAllNames().filter((n) => n.toLowerCase() !== key);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    const hidden = loadHiddenSet();
+    hidden.add(key);
+    saveHiddenSet(hidden);
   } catch {
     // silently fail
   }

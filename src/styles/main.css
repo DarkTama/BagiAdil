@@ -1571,21 +1571,87 @@ label {
   }
 }
 
-/* Saved participant groups */
-.groups-row {
+/* Quick-pick participant suggestions */
+.quick-pick {
+  margin-top: var(--space-md);
+}
+
+.quick-pick-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.quick-pick-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.quick-pick-manage {
+  min-height: 32px;
+  padding: 0 var(--space-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: color var(--transition-fast);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quick-pick-manage:hover {
+    color: var(--text-primary);
+  }
+}
+
+.quick-pick-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
+  gap: var(--space-xs);
 }
 
-.groups-select {
-  flex: 1 1 120px;
-  min-width: 120px;
-}
-
-.groups-row .btn {
+.quick-pick-chip,
+.quick-pick-more {
+  min-height: 36px;
+  max-width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius-lg);
+  background: transparent;
+  color: var(--text-secondary);
   font-size: var(--font-size-sm);
+  line-height: 1.3;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quick-pick-chip:hover,
+  .quick-pick-more:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.quick-pick-chip-manage {
+  border-style: solid;
+  border-color: rgba(239, 68, 68, 0.45);
+  color: var(--error);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quick-pick-chip-manage:hover {
+    background-color: rgba(239, 68, 68, 0.14);
+    color: var(--error);
+    border-color: var(--error);
+  }
 }
 
 /* Mark-as-paid tracker */

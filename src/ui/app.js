@@ -3,7 +3,13 @@
  * Initializes and coordinates all UI components.
  */
 
-import { initParticipants, getParticipants, setParticipants, updateTranslations as updateParticipantsTranslations } from './participants.js';
+import {
+  initParticipants,
+  getParticipants,
+  setParticipants,
+  refreshQuickPick,
+  updateTranslations as updateParticipantsTranslations,
+} from './participants.js';
 import { initAddItemForm, updateTranslations as updateAddItemFormTranslations } from './items.js';
 import { initBillParams, getParams, setParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
 import { renderResults } from './results.js';
@@ -474,6 +480,7 @@ function saveToHistory() {
   update({ historyId: id, receiptBlob: null });
   pruneReceipts(loadHistory().map((e) => e.id));
   refreshHistory();
+  refreshQuickPick();
 }
 
 function defaultHistoryLabel() {
