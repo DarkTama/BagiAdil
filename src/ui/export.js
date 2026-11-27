@@ -5,6 +5,7 @@
 import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
 import { buildShareUrl } from './snapshot.js';
+import { effectiveDiscount, clampedDiscountNotice } from './results.js';
 import { getSession, getPayment, subscribe, update } from './session.js';
 import { savePaymentInfo } from './storage.js';
 
@@ -238,6 +239,13 @@ export function buildPdfContent(results, itemsMap, payment = null) {
   );
   pdfContainer.appendChild(totalDiv);
 
+  if (results.verification?.discountClamped) {
+    const notice = document.createElement('p');
+    notice.style.cssText = 'text-align:center;margin:-10px 0 20px;font-size:12px;color:#92400e;';
+    notice.textContent = clampedDiscountNotice(results);
+    pdfContainer.appendChild(notice);
+  }
+
   // Participant cards
   results.participants.forEach((p) => {
     const card = document.createElement('div');
@@ -441,7 +449,8 @@ export function updateTranslations() {
 export function generateWhatsAppText(results, params = {}, shareUrl = '', payment = null) {
   const { participants, grandTotal } = results;
 
-  const totalDiscount = params.totalDiscount || 0;
+  // The engine caps a discount above the food total; show what was applied.
+  const totalDiscount = effectiveDiscount(results, params.totalDiscount || 0);
   const totalShipping = params.totalShipping || 0;
 
   // Calculate total tagihan (original total before discount/shipping adjustments)

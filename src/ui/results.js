@@ -7,6 +7,27 @@ import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
 
 /**
+ * The discount that was actually applied. The engine clamps a discount larger
+ * than the food total to the food total (verification.discountClamped).
+ * @param {object} result - Result from splitBill()
+ * @param {number} [requested=0] - the discount that was typed in
+ * @returns {number}
+ */
+export function effectiveDiscount(result, requested = 0) {
+  if (!result.verification?.discountClamped) return requested;
+  return result.participants.reduce((sum, p) => sum + Number(p.originalOrder), 0);
+}
+
+/**
+ * Localised one-line notice for a clamped discount.
+ * @param {object} result
+ * @returns {string}
+ */
+export function clampedDiscountNotice(result) {
+  return t('results.discountClamped').replace('{amount}', formatCurrency(effectiveDiscount(result)));
+}
+
+/**
  * Render calculation results into the container.
  * @param {object} result - Result from splitBill()
  * @param {HTMLElement} containerEl
@@ -32,6 +53,14 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
     banner.setAttribute('role', 'status');
     banner.textContent = t('results.stale');
     containerEl.appendChild(banner);
+  }
+
+  if (verification.discountClamped) {
+    const notice = document.createElement('div');
+    notice.className = 'discount-clamped-notice';
+    notice.setAttribute('role', 'status');
+    notice.textContent = clampedDiscountNotice(result);
+    containerEl.appendChild(notice);
   }
 
   // Internal arithmetic check: only worth showing when it fails.
