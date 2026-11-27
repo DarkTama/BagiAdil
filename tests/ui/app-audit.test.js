@@ -17,7 +17,7 @@ const q = (s) => document.querySelector(s);
 const qa = (s) => [...document.querySelectorAll(s)];
 const addPerson = (n) => {
   q('#participant-name').value = n;
-  q('#participants .btn-primary').click();
+  q('#participants .participants-add').click();
 };
 const addItem = (name, price, qty) => {
   const f = q('#add-item-form .section-content');

@@ -45,7 +45,7 @@ describe('UI Integration', () => {
     it('should add a participant', () => {
       initParticipants(participantsEl);
       const input = participantsEl.querySelector('#participant-name');
-      const addBtn = participantsEl.querySelector('.btn-primary');
+      const addBtn = participantsEl.querySelector('.participants-add');
 
       input.value = 'Alice';
       addBtn.click();
@@ -56,7 +56,7 @@ describe('UI Integration', () => {
     it('should not add empty name', () => {
       initParticipants(participantsEl);
       const input = participantsEl.querySelector('#participant-name');
-      const addBtn = participantsEl.querySelector('.btn-primary');
+      const addBtn = participantsEl.querySelector('.participants-add');
 
       input.value = '';
       addBtn.click();
@@ -69,14 +69,14 @@ describe('UI Integration', () => {
     it('should not add duplicate name', () => {
       initParticipants(participantsEl);
       const input = participantsEl.querySelector('#participant-name');
-      const addBtn = participantsEl.querySelector('.btn-primary');
+      const addBtn = participantsEl.querySelector('.participants-add');
 
       input.value = 'Alice';
       addBtn.click();
 
       // Re-query input after re-render
       const input2 = participantsEl.querySelector('#participant-name');
-      const addBtn2 = participantsEl.querySelector('.btn-primary');
+      const addBtn2 = participantsEl.querySelector('.participants-add');
       input2.value = 'alice';
       addBtn2.click();
 
@@ -88,7 +88,7 @@ describe('UI Integration', () => {
     it('should remove a participant', () => {
       initParticipants(participantsEl);
       const input = participantsEl.querySelector('#participant-name');
-      const addBtn = participantsEl.querySelector('.btn-primary');
+      const addBtn = participantsEl.querySelector('.participants-add');
 
       input.value = 'Alice';
       addBtn.click();
@@ -104,7 +104,7 @@ describe('UI Integration', () => {
       initParticipants(participantsEl, { onChange: (p) => changes.push([...p]) });
 
       const input = participantsEl.querySelector('#participant-name');
-      const addBtn = participantsEl.querySelector('.btn-primary');
+      const addBtn = participantsEl.querySelector('.participants-add');
 
       input.value = 'Alice';
       addBtn.click();
@@ -247,12 +247,12 @@ describe('UI Integration', () => {
 
       // Add participants
       let input = participantsEl.querySelector('#participant-name');
-      let addBtn = participantsEl.querySelector('.btn-primary');
+      let addBtn = participantsEl.querySelector('.participants-add');
       input.value = 'Alice';
       addBtn.click();
 
       input = participantsEl.querySelector('#participant-name');
-      addBtn = participantsEl.querySelector('.btn-primary');
+      addBtn = participantsEl.querySelector('.participants-add');
       input.value = 'Bob';
       addBtn.click();
 

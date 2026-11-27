@@ -53,7 +53,7 @@ export function initUpload(containerEl, onComplete) {
         <p class="upload-icon">\u{1F4F7}</p>
         <p class="upload-text">${t('upload.dragDrop')}</p>
         <p class="upload-subtext">${t('upload.or')}</p>
-        <button type="button" class="btn btn-primary upload-btn" id="upload-btn">${t('upload.chooseImage')}</button>
+        <button type="button" class="btn btn-secondary upload-btn" id="upload-btn">${t('upload.chooseImage')}</button>
         <input type="file" id="receipt-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" hidden />
       </div>
     </div>

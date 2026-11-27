@@ -65,7 +65,7 @@ function render() {
   // Add button
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
-  addBtn.className = 'btn btn-primary btn-add-item';
+  addBtn.className = 'btn btn-secondary btn-add-item';
   addBtn.textContent = '+ ' + t('table.addItem');
   addBtn.addEventListener('click', () => handleSubmit(nameInput, priceInput, qtyInput));
   form.appendChild(addBtn);

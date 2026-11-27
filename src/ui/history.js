@@ -122,7 +122,7 @@ function renderEntry(entry) {
 
   const loadBtn = document.createElement('button');
   loadBtn.type = 'button';
-  loadBtn.className = 'btn btn-primary history-load';
+  loadBtn.className = 'btn btn-secondary history-load';
   loadBtn.textContent = t('history.load');
   loadBtn.addEventListener('click', () => {
     if (onLoadCallback) onLoadCallback(entry);
