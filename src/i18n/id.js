@@ -150,6 +150,9 @@ const id = {
   'migration.bannerNothing':
     'BagiAdil sekarang ada di bagiadil.darktama.dev. Simpan alamat baru ini ya!',
   'migration.dismiss': 'Tutup pemberitahuan',
+  'migration.hint':
+    'Pernah pakai BagiAdil di darktama.github.io? Pindahkan data lamamu ke sini.',
+  'migration.moveButton': 'Pindahkan data saya',
   'migration.invalid': 'Data migrasi tidak valid dan diabaikan.',
 };
 

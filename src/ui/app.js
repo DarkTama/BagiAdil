@@ -152,8 +152,8 @@ export function initApp() {
   // Reopen the last in-progress split (after every component exists).
   restoreDraft();
 
-  // Show bridge migration banner if applicable.
-  initMigrationNotice(migration);
+  // Show bridge migration banner or direct-visit hint if applicable.
+  initMigrationNotice(migration, { isShared: false });
 
   // Apply initial translations
   updateAllTranslations();
@@ -560,7 +560,7 @@ function renderSharedView(snapshot, migration = null) {
   });
 
   initLangToggle();
-  initMigrationNotice(migration);
+  initMigrationNotice(migration, { isShared: true });
 
   const resultsEl = document.querySelector('#results .section-content');
 

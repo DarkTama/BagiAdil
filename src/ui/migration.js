@@ -7,13 +7,22 @@
 
 import { decompressFromEncodedURIComponent } from 'lz-string';
 import { t, setLocale } from '../i18n/index.js';
-import { saveParticipants, mergeHistoryEntries, mergeGroups } from './storage.js';
+import {
+  saveParticipants,
+  mergeHistoryEntries,
+  mergeGroups,
+  loadHistory,
+  loadGroups,
+  loadParticipants,
+  loadDraft,
+} from './storage.js';
 import { showToast } from './toast.js';
 
 const LOCALE_KEY = 'bagiadil-lang';
 const HISTORY_KEY = 'bagiadil_history';
 const GROUPS_KEY = 'bagiadil_groups';
 const PARTICIPANTS_KEY = 'bagiadil_participants';
+const HINT_DISMISSED_KEY = 'bagiadil_migrate_hint_dismissed';
 
 const COPY_IF_ABSENT_KEYS = new Set([
   'bagiadil_payment',
@@ -35,9 +44,18 @@ const ALLOWED_BRIDGE_ORIGIN = parseOrigin(
 );
 const NEW_DOMAIN_LABEL = 'bagiadil.darktama.dev';
 
-// Per-page-load state for the migration banner (not persisted across reloads).
-let activeBannerKey = null;
+// Per-page-load state for the migration notice (banner dismissal is memory-only;
+// hint dismissal persists in localStorage).
+let activeNoticeKind = null;
 let noticeDismissed = false;
+
+/**
+ * URL on the old GitHub Pages bridge that forces re-sending saved data.
+ * @returns {string}
+ */
+export function getBridgeResendUrl() {
+  return ALLOWED_BRIDGE_ORIGIN ? `${ALLOWED_BRIDGE_ORIGIN}/BagiAdil/#resend` : '';
+}
 
 function isAllowedKey(key) {
   return key.startsWith('bagiadil_') || key === LOCALE_KEY;
@@ -208,61 +226,104 @@ function appendTextWithBoldDomain(el, message) {
   }
 }
 
+function hasAnyAppData() {
+  return (
+    loadHistory().length > 0 ||
+    loadGroups().length > 0 ||
+    loadParticipants().length > 0 ||
+    loadDraft() !== null ||
+    safeGetItem('bagiadil_draft') !== null
+  );
+}
+
 function renderNotice() {
   const slot = getNoticeSlot();
   if (!slot) return;
   slot.innerHTML = '';
 
-  if (noticeDismissed || !activeBannerKey) {
+  if (noticeDismissed || !activeNoticeKind) {
     slot.hidden = true;
     return;
   }
 
-  const banner = document.createElement('div');
-  banner.className = 'migration-banner';
-  banner.setAttribute('role', 'status');
-
+  const card = document.createElement('div');
   const body = document.createElement('div');
   body.className = 'migration-notice-body';
 
   const text = document.createElement('p');
   text.className = 'migration-notice-text';
-  appendTextWithBoldDomain(text, t(activeBannerKey));
-  body.appendChild(text);
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'migration-notice-close';
   closeBtn.setAttribute('aria-label', t('migration.dismiss'));
   closeBtn.textContent = '×';
-  closeBtn.addEventListener('click', () => {
-    noticeDismissed = true;
-    renderNotice();
-  });
 
-  banner.appendChild(body);
-  banner.appendChild(closeBtn);
-  slot.appendChild(banner);
+  if (activeNoticeKind === 'hint') {
+    card.className = 'migration-hint';
+    text.textContent = t('migration.hint');
+    body.appendChild(text);
+
+    const actions = document.createElement('div');
+    actions.className = 'migration-hint-actions';
+    const moveLink = document.createElement('a');
+    moveLink.className = 'btn btn-secondary migration-move-link';
+    moveLink.href = getBridgeResendUrl();
+    moveLink.textContent = t('migration.moveButton');
+    actions.appendChild(moveLink);
+    body.appendChild(actions);
+
+    closeBtn.addEventListener('click', () => {
+      safeSetItem(HINT_DISMISSED_KEY, '1');
+      noticeDismissed = true;
+      renderNotice();
+    });
+  } else {
+    card.className = 'migration-banner';
+    card.setAttribute('role', 'status');
+    const key =
+      activeNoticeKind === 'banner-imported'
+        ? 'migration.bannerImported'
+        : 'migration.bannerNothing';
+    appendTextWithBoldDomain(text, t(key));
+    body.appendChild(text);
+
+    closeBtn.addEventListener('click', () => {
+      noticeDismissed = true;
+      renderNotice();
+    });
+  }
+
+  card.appendChild(body);
+  card.appendChild(closeBtn);
+  slot.appendChild(card);
   slot.hidden = false;
 }
 
 /**
  * Initialize the top-of-page migration notice from `importMigrationFromHash` result.
  * @param {{ fromBridge: boolean, outcome: string }} migrationResult
+ * @param {{ isShared?: boolean }} [options={}]
  */
-export function initMigrationNotice(migrationResult) {
+export function initMigrationNotice(migrationResult, { isShared = false } = {}) {
   noticeDismissed = false;
-  activeBannerKey = null;
+  activeNoticeKind = null;
 
+  const fromBridge = Boolean(migrationResult && migrationResult.fromBridge);
   if (
-    migrationResult &&
-    migrationResult.fromBridge &&
+    fromBridge &&
     (migrationResult.outcome === 'imported' || migrationResult.outcome === 'nothing')
   ) {
-    activeBannerKey =
-      migrationResult.outcome === 'imported'
-        ? 'migration.bannerImported'
-        : 'migration.bannerNothing';
+    activeNoticeKind =
+      migrationResult.outcome === 'imported' ? 'banner-imported' : 'banner-nothing';
+  } else if (
+    !isShared &&
+    !fromBridge &&
+    !hasAnyAppData() &&
+    safeGetItem(HINT_DISMISSED_KEY) === null &&
+    getBridgeResendUrl()
+  ) {
+    activeNoticeKind = 'hint';
   }
 
   renderNotice();
@@ -272,7 +333,7 @@ export function initMigrationNotice(migrationResult) {
  * Re-render the active migration notice in the current locale.
  */
 export function updateMigrationNoticeTranslations() {
-  if (!noticeDismissed && activeBannerKey) {
+  if (!noticeDismissed && activeNoticeKind) {
     renderNotice();
   }
 }
