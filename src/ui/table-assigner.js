@@ -295,11 +295,16 @@ function renderUnassignedTable() {
     deleteBtn.textContent = '✕';
     deleteBtn.title = t('table.remove');
     deleteBtn.setAttribute('aria-label', t('table.remove'));
+    deleteBtn.dataset.focusKey = `del:${item.id}`;
     deleteBtn.addEventListener('click', () => {
+      // Focus moves to the next row's delete button (or the previous one).
+      const idx = items.indexOf(item);
+      const neighbor = items[idx + 1] || items[idx - 1];
       items = items.filter((i) => i.id !== item.id);
       if (editingItemId === item.id) editingItemId = null;
       render();
       notifyChange();
+      if (neighbor) restoreFocus(`del:${neighbor.id}`);
     });
     tdAction.appendChild(deleteBtn);
     tr.appendChild(tdAction);
@@ -317,6 +322,7 @@ function createEditRow(item) {
   const tr = document.createElement('tr');
   tr.className = 'edit-row';
   tr.dataset.itemId = item.id;
+  const focusKey = `edit:${item.id}`;
 
   // Item name
   const tdName = document.createElement('td');
@@ -328,6 +334,9 @@ function createEditRow(item) {
   nameInput.value = item.name;
   nameInput.placeholder = t('placeholder.itemName');
   nameInput.setAttribute('aria-label', t('label.item'));
+  // Every edit-row control shares the edit button's key: opening edit lands on
+  // this input (first match), and Save/Cancel land back on the edit button.
+  [nameInput].forEach((el) => (el.dataset.focusKey = focusKey));
   tdName.appendChild(nameInput);
   tr.appendChild(tdName);
 
@@ -380,6 +389,7 @@ function createEditRow(item) {
   cancelBtn.title = t('table.cancel');
   cancelBtn.setAttribute('aria-label', t('table.cancel'));
 
+  [qtyInput, priceInput, saveBtn, cancelBtn].forEach((el) => (el.dataset.focusKey = focusKey));
   tdAction.appendChild(saveBtn);
   tdAction.appendChild(cancelBtn);
   tr.appendChild(tdAction);
@@ -536,6 +546,8 @@ function createChipRow(item, remaining) {
         delete item.split;
         if (assignedQty(item) > item.totalQty) item.assignments = [];
       } else {
+        // Units become weights; only a fully assigned item keeps the same money.
+        if (assignedQty(item) < item.totalQty) item.assignments = [];
         item.split = true;
       }
       render();
@@ -600,6 +612,7 @@ function renderAssignedSection() {
       const undoBtn = document.createElement('button');
       undoBtn.type = 'button';
       undoBtn.className = 'btn undo-btn';
+      undoBtn.dataset.focusKey = `undo:${assignedItem.itemId}:${person}`;
       undoBtn.textContent = t('table.undo');
       undoBtn.addEventListener('click', () => {
         // Find the item and remove this assignment

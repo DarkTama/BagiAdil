@@ -771,7 +771,7 @@ label {
 }
 
 /* Assignment chips: one row of participant chips under each item */
-.assignment-table tr[data-item-id] td {
+.assignment-table tr[data-item-id]:not(.edit-row) td {
   border-bottom: none;
 }
 
@@ -1005,7 +1005,7 @@ label {
   }
 
   /* Item card and its chip row read as one card. */
-  .assignment-table tr[data-item-id] {
+  .assignment-table tr[data-item-id]:not(.edit-row) {
     margin-bottom: 0;
     border-bottom: none;
     border-bottom-left-radius: 0;

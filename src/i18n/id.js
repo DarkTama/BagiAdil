@@ -124,7 +124,7 @@ const id = {
   'guide.title': 'Panduan Singkat',
   'guide.step1': 'Tambahkan peserta — semua orang yang ikut patungan.',
   'guide.step2': 'Tambahkan item makanan, atau scan struk lewat tab Scan Struk.',
-  'guide.step3': 'Tetapkan setiap item ke peserta yang memesannya.',
+  'guide.step3': 'Ketuk nama peserta di bawah tiap item. Pakai "Bagi rata" untuk item yang dimakan bersama.',
   'guide.step4': 'Tekan Hitung Pembagian untuk melihat hasilnya.',
   'guide.tabsNote': 'Buka tab Riwayat kapan saja untuk melihat pembagian tersimpan.',
   'validation.nameEmpty': 'Nama tidak boleh kosong',
