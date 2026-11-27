@@ -16,6 +16,9 @@ import {
   savePaymentInfo,
   loadPaymentInfo,
   clearPaymentInfo,
+  saveDraft,
+  loadDraft,
+  clearDraft,
 } from '../../src/ui/storage.js';
 
 describe('Storage - localStorage integration', () => {
@@ -222,6 +225,21 @@ describe('Storage - localStorage integration', () => {
       expect(renameHistoryEntry(id, 'y')).toBe(true);
       expect(renameHistoryEntry('nope', 'y')).toBe(false);
       expect(deleteHistoryEntry(id)).toBe(true);
+    });
+  });
+
+  describe('draft', () => {
+    it('round-trips and clears', () => {
+      const draft = { v: 1, snapshot: { participants: ['A'] }, historyId: null, paid: {}, calculated: false };
+      expect(saveDraft(draft)).toBe(true);
+      expect(loadDraft()).toEqual(draft);
+      clearDraft();
+      expect(loadDraft()).toBeNull();
+    });
+
+    it('returns null for a corrupt draft', () => {
+      localStorage.setItem('bagiadil_draft', '{oops');
+      expect(loadDraft()).toBeNull();
     });
   });
 

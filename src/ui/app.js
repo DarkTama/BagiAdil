@@ -22,10 +22,13 @@ import {
   loadItems as tableLoadItems,
 } from './table-assigner.js';
 import { initExport, updateTranslations as updateExportTranslations } from './export.js';
-import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './storage.js';
+import {
+  initStorage, saveParticipants, saveHistoryEntry, loadHistory, getHistoryEntry,
+  saveDraft, loadDraft, clearDraft,
+} from './storage.js';
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
 import { putReceipt, pruneReceipts } from './image-store.js';
-import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
+import { buildSnapshot, computeSplit, decodeSnapshot, validateSnapshot } from './snapshot.js';
 import { getSession, getPayment, subscribe, update, setCalculated, resetSession, editorChanged } from './session.js';
 import { showToast } from './toast.js';
 import { initGuide } from './guide.js';
@@ -117,8 +120,9 @@ export function initApp() {
     });
   }
 
-  // Results and export visibility follow the session.
+  // Results and export visibility follow the session; so does the draft.
   subscribe(render);
+  subscribe(persistDraft);
 
   // Wire up calculate button
   calculateBtn.addEventListener('click', handleCalculate);
@@ -128,6 +132,9 @@ export function initApp() {
   document.addEventListener('locale-changed', () => {
     updateAllTranslations();
   });
+
+  // Reopen the last in-progress split (after every component exists).
+  restoreDraft();
 
   // Apply initial translations
   updateAllTranslations();
@@ -242,8 +249,44 @@ function handleTableStateChange(state) {
 }
 
 /** Snapshot of what the editor currently holds. */
-function readEditor() {
-  return buildSnapshot(getParticipants(), getParams(), getTableState().items, getPayment());
+function readEditor(payment = getPayment()) {
+  return buildSnapshot(getParticipants(), getParams(), getTableState().items, payment);
+}
+
+/**
+ * Session subscriber: keep the in-progress split in localStorage, or drop it
+ * once the editor is blank. The draft carries the RAW payment strings so the
+ * inputs restore exactly.
+ */
+function persistDraft(state) {
+  const snapshot = readEditor(state.payment);
+  if (snapshot.participants.length === 0 && snapshot.items.length === 0) {
+    clearDraft();
+    return;
+  }
+  saveDraft({
+    v: 1,
+    snapshot,
+    historyId: state.historyId,
+    paid: state.paid,
+    calculated: state.calc !== null && !state.stale,
+  });
+}
+
+/** Reopen the draft written by persistDraft. No history write, toast or scroll. */
+function restoreDraft() {
+  const draft = loadDraft();
+  if (!draft || draft.v !== 1 || !validateSnapshot(draft.snapshot)) {
+    clearDraft();
+    return;
+  }
+  applySnapshot(draft.snapshot);
+  resetSession({
+    historyId: draft.historyId && getHistoryEntry(draft.historyId) ? draft.historyId : null,
+    paid: draft.paid || {},
+    payment: draft.snapshot.payment,
+  });
+  if (draft.calculated) showCalculated();
 }
 
 function whileApplying(write) {
