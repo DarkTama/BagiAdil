@@ -5,28 +5,18 @@
 import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
 import { buildShareUrl } from './snapshot.js';
+import { getSession } from './session.js';
 import { loadPaymentInfo, savePaymentInfo } from './storage.js';
 
 let containerEl = null;
-let getResultsFn = null;
-let getParamsFn = null;
-let getItemsMapFn = null;
-let getSnapshotFn = null;
 
 /**
- * Initialize the export component.
+ * Initialize the export component. Results, items and the calculated snapshot
+ * are read from the session.
  * @param {HTMLElement} el - Container element
- * @param {function} resultsFn - Function that returns current results object
- * @param {function} [paramsFn] - Function that returns current params
- * @param {function} [itemsMapFn] - Function that returns current items map
- * @param {function} [snapshotFn] - Function that returns the current split snapshot
  */
-export function initExport(el, resultsFn, paramsFn, itemsMapFn, snapshotFn) {
+export function initExport(el) {
   containerEl = el;
-  getResultsFn = resultsFn;
-  getParamsFn = paramsFn || null;
-  getItemsMapFn = itemsMapFn || null;
-  getSnapshotFn = snapshotFn || null;
   render();
 }
 
@@ -159,8 +149,8 @@ function render() {
  * @returns {object|null}
  */
 function getLiveSnapshot() {
-  const snapshot = getSnapshotFn ? getSnapshotFn() : null;
-  return snapshot && { ...snapshot, payment: getPaymentInfo() };
+  const { calc } = getSession();
+  return calc && { ...calc.snapshot, payment: getPaymentInfo() };
 }
 
 async function handleShareLink() {
@@ -284,8 +274,9 @@ export function buildPdfContent(results, itemsMap, payment = null) {
 }
 
 async function handlePdfExport() {
-  const results = getResultsFn ? getResultsFn() : null;
-  if (!results) return;
+  const { calc } = getSession();
+  if (!calc) return;
+  const results = calc.result;
 
   const pdfBtn = containerEl.querySelector('.export-pdf-btn');
   if (pdfBtn.disabled) return;
@@ -298,7 +289,7 @@ async function handlePdfExport() {
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
 
-    const itemsMap = getItemsMapFn ? getItemsMapFn() : null;
+    const itemsMap = calc.itemsMap;
     const payment = getPaymentInfo();
     const pdfContainer = buildPdfContent(results, itemsMap, payment);
     document.body.appendChild(pdfContainer);
@@ -337,10 +328,12 @@ async function handlePdfExport() {
 }
 
 async function handleWhatsAppCopy() {
-  const results = getResultsFn ? getResultsFn() : null;
-  if (!results) return;
+  const { calc } = getSession();
+  if (!calc) return;
+  const results = calc.result;
 
-  const params = getParamsFn ? getParamsFn() : {};
+  // Calculated params, not live inputs: the text must match the results on screen.
+  const params = calc.snapshot.params;
   const snapshot = getLiveSnapshot();
   const shareUrl = snapshot ? buildShareUrl(snapshot) : '';
   const payment = getPaymentInfo();
