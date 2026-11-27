@@ -28,8 +28,30 @@ export function updateTranslations() {
   if (!containerEl) return;
   const nameInput = containerEl.querySelector('.add-item-name');
   if (nameInput) nameInput.placeholder = t('table.itemName');
+  const labels = {
+    'add-item-name': t('table.itemName'),
+    'add-item-price': t('table.unitPrice'),
+    'add-item-qty': t('table.qty'),
+  };
+  Object.entries(labels).forEach(([id, text]) => {
+    const label = containerEl.querySelector(`label[for="${id}"]`);
+    if (label) label.textContent = text;
+  });
   const addBtn = containerEl.querySelector('.btn-add-item');
   if (addBtn) addBtn.textContent = '+ ' + t('table.addItem');
+  const error = containerEl.querySelector('.add-item-error');
+  if (error && error.dataset.key) error.textContent = t(error.dataset.key);
+}
+
+function createField(id, labelKey, input) {
+  input.id = id;
+  const label = document.createElement('label');
+  label.className = 'visually-hidden';
+  label.setAttribute('for', id);
+  label.textContent = t(labelKey);
+  const frag = document.createDocumentFragment();
+  frag.append(label, input);
+  return frag;
 }
 
 function render() {
@@ -44,14 +66,14 @@ function render() {
   nameInput.type = 'text';
   nameInput.className = 'add-item-name';
   nameInput.placeholder = t('table.itemName');
-  form.appendChild(nameInput);
+  form.appendChild(createField('add-item-name', 'table.itemName', nameInput));
 
   // Unit price input
   const priceInput = document.createElement('input');
   priceInput.className = 'add-item-price';
   priceInput.placeholder = 'Rp 0';
   attachCurrencyInput(priceInput);
-  form.appendChild(priceInput);
+  form.appendChild(createField('add-item-price', 'table.unitPrice', priceInput));
 
   // Quantity input
   const qtyInput = document.createElement('input');
@@ -60,7 +82,7 @@ function render() {
   qtyInput.placeholder = '1';
   qtyInput.min = '1';
   qtyInput.value = '1';
-  form.appendChild(qtyInput);
+  form.appendChild(createField('add-item-qty', 'table.qty', qtyInput));
 
   // Add button
   const addBtn = document.createElement('button');
@@ -70,6 +92,12 @@ function render() {
   addBtn.addEventListener('click', () => handleSubmit(nameInput, priceInput, qtyInput));
   form.appendChild(addBtn);
 
+  // Inline error (announced), shared by name and qty
+  const errorEl = document.createElement('span');
+  errorEl.className = 'error-message add-item-error';
+  errorEl.id = 'add-item-error';
+  errorEl.setAttribute('role', 'alert');
+
   // Enter key support on all inputs
   [nameInput, priceInput, qtyInput].forEach((input) => {
     input.addEventListener('keydown', (e) => {
@@ -77,20 +105,42 @@ function render() {
         handleSubmit(nameInput, priceInput, qtyInput);
       }
     });
+    input.addEventListener('input', () => clearError(nameInput, qtyInput, errorEl));
   });
 
-  containerEl.appendChild(form);
+  containerEl.append(form, errorEl);
+}
+
+function showError(input, errorEl, key) {
+  errorEl.dataset.key = key;
+  errorEl.textContent = t(key);
+  input.classList.add('input-error');
+  input.setAttribute('aria-invalid', 'true');
+  input.setAttribute('aria-describedby', errorEl.id);
+  input.focus();
+}
+
+function clearError(nameInput, qtyInput, errorEl) {
+  errorEl.textContent = '';
+  delete errorEl.dataset.key;
+  [nameInput, qtyInput].forEach((input) => {
+    input.classList.remove('input-error');
+    input.removeAttribute('aria-invalid');
+    input.removeAttribute('aria-describedby');
+  });
 }
 
 function handleSubmit(nameInput, priceInput, qtyInput) {
+  const errorEl = containerEl.querySelector('.add-item-error');
+  clearError(nameInput, qtyInput, errorEl);
+
   const name = nameInput.value.trim();
+  // An empty price field is Rp 0, same as the inline edit row (free items are allowed).
   const unitPrice = getCurrencyValue(priceInput);
   const qty = parseInt(qtyInput.value, 10) || 1;
 
-  // Validate
-  if (!name) return;
-  if (unitPrice <= 0) return;
-  if (qty < 1) return;
+  if (!name) return showError(nameInput, errorEl, 'table.errorItemName');
+  if (qty < 1) return showError(qtyInput, errorEl, 'table.errorItemQty');
 
   if (onAddItemCallback) {
     onAddItemCallback({ name, unitPrice, qty });

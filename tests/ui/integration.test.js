@@ -154,7 +154,7 @@ describe('UI Integration', () => {
       expect(addedItems.length).toBe(0);
     });
 
-    it('should not submit with zero or negative price', () => {
+    it('should allow a zero price, matching the inline edit row', () => {
       const addedItems = [];
       initAddItemForm(addItemFormEl, { onAddItem: (item) => addedItems.push(item) });
 
@@ -166,7 +166,7 @@ describe('UI Integration', () => {
       priceInput.value = '0';
       addBtn.click();
 
-      expect(addedItems.length).toBe(0);
+      expect(addedItems).toEqual([{ name: 'Nasi Goreng', unitPrice: 0, qty: 1 }]);
     });
   });
 
