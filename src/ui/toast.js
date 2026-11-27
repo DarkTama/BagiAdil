@@ -35,7 +35,7 @@ export function showToast(message, type = 'info', duration = 3500) {
   const dismiss = () => {
     if (!toast.isConnected) return;
     toast.classList.add('toast--leaving');
-    setTimeout(() => toast.remove(), 300);
+    setTimeout(() => toast.remove(), 200); // matches .toast--leaving duration
   };
 
   const timer = setTimeout(dismiss, duration);

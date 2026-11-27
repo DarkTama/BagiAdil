@@ -368,7 +368,8 @@ function handleCalculate(resultsEl) {
   // Scroll to results
   const resultsSection = document.querySelector('#results');
   if (resultsSection) {
-    resultsSection.scrollIntoView({ behavior: 'smooth' });
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    resultsSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 }
 

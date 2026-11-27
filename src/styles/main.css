@@ -79,6 +79,7 @@ button {
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 400ms ease;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* Legacy spacing tokens (used internally) */
   --space-xs: 0.25rem;
@@ -466,16 +467,6 @@ label {
   border-radius: var(--border-radius);
   padding: var(--space-md);
   border: 1px solid var(--border-color);
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .result-card:hover {
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: var(--shadow-md);
-  }
 }
 
 .result-card-name {
@@ -1469,7 +1460,7 @@ label {
   border-radius: var(--border-radius-sm);
   font-size: var(--font-size-sm);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  animation: toast-in 0.25s ease;
+  animation: toast-in 0.25s var(--ease-out);
 }
 
 .toast--success {
@@ -1485,7 +1476,7 @@ label {
 }
 
 .toast--leaving {
-  animation: toast-out 0.3s ease forwards;
+  animation: toast-out 0.2s ease forwards;
 }
 
 @keyframes toast-in {
@@ -1670,5 +1661,32 @@ header {
 @media (min-width: 768px) {
   .assignment-table {
     table-layout: fixed;
+  }
+}
+
+/* Reduced motion: keep fades (they aid comprehension), drop movement */
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes toast-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active {
+    transform: none;
+  }
+
+  .toast {
+    animation: toast-fade-in 0.15s ease;
+  }
+
+  .toast--leaving {
+    animation: toast-fade-out 0.15s ease forwards;
   }
 }
