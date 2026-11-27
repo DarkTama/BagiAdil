@@ -67,7 +67,7 @@ function render() {
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
-  addBtn.className = 'btn btn-primary';
+  addBtn.className = 'btn btn-secondary participants-add';
   addBtn.textContent = t('btn.add');
   addBtn.addEventListener('click', () => addParticipant(input));
   row.appendChild(addBtn);
@@ -82,7 +82,8 @@ function render() {
   containerEl.appendChild(inputGroup);
 
   // Saved participant groups
-  containerEl.appendChild(renderGroupsRow());
+  const groupsRow = renderGroupsRow();
+  if (groupsRow) containerEl.appendChild(groupsRow);
 
   // Handle enter key
   input.addEventListener('keydown', (e) => {
@@ -160,71 +161,64 @@ function removeParticipant(index) {
 }
 
 /**
- * Build the saved-groups row: a group picker with Load / Delete, and a
- * Save-as-group button.
- * @returns {HTMLElement}
+ * Build the saved-groups row: a group picker with Load / Delete (only once a
+ * group exists) and a Save-as-group button (only with 2+ participants).
+ * @returns {HTMLElement|null} null when there is nothing to show
  */
 function renderGroupsRow() {
   const groups = loadGroups();
+  const canSave = participants.length >= 2;
+  if (groups.length === 0 && !canSave) return null;
+
   const wrap = document.createElement('div');
   wrap.className = 'groups-row';
 
-  const select = document.createElement('select');
-  select.className = 'groups-select';
-  select.setAttribute('aria-label', t('groups.select'));
-  if (groups.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = t('groups.none');
-    select.appendChild(opt);
-    select.disabled = true;
-  } else {
+  if (groups.length > 0) {
+    const select = document.createElement('select');
+    select.className = 'groups-select';
+    select.setAttribute('aria-label', t('groups.select'));
     groups.forEach((g) => {
       const opt = document.createElement('option');
       opt.value = g.name;
       opt.textContent = `${g.name} (${g.members.length})`;
       select.appendChild(opt);
     });
+    wrap.appendChild(select);
+
+    const loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.className = 'btn btn-secondary groups-load';
+    loadBtn.textContent = t('groups.load');
+    loadBtn.addEventListener('click', () => loadGroupByName(select.value));
+    wrap.appendChild(loadBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-danger groups-delete';
+    delBtn.textContent = t('groups.delete');
+    delBtn.addEventListener('click', () => {
+      if (!select.value) return;
+      deleteGroup(select.value);
+      showToast(t('groups.deleted'), 'info');
+      render();
+    });
+    wrap.appendChild(delBtn);
   }
-  wrap.appendChild(select);
 
-  const loadBtn = document.createElement('button');
-  loadBtn.type = 'button';
-  loadBtn.className = 'btn groups-load';
-  loadBtn.textContent = t('groups.load');
-  loadBtn.disabled = groups.length === 0;
-  loadBtn.addEventListener('click', () => loadGroupByName(select.value));
-  wrap.appendChild(loadBtn);
-
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'btn btn-danger groups-delete';
-  delBtn.textContent = t('groups.delete');
-  delBtn.disabled = groups.length === 0;
-  delBtn.addEventListener('click', () => {
-    if (!select.value) return;
-    deleteGroup(select.value);
-    showToast(t('groups.deleted'), 'info');
-    render();
-  });
-  wrap.appendChild(delBtn);
-
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'button';
-  saveBtn.className = 'btn btn-primary groups-save';
-  saveBtn.textContent = t('groups.save');
-  saveBtn.addEventListener('click', () => {
-    if (participants.length === 0) {
-      showToast(t('groups.saveEmpty'), 'warning');
-      return;
-    }
-    const name = window.prompt(t('groups.namePrompt'));
-    if (!name || !name.trim()) return;
-    saveGroup(name, participants);
-    showToast(t('groups.saved'), 'success');
-    render();
-  });
-  wrap.appendChild(saveBtn);
+  if (canSave) {
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn btn-secondary groups-save';
+    saveBtn.textContent = t('groups.save');
+    saveBtn.addEventListener('click', () => {
+      const name = window.prompt(t('groups.namePrompt'));
+      if (!name || !name.trim()) return;
+      saveGroup(name, participants);
+      showToast(t('groups.saved'), 'success');
+      render();
+    });
+    wrap.appendChild(saveBtn);
+  }
 
   return wrap;
 }

@@ -64,7 +64,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
           <input type="number" id="ocr-delivery-fee" value="${parsedData.deliveryFee}" min="0" />
         </div>
       </div>
-      <button type="button" class="btn btn-primary ocr-confirm-btn" id="ocr-confirm">
+      <button type="button" class="btn btn-secondary ocr-confirm-btn" id="ocr-confirm">
         ${t('ocr.confirmUse')}
       </button>
     </div>

@@ -129,7 +129,7 @@ function render() {
   // PDF export button
   const pdfBtn = document.createElement('button');
   pdfBtn.type = 'button';
-  pdfBtn.className = 'btn btn-primary export-btn export-pdf-btn';
+  pdfBtn.className = 'btn btn-secondary export-btn export-pdf-btn';
   pdfBtn.innerHTML = `\u{1F4C4} ${t('export.pdf')}`;
   pdfBtn.addEventListener('click', handlePdfExport);
   wrapper.appendChild(pdfBtn);
@@ -137,7 +137,7 @@ function render() {
   // WhatsApp copy button
   const waBtn = document.createElement('button');
   waBtn.type = 'button';
-  waBtn.className = 'btn btn-primary export-btn export-wa-btn';
+  waBtn.className = 'btn btn-secondary export-btn export-wa-btn';
   waBtn.innerHTML = `\u{1F4CB} ${t('export.whatsapp')}`;
   waBtn.addEventListener('click', handleWhatsAppCopy);
   wrapper.appendChild(waBtn);
@@ -145,7 +145,7 @@ function render() {
   // Share link button
   const shareBtn = document.createElement('button');
   shareBtn.type = 'button';
-  shareBtn.className = 'btn btn-primary export-btn export-share-btn';
+  shareBtn.className = 'btn btn-secondary export-btn export-share-btn';
   shareBtn.innerHTML = `\u{1F517} ${t('export.shareLink')}`;
   shareBtn.addEventListener('click', handleShareLink);
   wrapper.appendChild(shareBtn);

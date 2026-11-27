@@ -78,7 +78,7 @@ function openGuide() {
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
-  closeBtn.className = 'btn btn-primary guide-close';
+  closeBtn.className = 'btn btn-secondary guide-close';
   closeBtn.textContent = t('guide.close');
   closeBtn.addEventListener('click', closeGuide);
   modal.appendChild(closeBtn);

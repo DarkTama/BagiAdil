@@ -379,7 +379,7 @@ function createEditRow(item) {
 
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
-  saveBtn.className = 'btn btn-primary btn-save-item';
+  saveBtn.className = 'btn btn-secondary btn-save-item';
   saveBtn.textContent = t('table.save');
   saveBtn.title = t('table.save');
   saveBtn.setAttribute('aria-label', t('table.save'));
@@ -505,7 +505,7 @@ function createAssignPopup(item, maxQty) {
   // Confirm button
   const confirmBtn = document.createElement('button');
   confirmBtn.type = 'button';
-  confirmBtn.className = 'btn btn-primary btn-popup-confirm';
+  confirmBtn.className = 'btn btn-secondary btn-popup-confirm';
   confirmBtn.textContent = t('table.assign');
   confirmBtn.addEventListener('click', () => {
     const person = select.value;

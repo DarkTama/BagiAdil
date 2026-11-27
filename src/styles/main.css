@@ -298,7 +298,7 @@ label {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn:hover {
+  .btn:hover:where(:not(:disabled)) {
     background-color: var(--bg-hover);
     border-color: rgba(255, 255, 255, 0.2);
   }
@@ -316,10 +316,30 @@ label {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn-primary:hover {
+  .btn-primary:hover:where(:not(:disabled)) {
     background-color: var(--accent-secondary);
     border-color: var(--accent-secondary);
   }
+}
+
+/* Secondary: outlined. Solid white (.btn-primary) is reserved for the one main action per view. */
+.btn-secondary {
+  background-color: transparent;
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-secondary:hover:where(:not(:disabled)) {
+    background-color: var(--bg-hover);
+    border-color: var(--text-secondary);
+  }
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-danger {
@@ -332,7 +352,7 @@ label {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn-danger:hover {
+  .btn-danger:hover:where(:not(:disabled)) {
     background-color: rgba(239, 68, 68, 0.2);
     border-color: var(--error);
   }
