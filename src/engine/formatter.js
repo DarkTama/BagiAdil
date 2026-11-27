@@ -30,6 +30,7 @@ export function formatCurrency(amount) {
 export function parseRupiah(str) {
   if (typeof str === 'number') return Math.round(str) || 0;
   if (!str) return 0;
-  const digits = String(str).replace(/\D/g, '');
+  // Drop a trailing 2-digit decimal part ("12.500,00") so it is not read as x100.
+  const digits = String(str).trim().replace(/[.,]\d{2}$/, '').replace(/\D/g, '');
   return digits ? parseInt(digits, 10) : 0;
 }

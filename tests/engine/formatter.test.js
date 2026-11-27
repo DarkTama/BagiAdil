@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency } from '../../src/engine/formatter.js';
+import { formatCurrency, parseRupiah } from '../../src/engine/formatter.js';
 
 describe('formatCurrency', () => {
   it('formats a basic amount in IDR with Rp prefix', () => {
@@ -36,5 +36,19 @@ describe('formatCurrency', () => {
   it('formats small amounts correctly', () => {
     const result = formatCurrency(500);
     expect(result).toBe('Rp 500');
+  });
+});
+
+describe('parseRupiah', () => {
+  it.each([
+    ['Rp 12.500', 12500],
+    ['12.500,00', 12500],
+    ['Rp12.500,00', 12500],
+    ['12,500', 12500],
+    ['', 0],
+    [null, 0],
+    ['Rp 0', 0],
+  ])('parses %j as %i', (input, expected) => {
+    expect(parseRupiah(input)).toBe(expected);
   });
 });
