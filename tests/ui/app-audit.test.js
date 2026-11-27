@@ -233,3 +233,24 @@ describe('Calculate goes through computeSplit (L4, M7)', () => {
     expect(qa('.toast--error').map((e) => e.textContent)).toContain(t('history.saveFailed'));
   });
 });
+
+describe('broken share link (F7)', () => {
+  it('opens the normal editor with a toast and clears the hash', async () => {
+    const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
+    const { t } = await import('../../src/i18n/index.js');
+    const valid = encodeSnapshot({
+      participants: ['Ani'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [{ name: 'Nasi', unitPrice: 20000, totalQty: 1, assignments: [{ person: 'Ani', qty: 1 }] }],
+    });
+    vi.resetModules();
+    loadDom();
+    location.hash = '#share=' + valid.slice(0, 20);
+    const { initApp } = await import('../../src/ui/app.js');
+    initApp();
+    expect(q('#participants')).not.toBeNull();
+    expect(q('#manual-section').style.display).not.toBe('none');
+    expect(qa('.toast').map((e) => e.textContent)).toContain(t('share.invalid'));
+    expect(location.hash).toBe('');
+  });
+});

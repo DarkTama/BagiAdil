@@ -51,6 +51,11 @@ export function initApp() {
     renderSharedView(sharedSnapshot);
     return;
   }
+  // A share link that cannot be decoded: drop it and open the normal editor.
+  const brokenShareLink = /share=/.test(location.hash || '');
+  if (brokenShareLink) {
+    window.history.replaceState(null, '', location.pathname + location.search);
+  }
 
   const participantsEl = document.querySelector('#participants .section-content');
   const billParamsEl = document.querySelector('#bill-params .section-content');
@@ -128,6 +133,8 @@ export function initApp() {
 
   // Apply initial translations
   updateAllTranslations();
+
+  if (brokenShareLink) showToast(t('share.invalid'), 'warning');
 }
 
 function initLangToggle() {
