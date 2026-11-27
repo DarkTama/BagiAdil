@@ -433,3 +433,21 @@ describe('new split and auto new entry (W1 H2)', () => {
     expect(qa('.chip').length).toBe(1);
   });
 });
+
+describe('deleting the open history entry (M6)', () => {
+  it('forgets the entry: no ghost on paid toggle, recalculate makes a labelled one', () => {
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    expect(loadHistoryRaw().length).toBe(1);
+    q('#history .history-delete').click();
+    expect(loadHistoryRaw().length).toBe(0);
+    q('#results .paid-toggle').click();
+    expect(loadHistoryRaw().length).toBe(0);
+    q('#calculate').click();
+    const entries = loadHistoryRaw();
+    expect(entries.length).toBe(1);
+    expect(entries[0].label).toBeTruthy();
+  });
+});
