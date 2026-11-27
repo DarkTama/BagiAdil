@@ -540,6 +540,23 @@ describe('draft autosave and restore (W3 M5)', () => {
     expect(localStorage.getItem('bagiadil_draft')).toBe(draft);
   });
 
+  it('discards a draft the engine cannot compute instead of throwing on load', async () => {
+    localStorage.setItem('bagiadil_draft', JSON.stringify({
+      v: 1,
+      snapshot: {
+        participants: ['Ani'],
+        params: { totalDiscount: 0, totalShipping: 0 },
+        items: [{ name: 'X', unitPrice: 1000.5, totalQty: 1, assignments: [{ person: 'Ani', qty: 1 }] }],
+      },
+      historyId: null,
+      paid: {},
+      calculated: true,
+    }));
+    await reload();
+    expect(qa('.chip').length).toBe(0);
+    expect(localStorage.getItem('bagiadil_draft')).toBeNull();
+  });
+
   it('discards a corrupt draft', async () => {
     localStorage.setItem('bagiadil_draft', JSON.stringify({ v: 1, snapshot: { participants: 'x' } }));
     await reload();

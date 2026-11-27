@@ -276,6 +276,12 @@ describe('versioned share links and validation (L1, L2)', () => {
     expect(decodeSnapshot(link([2, ['Ani'], 0, 0, [['A', 1000, 1, [[0, 2]]]]]))).toBeNull();
   });
 
+  it('rejects fractional rupiah, which the engine cannot compute', () => {
+    expect(decodeSnapshot(link([2, ['Ani'], 0, 0, [['A', 1000.5, 1, [[0, 1]]]]]))).toBeNull();
+    expect(decodeSnapshot(link([2, ['Ani'], 0.5, 0, [['A', 1000, 1, [[0, 1]]]]]))).toBeNull();
+    expect(decodeSnapshot(link([2, ['Ani'], 0, 1500.25, [['A', 1000, 1, [[0, 1]]]]]))).toBeNull();
+  });
+
   it('accepts free (Rp 0) items and a payment block; rejects non-string payment', () => {
     expect(validateSnapshot({ ...good, items: [{ ...good.items[0], unitPrice: 0 }] })).toBe(true);
     expect(validateSnapshot({ ...good, payment: { bank: 'BCA', accountNumber: '1', accountName: '' } })).toBe(true);
