@@ -205,7 +205,7 @@ describe('UI Integration', () => {
 
       renderResults(result, resultsEl);
 
-      expect(resultsEl.querySelector('.badge-success')).not.toBeNull();
+      expect(resultsEl.querySelector('.badge')).toBeNull(); // balanced: no jargon badge
       expect(resultsEl.querySelector('.grand-total-amount').textContent).toContain('Rp');
       const cards = resultsEl.querySelectorAll('.result-card');
       expect(cards.length).toBe(2);
@@ -310,7 +310,7 @@ describe('UI Integration', () => {
       renderResults(result, resultsEl);
 
       // Verify results are displayed
-      expect(resultsEl.querySelector('.badge')).not.toBeNull();
+      expect(resultsEl.querySelector('.badge')).toBeNull();
       expect(resultsEl.querySelectorAll('.result-card').length).toBe(2);
       expect(resultsEl.querySelector('.grand-total-amount').textContent).toContain('Rp');
     });

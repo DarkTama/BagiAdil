@@ -444,7 +444,7 @@ export function updateTranslations() {
  * @returns {string}
  */
 export function generateWhatsAppText(results, params = {}, shareUrl = '', payment = null) {
-  const { participants, grandTotal, verification } = results;
+  const { participants, grandTotal } = results;
 
   const totalDiscount = params.totalDiscount || 0;
   const totalShipping = params.totalShipping || 0;
@@ -462,8 +462,7 @@ export function generateWhatsAppText(results, params = {}, shareUrl = '', paymen
     text += `- ${p.name}: ${formatCurrency(p.finalPayment)}\n`;
   });
 
-  const balancedText = verification.balanced ? t('results.balanced') : t('results.unbalanced');
-  text += `\n_Total: ${formatCurrency(grandTotal)} (${balancedText})_`;
+  text += `\n_Total: ${formatCurrency(grandTotal)}_`;
 
   if (payment && (payment.bank || payment.accountNumber)) {
     text += `\n\n*${t('export.wa.payment')}:*`;

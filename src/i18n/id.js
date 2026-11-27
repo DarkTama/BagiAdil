@@ -15,6 +15,7 @@ const id = {
   'upload.dragDrop': 'Seret & lepas gambar struk di sini',
   'upload.chooseImage': 'Pilih Gambar',
   'upload.optimizing': 'Mengompres gambar...',
+  'ocr.uploadTitle': 'Unggah Struk',
   'ocr.scanResults': 'Hasil Scan',
   'ocr.detectedItems': 'Item Terdeteksi',
   'ocr.confirmUse': 'Konfirmasi & Gunakan',

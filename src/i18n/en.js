@@ -15,6 +15,7 @@ const en = {
   'upload.dragDrop': 'Drag & drop receipt image here',
   'upload.chooseImage': 'Choose Image',
   'upload.optimizing': 'Optimizing image...',
+  'ocr.uploadTitle': 'Upload Receipt',
   'ocr.scanResults': 'Scan Results',
   'ocr.detectedItems': 'Detected Items',
   'ocr.confirmUse': 'Confirm & Use',
