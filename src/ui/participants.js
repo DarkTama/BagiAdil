@@ -110,7 +110,7 @@ function render() {
       removeBtn.type = 'button';
       removeBtn.className = 'chip-remove';
       removeBtn.textContent = '\u00d7';
-      removeBtn.setAttribute('aria-label', `Remove ${name}`);
+      removeBtn.setAttribute('aria-label', t('participants.remove').replace('{name}', name));
       removeBtn.addEventListener('click', () => removeParticipant(index));
       chip.appendChild(removeBtn);
 
@@ -127,12 +127,12 @@ function addParticipant(inputEl) {
 
   // Validate
   if (!name) {
-    showError(errorEl, inputEl, 'Name cannot be empty');
+    showError(errorEl, inputEl, t('validation.nameEmpty'));
     return;
   }
 
   if (participants.some((p) => p.toLowerCase() === name.toLowerCase())) {
-    showError(errorEl, inputEl, 'This name already exists');
+    showError(errorEl, inputEl, t('validation.nameExists'));
     return;
   }
 

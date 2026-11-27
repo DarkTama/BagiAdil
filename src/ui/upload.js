@@ -18,6 +18,26 @@ export function updateTranslations() {
   if (uploadSubtext) uploadSubtext.textContent = t('upload.or');
   const uploadBtn = uploadContainerEl.querySelector('.upload-btn');
   if (uploadBtn) uploadBtn.textContent = t('upload.chooseImage');
+  const removeBtn = uploadContainerEl.querySelector('.upload-remove');
+  if (removeBtn) removeBtn.textContent = t('upload.remove');
+  const preview = uploadContainerEl.querySelector('#preview-image');
+  if (preview) preview.alt = t('upload.previewAlt');
+}
+
+/**
+ * Translate an engine progress status (Tesseract / PDF engine, English only)
+ * into the current locale.
+ * @param {string} [status]
+ * @returns {string}
+ */
+function progressLabel(status = '') {
+  const s = status.toLowerCase();
+  const page = s.match(/page (\d+) of (\d+)/);
+  if (page) return t('upload.pdfPage').replace('{page}', page[1]).replace('{total}', page[2]);
+  if (s.includes('recogni')) return t('upload.recognizing');
+  if (s.includes('complete')) return t('upload.complete');
+  if (/loading|initializ|reading/.test(s)) return t('upload.initializing');
+  return t('upload.processing');
 }
 
 /**
@@ -38,11 +58,11 @@ export function initUpload(containerEl, onComplete) {
       </div>
     </div>
     <div class="upload-preview" id="upload-preview" hidden>
-      <img id="preview-image" alt="Receipt preview" />
-      <button type="button" class="btn btn-danger upload-remove" id="upload-remove">Remove</button>
+      <img id="preview-image" alt="${t('upload.previewAlt')}" />
+      <button type="button" class="btn btn-danger upload-remove" id="upload-remove">${t('upload.remove')}</button>
     </div>
     <div class="upload-progress" id="upload-progress" hidden>
-      <p class="progress-status" id="progress-status">Initializing OCR...</p>
+      <p class="progress-status" id="progress-status">${t('upload.initializing')}</p>
       <div class="progress-bar-container">
         <div class="progress-bar" id="progress-bar"></div>
       </div>
@@ -144,11 +164,11 @@ export function initUpload(containerEl, onComplete) {
   }
 
   async function processFile(file) {
-    progressStatus.textContent = 'Initializing...';
+    progressStatus.textContent = t('upload.initializing');
     progressBar.style.width = '0%';
 
     const onProgress = (info) => {
-      progressStatus.textContent = info.status || 'Processing...';
+      progressStatus.textContent = progressLabel(info.status);
       progressBar.style.width = `${Math.round((info.progress || 0) * 100)}%`;
     };
 
@@ -194,13 +214,16 @@ export function initUpload(containerEl, onComplete) {
       }
 
       progressBar.style.width = '100%';
-      progressStatus.textContent = 'Complete!';
+      progressStatus.textContent = t('upload.complete');
 
       if (onComplete) {
         onComplete({ ...result, receiptBlob });
       }
     } catch (err) {
-      progressStatus.textContent = 'Error: ' + (err.message || 'Processing failed');
+      progressStatus.textContent = t('upload.error').replace(
+        '{message}',
+        err.message || t('upload.failed'),
+      );
       progressBar.style.width = '0%';
       // Attempt to terminate OCR worker even on error
       if (file.type !== 'application/pdf') {

@@ -35,8 +35,8 @@ describe('Confidence scoring', () => {
 
     expect(result.level).toBe('low');
     expect(result.overall).toBeLessThan(50);
-    expect(result.issues).toContain('No items detected');
-    expect(result.issues).toContain('Subtotal not detected');
+    expect(result.issues).toContainEqual({ key: 'confidence.noItems' });
+    expect(result.issues).toContainEqual({ key: 'confidence.noSubtotal' });
   });
 
   it('returns medium confidence for decent OCR but incomplete parsing', () => {
@@ -53,7 +53,7 @@ describe('Confidence scoring', () => {
     expect(result.level).toBe('medium');
     expect(result.overall).toBeGreaterThanOrEqual(50);
     expect(result.overall).toBeLessThan(80);
-    expect(result.issues).toContain('Subtotal not detected');
+    expect(result.issues).toContainEqual({ key: 'confidence.noSubtotal' });
   });
 
   it('flags items with unusual prices', () => {
@@ -71,7 +71,7 @@ describe('Confidence scoring', () => {
     const result = scoreConfidence(ocrConfidence, parsedResult);
 
     expect(result.issues.length).toBeGreaterThan(0);
-    expect(result.issues.some((i) => i.includes('unusual prices'))).toBe(true);
+    expect(result.issues.some((i) => i.key === 'confidence.unusualPrices')).toBe(true);
   });
 
   it('flags items with price exceeding 2000000', () => {
@@ -85,7 +85,7 @@ describe('Confidence scoring', () => {
 
     const result = scoreConfidence(ocrConfidence, parsedResult);
 
-    expect(result.issues.some((i) => i.includes('unusual prices'))).toBe(true);
+    expect(result.issues.some((i) => i.key === 'confidence.unusualPrices')).toBe(true);
   });
 
   it('accepts items priced up to 2000000 as reasonable', () => {
@@ -99,7 +99,7 @@ describe('Confidence scoring', () => {
 
     const result = scoreConfidence(ocrConfidence, parsedResult);
 
-    expect(result.issues.some((i) => i.includes('unusual prices'))).toBe(false);
+    expect(result.issues.some((i) => i.key === 'confidence.unusualPrices')).toBe(false);
   });
 
   it('handles zero OCR confidence', () => {
