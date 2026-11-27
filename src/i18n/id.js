@@ -10,6 +10,8 @@ const id = {
   'section.discountShipping': 'Diskon & Ongkir',
   'section.results': 'Hasil',
   'btn.calculate': 'Hitung Pembagian',
+  'btn.newSplit': 'Split baru',
+  'split.newConfirm': 'Buang split ini dan mulai yang baru? Hasil yang belum tersimpan akan hilang.',
   'upload.dragDrop': 'Seret & lepas gambar struk di sini',
   'upload.chooseImage': 'Pilih Gambar',
   'upload.optimizing': 'Mengompres gambar...',

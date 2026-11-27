@@ -378,6 +378,11 @@ label {
   margin-bottom: var(--space-md);
 }
 
+.btn-new-split {
+  width: 100%;
+  margin-bottom: var(--space-md);
+}
+
 /* Participant chips */
 .chip-container {
   display: flex;
