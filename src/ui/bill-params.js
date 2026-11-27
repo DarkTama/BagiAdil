@@ -7,13 +7,18 @@ import { t } from '../i18n/index.js';
 import { attachCurrencyInput, getCurrencyValue, setCurrencyValue } from './currency-input.js';
 
 let containerEl = null;
+let onChangeCallback = null;
 
 /**
  * Initialize the bill params component.
  * @param {HTMLElement} el - Container element
+ * @param {object} [options]
+ * @param {function} [options.onChange] - Called when the user types in either
+ *   field (not on programmatic setParams)
  */
-export function initBillParams(el) {
+export function initBillParams(el, options = {}) {
   containerEl = el;
+  onChangeCallback = options.onChange || null;
   render();
 }
 
@@ -41,6 +46,10 @@ export function setParams({ totalDiscount, totalShipping }) {
   setCurrencyValue(shippingInput, totalShipping);
 }
 
+function notifyChange() {
+  if (onChangeCallback) onChangeCallback();
+}
+
 function render() {
   containerEl.innerHTML = '';
 
@@ -55,6 +64,7 @@ function render() {
   discountInput.id = 'total-discount';
   discountInput.placeholder = 'Rp 0';
   attachCurrencyInput(discountInput);
+  discountInput.addEventListener('input', notifyChange);
   discountGroup.appendChild(discountInput);
   containerEl.appendChild(discountGroup);
 
@@ -69,6 +79,7 @@ function render() {
   shippingInput.id = 'total-shipping';
   shippingInput.placeholder = 'Rp 0';
   attachCurrencyInput(shippingInput);
+  shippingInput.addEventListener('input', notifyChange);
   shippingGroup.appendChild(shippingInput);
   containerEl.appendChild(shippingGroup);
 }

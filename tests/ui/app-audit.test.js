@@ -254,3 +254,28 @@ describe('broken share link (F7)', () => {
     expect(location.hash).toBe('');
   });
 });
+
+describe('loading history is read-only (Q6) and applies people before items', () => {
+  it('does not re-save the entry and restores people that differ from the editor', async () => {
+    addPerson('Ani');
+    addPerson('Budi');
+    addItem('Nasi', 20000, 2);
+    assign(0, 'Ani', 1);
+    assign(0, 'Budi', 1);
+    q('#calculate').click();
+    const before = loadHistoryRaw();
+    expect(before.length).toBe(1);
+
+    // Editor now holds different people and items.
+    qa('.chip-remove').forEach((b) => b.click());
+    addPerson('Cici');
+    addItem('Teh', 5000, 1);
+
+    q('#history .history-load').click();
+    expect(cardNames().sort()).toEqual(['Ani', 'Budi']);
+    expect(qa('#table-assigner tbody tr[data-item-id]').length).toBe(1);
+    const after = loadHistoryRaw();
+    expect(after.length).toBe(1);
+    expect(after[0].updatedAt).toBe(before[0].updatedAt);
+  });
+});

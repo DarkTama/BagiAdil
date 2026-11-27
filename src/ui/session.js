@@ -51,3 +51,11 @@ export function resetSession(patch = {}) {
   state = { ...fresh(), ...patch };
   notify();
 }
+
+/**
+ * The editor changed. Stale tracking is not wired yet: for now this only
+ * notifies subscribers.
+ */
+export function editorChanged() {
+  notify();
+}
