@@ -25,11 +25,13 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
   const paid = options.paid || {};
   const onTogglePaid = options.onTogglePaid || null;
 
-  // Verification badge
-  const badge = document.createElement('div');
-  badge.className = verification.balanced ? 'badge badge-success' : 'badge badge-warning';
-  badge.textContent = verification.balanced ? t('results.balanced') : t('results.unbalanced');
-  containerEl.appendChild(badge);
+  // Internal arithmetic check: only worth showing when it fails.
+  if (!verification.balanced) {
+    const badge = document.createElement('div');
+    badge.className = 'badge badge-warning';
+    badge.textContent = t('results.unbalanced');
+    containerEl.appendChild(badge);
+  }
 
   // Grand total
   const totalEl = document.createElement('div');

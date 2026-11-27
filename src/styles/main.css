@@ -502,6 +502,12 @@ label {
   border: 1px solid var(--border-color);
 }
 
+.result-card-items {
+  list-style: none;
+  padding: 0;
+  margin-bottom: var(--space-sm);
+}
+
 .result-card-name {
   font-size: var(--font-size-md);
   font-weight: 600;

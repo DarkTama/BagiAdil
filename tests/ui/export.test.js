@@ -58,12 +58,13 @@ describe('Export - WhatsApp Text Generation', () => {
       expect(text).toContain('*Pembagian:*');
     });
 
-    it('should include balanced/unbalanced status', () => {
+    it('ends with the grand total and no internal balance jargon', () => {
       const text = generateWhatsAppText(sampleResult, {
         totalDiscount: 10000,
         totalShipping: 12000,
       });
-      expect(text).toMatch(/_(Total: .+ \((Seimbang|Tidak Seimbang)\))_/);
+      expect(text).toMatch(/_Total: [^()]+_/);
+      expect(text).not.toMatch(/Seimbang/);
     });
 
     it('appends the share link only when one is provided', () => {
