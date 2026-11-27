@@ -45,6 +45,8 @@ const id = {
   'placeholder.addParticipant': 'Tambah peserta',
   'validation.noParticipants': 'Tambah minimal satu peserta',
   'validation.noItems': 'Tambah minimal satu item',
+  'validation.noPayable': 'Tidak ada yang perlu dibayar: semua item bernilai Rp 0',
+  'history.saveFailed': 'Gagal menyimpan ke riwayat. Penyimpanan perangkat mungkin penuh.',
   'confidence.high': 'tinggi',
   'confidence.medium': 'sedang',
   'confidence.low': 'rendah',

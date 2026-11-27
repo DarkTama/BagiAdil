@@ -7,7 +7,6 @@ import { initParticipants, getParticipants, setParticipants, updateTranslations 
 import { initAddItemForm, updateTranslations as updateAddItemFormTranslations } from './items.js';
 import { initBillParams, getParams, setParams, updateTranslations as updateBillParamsTranslations } from './bill-params.js';
 import { renderResults } from './results.js';
-import { splitBill } from '../engine/calculator.js';
 import { initUpload, updateTranslations as updateUploadTranslations } from './upload.js';
 import { renderOCRResults } from './ocr-results.js';
 import { parseReceipt } from '../ocr/parsers/index.js';
@@ -296,40 +295,19 @@ function handleCalculate(resultsEl) {
     return;
   }
 
-  // Build orders from assignments
-  const orders = [];
-  Object.entries(state.assignments).forEach(([name, data]) => {
-    if (data.subtotal > 0) {
-      orders.push({ name, amount: data.subtotal });
-    }
-  });
-
-  if (orders.length === 0) {
+  // Compute through the single shared path (same as history and the shared view).
+  const payment = getPaymentInfo();
+  const snapshot = buildSnapshot(participants, params, state.items, payment);
+  const { result, itemsMap } = computeSplit(snapshot);
+  if (!result) {
+    // Every subtotal is Rp 0 (free items only): nobody pays anything.
+    showToast(t('validation.noPayable'), 'warning');
     return;
   }
 
-  // Call engine
-  const result = splitBill({
-    orders,
-    totalDiscount: params.totalDiscount,
-    totalShipping: params.totalShipping,
-  });
-
   currentResult = result;
-
-  // Build items map for results display
-  const itemsMap = {};
-  Object.entries(state.assignments).forEach(([person, data]) => {
-    if (data.items.length > 0) {
-      itemsMap[person] = data.items.map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        unitPrice: item.unitPrice,
-        price: item.qty * item.unitPrice,
-      }));
-    }
-  });
   currentItemsMap = itemsMap;
+  currentSnapshot = snapshot;
 
   // A brand-new split (not yet saved) starts with a clean paid state.
   if (!currentHistoryId) {
@@ -337,7 +315,6 @@ function handleCalculate(resultsEl) {
   }
 
   // Render results
-  const payment = getPaymentInfo();
   rerenderResults(resultsEl);
   updateExportVisibility(true);
 
@@ -346,7 +323,6 @@ function handleCalculate(resultsEl) {
 
   // Auto-save this split to history. Reusing currentHistoryId means a
   // reload-then-recalculate updates the same entry instead of duplicating it.
-  currentSnapshot = buildSnapshot(participants, params, state.items, payment);
   const historyEntry = { ...currentSnapshot };
   if (currentHistoryId) {
     historyEntry.id = currentHistoryId;
@@ -354,16 +330,22 @@ function handleCalculate(resultsEl) {
     historyEntry.label = defaultHistoryLabel();
   }
   historyEntry.paid = currentPaid;
-  currentHistoryId = saveHistoryEntry(historyEntry);
-
-  // Attach the scanned receipt image to this split. Consumed once, so a later
-  // recalculation of the same entry keeps the receipt instead of clearing it.
-  if (currentReceiptBlob) {
-    putReceipt(currentHistoryId, currentReceiptBlob);
-    currentReceiptBlob = null;
+  const savedId = saveHistoryEntry(historyEntry);
+  if (savedId) {
+    currentHistoryId = savedId;
+    // Attach the scanned receipt image to this split. Consumed once, so a later
+    // recalculation of the same entry keeps the receipt instead of clearing it.
+    if (currentReceiptBlob) {
+      putReceipt(currentHistoryId, currentReceiptBlob);
+      currentReceiptBlob = null;
+    }
+    pruneReceipts(loadHistory().map((e) => e.id));
+    refreshHistory();
+  } else {
+    // Write failed: keep the receipt blob and skip pruning, which would
+    // otherwise delete images of entries the failed write did not persist.
+    showToast(t('history.saveFailed'), 'error');
   }
-  pruneReceipts(loadHistory().map((e) => e.id));
-  refreshHistory();
 
   // Scroll to results
   const resultsSection = document.querySelector('#results');

@@ -45,6 +45,8 @@ const en = {
   'placeholder.addParticipant': 'Add participant',
   'validation.noParticipants': 'Add at least one participant',
   'validation.noItems': 'Add at least one item',
+  'validation.noPayable': 'Nobody has anything to pay: every item is Rp 0',
+  'history.saveFailed': 'Could not save to history. Device storage may be full.',
   'confidence.high': 'high',
   'confidence.medium': 'medium',
   'confidence.low': 'low',

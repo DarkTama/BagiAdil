@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // App-level regression tests for audit findings (drive the real DOM via initApp).
-/* global HTMLElement */
+/* global HTMLElement, Storage */
 
 import 'fake-indexeddb/auto';
 import fs from 'node:fs';
@@ -36,6 +36,7 @@ const assign = (itemIdx, person, qty) => {
   pop.querySelector('.popup-qty-input').value = String(qty);
   pop.querySelector('.btn-popup-confirm').click();
 };
+const loadHistoryRaw = () => JSON.parse(localStorage.getItem('bagiadil_history') || '[]');
 const cardNames = () => qa('#results .result-card .result-card-name').map((e) => e.textContent);
 
 beforeEach(async () => {
@@ -198,5 +199,37 @@ describe('item names are not HTML (audit XSS)', () => {
     assign(0, 'Ani', 1);
     expect(document.getElementById('pwn')).toBeNull();
     expect(q('#table-assigner .td-item-name').textContent).toContain('<img src=x id=pwn>');
+  });
+});
+
+describe('Calculate goes through computeSplit (L4, M7)', () => {
+  it('toasts when every subtotal is Rp 0 and renders no result cards', async () => {
+    const { t } = await import('../../src/i18n/index.js');
+    addPerson('Ani');
+    addItem('Gratis', 0, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    expect(qa('#results .result-card').length).toBe(0);
+    expect(qa('.toast').map((e) => e.textContent)).toContain(t('validation.noPayable'));
+    expect(loadHistoryRaw()).toEqual([]);
+  });
+
+  it('toasts history.saveFailed when the history write throws, results still show', async () => {
+    const { t } = await import('../../src/i18n/index.js');
+    const orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'bagiadil_history') throw new Error('QuotaExceededError');
+      return orig.call(this, k, v);
+    };
+    try {
+      addPerson('Ani');
+      addItem('Nasi', 20000, 1);
+      assign(0, 'Ani', 1);
+      q('#calculate').click();
+    } finally {
+      Storage.prototype.setItem = orig;
+    }
+    expect(cardNames()).toEqual(['Ani']);
+    expect(qa('.toast--error').map((e) => e.textContent)).toContain(t('history.saveFailed'));
   });
 });
