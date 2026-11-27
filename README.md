@@ -79,7 +79,7 @@ BagiAdil/
 │   │   └── main.css
 │   └── ui/
 │       ├── app.js
-│       ├── assigner.js
+│       ├── table-assigner.js
 │       ├── bill-params.js
 │       ├── export.js
 │       ├── items.js
