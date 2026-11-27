@@ -162,3 +162,31 @@ describe('history Share link keeps payment (audit H3b)', () => {
     });
   });
 });
+
+describe('shared view matches the host screen (audit H1 rounding order)', () => {
+  it('bills the rounding extra to the same person after encode/decode', async () => {
+    addPerson('Ani');
+    addPerson('Budi');
+    addItem('Ayam', 10040, 1);
+    addItem('Bakso', 10040, 1);
+    assign(0, 'Budi', 1); // first item -> Budi
+    assign(1, 'Ani', 1);
+    q('#calculate').click();
+    const local = Object.fromEntries(
+      qa('#results .result-card').map((c) => [
+        c.querySelector('.result-card-name').textContent,
+        c.querySelector('.result-card-final strong').textContent,
+      ]),
+    );
+    const entry = JSON.parse(localStorage.getItem('bagiadil_history'))[0];
+    const { computeSplit, encodeSnapshot, decodeSnapshot } = await import('../../src/ui/snapshot.js');
+    const { formatCurrency } = await import('../../src/engine/formatter.js');
+    const shared = Object.fromEntries(
+      computeSplit(decodeSnapshot(encodeSnapshot(entry))).result.participants.map((p) => [
+        p.name,
+        formatCurrency(p.finalPayment),
+      ]),
+    );
+    expect(shared).toEqual(local);
+  });
+});
