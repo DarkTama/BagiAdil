@@ -517,3 +517,123 @@ describe('origin migration import', () => {
     ).toEqual({ fromBridge: true, outcome: 'imported' });
   });
 });
+
+describe('direct-visit migration hint and history resend link', () => {
+  const EXPECTED_RESEND_URL = `${ALLOWED_ORIGIN}/BagiAdil/#resend`;
+
+  it('shows hint card on direct visit with empty storage, persists dismissal, and stays hidden on re-init', async () => {
+    await bootApp('', '');
+
+    expect(q('.migration-banner')).toBeNull();
+    const hint = q('.migration-hint');
+    expect(hint).toBeTruthy();
+    expect(hint.querySelector('.migration-notice-text').textContent).toBe(
+      'Pernah pakai BagiAdil di darktama.github.io? Pindahkan data lamamu ke sini.',
+    );
+
+    const link = hint.querySelector('a.migration-move-link');
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe(EXPECTED_RESEND_URL);
+    expect(link.textContent).toBe('Pindahkan data saya');
+    expect(link.classList.contains('btn-secondary')).toBe(true);
+
+    // Locale switch updates hint card and button text
+    q('.lang-btn[data-lang="en"]').click();
+    expect(q('.migration-hint .migration-notice-text').textContent).toBe(
+      'Used BagiAdil at darktama.github.io before? Bring your old data here.',
+    );
+    expect(q('.migration-hint a.migration-move-link').textContent).toBe('Move my data');
+
+    // Close button sets dismissal flag and hides card
+    const closeBtn = q('.migration-hint .migration-notice-close');
+    expect(closeBtn.getAttribute('aria-label')).toBeTruthy();
+    closeBtn.click();
+
+    expect(localStorage.getItem('bagiadil_migrate_hint_dismissed')).toBe('1');
+    expect(q('.migration-hint')).toBeNull();
+    expect(q('#migration-notice').hidden).toBe(true);
+
+    // Re-init does not show hint card again
+    await bootApp('', '');
+    expect(q('.migration-hint')).toBeNull();
+  });
+
+  it('does not show hint card when existing history, groups, participants, or draft exist', async () => {
+    localStorage.setItem('bagiadil_history', JSON.stringify([makeHistoryEntry('h1', 1000)]));
+    await bootApp('', '');
+    expect(q('.migration-hint')).toBeNull();
+
+    localStorage.clear();
+    localStorage.setItem('bagiadil_groups', JSON.stringify([{ name: 'G', members: ['Ani'] }]));
+    await bootApp('', '');
+    expect(q('.migration-hint')).toBeNull();
+
+    localStorage.clear();
+    localStorage.setItem('bagiadil_participants', JSON.stringify(['Ani']));
+    await bootApp('', '');
+    expect(q('.migration-hint')).toBeNull();
+
+    localStorage.clear();
+    localStorage.setItem(
+      'bagiadil_draft',
+      JSON.stringify({
+        v: 1,
+        snapshot: { participants: ['Ani'], params: { totalDiscount: 0, totalShipping: 0 }, items: [] },
+        historyId: null,
+        paid: {},
+        calculated: false,
+      }),
+    );
+    await bootApp('', '');
+    expect(q('.migration-hint')).toBeNull();
+  });
+
+  it('shows hint card when history, groups, and participants are empty arrays', async () => {
+    localStorage.setItem('bagiadil_history', '[]');
+    localStorage.setItem('bagiadil_groups', '[]');
+    localStorage.setItem('bagiadil_participants', '[]');
+    await bootApp('', '');
+    expect(q('.migration-hint')).toBeTruthy();
+  });
+
+  it('does not show hint card on shared view (direct visit or from bridge)', async () => {
+    const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
+    const shareEncoded = encodeSnapshot({
+      participants: ['Zed'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [
+        { name: 'Soto', unitPrice: 20000, totalQty: 1, assignments: [{ person: 'Zed', qty: 1 }] },
+      ],
+    });
+
+    await bootApp(`share=${shareEncoded}`, '');
+    expect(q('.migration-hint')).toBeNull();
+    expect(q('.migration-banner')).toBeNull();
+
+    await bootApp(`share=${shareEncoded}`, `${ALLOWED_ORIGIN}/BagiAdil/`);
+    expect(q('.migration-banner')).toBeTruthy();
+    expect(q('.migration-hint')).toBeNull();
+  });
+
+  it('does not show hint card when arriving from bridge without data', async () => {
+    await bootApp('', `${ALLOWED_ORIGIN}/BagiAdil/`);
+    expect(q('.migration-banner')).toBeTruthy();
+    expect(q('.migration-hint')).toBeNull();
+  });
+
+  it('shows the resend link without card chrome in the History tab empty state even after dismissal', async () => {
+    localStorage.setItem('bagiadil_migrate_hint_dismissed', '1');
+    await bootApp('', '');
+
+    expect(q('.migration-hint')).toBeNull();
+    const historySection = q('#history');
+    expect(historySection.querySelector('.migration-hint')).toBeNull();
+    const link = historySection.querySelector('a.history-migrate-link');
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe(EXPECTED_RESEND_URL);
+    expect(link.textContent).toBe('Pindahkan data saya');
+
+    q('.lang-btn[data-lang="en"]').click();
+    expect(q('#history a.history-migrate-link').textContent).toBe('Move my data');
+  });
+});

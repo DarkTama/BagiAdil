@@ -150,6 +150,9 @@ const en = {
   'migration.bannerNothing':
     'BagiAdil now lives at bagiadil.darktama.dev. Bookmark the new address!',
   'migration.dismiss': 'Dismiss notice',
+  'migration.hint':
+    'Used BagiAdil at darktama.github.io before? Bring your old data here.',
+  'migration.moveButton': 'Move my data',
   'migration.invalid': 'Migration data is invalid and was ignored.',
 };
 

@@ -1743,7 +1743,8 @@ header {
   margin-bottom: var(--space-md);
 }
 
-.migration-banner {
+.migration-banner,
+.migration-hint {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1753,6 +1754,23 @@ header {
   border-left: 4px solid var(--accent-secondary);
   border-radius: var(--border-radius);
   padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+}
+
+.migration-hint-actions {
+  margin-top: var(--space-sm);
+}
+
+.migration-move-link,
+.history-migrate-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.history-migrate-link {
+  margin-top: var(--space-md);
 }
 
 .migration-notice-body {

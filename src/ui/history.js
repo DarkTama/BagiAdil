@@ -9,6 +9,7 @@ import { formatCurrency } from '../engine/formatter.js';
 import { computeSplit, buildShareUrl } from './snapshot.js';
 import { loadHistory, deleteHistoryEntry, renameHistoryEntry } from './storage.js';
 import { getReceipt, deleteReceipt } from './image-store.js';
+import { getBridgeResendUrl } from './migration.js';
 
 let containerEl = null;
 let onLoadCallback = null;
@@ -58,6 +59,15 @@ function render() {
     empty.className = 'history-empty';
     empty.textContent = t('history.empty');
     containerEl.appendChild(empty);
+
+    const resendUrl = getBridgeResendUrl();
+    if (resendUrl) {
+      const resendLink = document.createElement('a');
+      resendLink.className = 'btn btn-secondary history-migrate-link';
+      resendLink.href = resendUrl;
+      resendLink.textContent = t('migration.moveButton');
+      containerEl.appendChild(resendLink);
+    }
     return;
   }
 
