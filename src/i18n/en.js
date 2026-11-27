@@ -25,6 +25,7 @@ const en = {
   'results.preRounding': 'Pre-rounding Total',
   'results.finalPayment': 'Final Payment',
   'results.unbalanced': 'Unbalanced',
+  'results.stale': 'Data changed, recalculate',
   'results.paid': 'Paid',
   'results.unpaid': 'Unpaid',
   'results.markPaid': 'Mark as paid',

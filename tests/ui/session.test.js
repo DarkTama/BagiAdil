@@ -53,4 +53,20 @@ describe('session', () => {
     session.resetSession();
     expect(session.getSession().payment.bank).toBe('BCA');
   });
+
+  it('stale is derived from the editor snapshot vs calc.snapshot', () => {
+    const snap = { participants: ['A'], params: { totalDiscount: 0, totalShipping: 0 }, items: [] };
+    session.editorChanged(snap);
+    expect(session.getSession().stale).toBe(false); // nothing calculated yet
+    session.setCalculated(snap, { result: {}, itemsMap: {} });
+    session.editorChanged({ ...snap, payment: { bank: 'x' }, v: 1 });
+    expect(session.getSession().stale).toBe(false); // payment is not an input
+    session.editorChanged({ ...snap, participants: ['A', 'B'] });
+    expect(session.getSession().stale).toBe(true);
+    session.editorChanged(snap);
+    expect(session.getSession().stale).toBe(false); // reverted
+    session.editorChanged({ ...snap, participants: [] });
+    session.setCalculated(snap, { result: {}, itemsMap: {} });
+    expect(session.getSession().stale).toBe(false);
+  });
 });

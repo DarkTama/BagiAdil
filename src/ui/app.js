@@ -174,11 +174,13 @@ function render(state = getSession()) {
         paid: state.paid,
         onTogglePaid: handleTogglePaid,
         payment: getPayment(),
+        stale: state.stale,
       });
     } else {
       resultsEl.innerHTML = '';
     }
   }
+  document.querySelector('#results')?.classList.toggle('is-stale', state.stale);
   const exportSection = document.querySelector('#export-section');
   if (exportSection) exportSection.hidden = !state.calc;
 }

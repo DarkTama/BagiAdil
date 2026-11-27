@@ -21,7 +21,11 @@ const fresh = () => ({
   paid: {}, // { [name]: true }
   receiptBlob: null, // Blob|null: attached on the next successful history save
   calc: null, // null | { snapshot, result, itemsMap }: last successful Calculate
+  stale: false, // derived: the editor no longer matches calc.snapshot
 });
+
+// Payment and paid are left out on purpose: editing them does not change the numbers.
+const inputsKey = (snap) => JSON.stringify([snap.participants, snap.params, snap.items]);
 
 let state = fresh();
 const listeners = new Set();
@@ -62,7 +66,7 @@ export function update(patch) {
 
 /** Record a successful Calculate. */
 export function setCalculated(snapshot, { result, itemsMap }) {
-  state = { ...state, calc: { snapshot, result, itemsMap } };
+  state = { ...state, calc: { snapshot, result, itemsMap }, stale: false };
   notify();
 }
 
@@ -78,9 +82,11 @@ export function resetSession(patch = {}) {
 }
 
 /**
- * The editor changed. Stale tracking is not wired yet: for now this only
- * notifies subscribers.
+ * The editor changed: recompute whether the results are stale. Derived by
+ * comparing against calc.snapshot, so reverting an edit clears the banner.
+ * @param {object} snapshot - current editor snapshot
  */
-export function editorChanged() {
+export function editorChanged(snapshot) {
+  state = { ...state, stale: state.calc !== null && inputsKey(snapshot) !== inputsKey(state.calc.snapshot) };
   notify();
 }

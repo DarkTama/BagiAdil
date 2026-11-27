@@ -25,6 +25,7 @@ const id = {
   'results.preRounding': 'Total Sebelum Pembulatan',
   'results.finalPayment': 'Pembayaran Akhir',
   'results.unbalanced': 'Tidak Seimbang',
+  'results.stale': 'Data berubah, hitung ulang',
   'results.paid': 'Lunas',
   'results.unpaid': 'Belum Lunas',
   'results.markPaid': 'Tandai Lunas',
