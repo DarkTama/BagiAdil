@@ -422,6 +422,15 @@ describe('origin migration import', () => {
     expect(localStorage.getItem('bagiadil_history')).toBeNull();
   });
 
+  it('does not repeat the "nothing" banner on a reload (the referrer survives reloads)', async () => {
+    const spy = vi
+      .spyOn(performance, 'getEntriesByType')
+      .mockReturnValue([{ type: 'reload' }]);
+    await bootApp('');
+    expect(q('.migration-banner')).toBeNull();
+    spy.mockRestore();
+  });
+
   it('shows the "nothing" banner in shared view when arriving from the bridge without migrate=', async () => {
     const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
     const shareEncoded = encodeSnapshot({

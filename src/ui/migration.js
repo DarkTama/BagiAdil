@@ -310,9 +310,14 @@ export function initMigrationNotice(migrationResult, { isShared = false } = {}) 
   activeNoticeKind = null;
 
   const fromBridge = Boolean(migrationResult && migrationResult.fromBridge);
+  // The referrer survives reloads and back/forward, so only a fresh navigation
+  // from the bridge counts as "just arrived" for the no-data banner.
+  const navType = performance.getEntriesByType?.('navigation')?.[0]?.type;
+  const justArrived = navType !== 'reload' && navType !== 'back_forward';
   if (
     fromBridge &&
-    (migrationResult.outcome === 'imported' || migrationResult.outcome === 'nothing')
+    (migrationResult.outcome === 'imported' ||
+      (migrationResult.outcome === 'nothing' && justArrived))
   ) {
     activeNoticeKind =
       migrationResult.outcome === 'imported' ? 'banner-imported' : 'banner-nothing';
