@@ -161,16 +161,20 @@ function updateAllTranslations() {
   updateTableTranslations();
   updateHistoryTranslations();
 
-  // Re-render results if they exist
-  if (currentResult) {
-    const resultsEl = document.querySelector('#results .section-content');
-    if (resultsEl) {
-      renderResults(currentResult, resultsEl, currentItemsMap, {
-        paid: currentPaid,
-        onTogglePaid: handleTogglePaid,
-      });
-    }
-  }
+  rerenderResults();
+}
+
+/**
+ * Re-render the current result. Single path so the payment box (read live from
+ * the export form) is never dropped.
+ */
+function rerenderResults(resultsEl = document.querySelector('#results .section-content')) {
+  if (!currentResult || !resultsEl) return;
+  renderResults(currentResult, resultsEl, currentItemsMap, {
+    paid: currentPaid,
+    onTogglePaid: handleTogglePaid,
+    payment: getPaymentInfo(),
+  });
 }
 
 function initModeTabs() {
@@ -330,11 +334,7 @@ function handleCalculate(resultsEl) {
 
   // Render results
   const payment = getPaymentInfo();
-  renderResults(result, resultsEl, itemsMap, {
-    paid: currentPaid,
-    onTogglePaid: handleTogglePaid,
-    payment,
-  });
+  rerenderResults(resultsEl);
   updateExportVisibility(true);
 
   // Save participants
@@ -387,13 +387,7 @@ function handleTogglePaid(name, isPaid) {
     saveHistoryEntry({ id: currentHistoryId, paid: currentPaid });
     refreshHistory();
   }
-  const resultsEl = document.querySelector('#results .section-content');
-  if (currentResult && resultsEl) {
-    renderResults(currentResult, resultsEl, currentItemsMap, {
-      paid: currentPaid,
-      onTogglePaid: handleTogglePaid,
-    });
-  }
+  rerenderResults();
 }
 
 /**

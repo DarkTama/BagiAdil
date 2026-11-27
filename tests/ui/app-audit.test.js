@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // App-level regression tests for audit findings (drive the real DOM via initApp).
+/* global HTMLElement */
 
 import 'fake-indexeddb/auto';
 import fs from 'node:fs';
@@ -77,5 +78,30 @@ describe('removed participant (audit H1)', () => {
     q('#history .history-load').click();
     expect(cardNames().sort()).toEqual(['Ani', 'Budi']);
     expect(q('#calculate-status').className).toContain('status-success');
+  });
+});
+
+describe('payment box persists across re-renders (audit C1)', () => {
+  const setup = () => {
+    q('#pay-bank').value = 'BCA';
+    q('#pay-account-number').value = '111';
+    q('#pay-bank').dispatchEvent(new Event('input'));
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+    expect(q('#results .payment-info-box')).not.toBeNull();
+  };
+
+  it('keeps the payment box after marking someone paid', () => {
+    setup();
+    q('#results .paid-toggle').click();
+    expect(q('#results .payment-info-box')).not.toBeNull();
+  });
+
+  it('keeps the payment box after a language switch', () => {
+    setup();
+    q('.lang-btn:not(.active)').click();
+    expect(q('#results .payment-info-box')).not.toBeNull();
   });
 });
