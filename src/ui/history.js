@@ -12,6 +12,7 @@ import { getReceipt, deleteReceipt } from './image-store.js';
 
 let containerEl = null;
 let onLoadCallback = null;
+let onDeleteCallback = null;
 // Object URLs for receipt thumbnails, revoked on each re-render.
 let objectUrls = [];
 
@@ -20,10 +21,12 @@ let objectUrls = [];
  * @param {HTMLElement} el - Container element
  * @param {object} options
  * @param {function} options.onLoad - Called with a history entry when "Load" is clicked
+ * @param {function} [options.onDelete] - Called with the entry id after it was deleted
  */
 export function initHistory(el, options = {}) {
   containerEl = el;
   onLoadCallback = options.onLoad || null;
+  onDeleteCallback = options.onDelete || null;
   render();
 }
 
@@ -150,8 +153,10 @@ function renderEntry(entry) {
   deleteBtn.textContent = t('history.delete');
   deleteBtn.addEventListener('click', () => {
     if (window.confirm(t('history.deleteConfirm'))) {
-      deleteHistoryEntry(entry.id);
-      deleteReceipt(entry.id);
+      if (deleteHistoryEntry(entry.id)) {
+        deleteReceipt(entry.id);
+        if (onDeleteCallback) onDeleteCallback(entry.id);
+      }
       render();
     }
   });

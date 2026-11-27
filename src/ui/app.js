@@ -108,7 +108,13 @@ export function initApp() {
   // Initialize split history
   const historyEl = document.querySelector('#history .section-content');
   if (historyEl) {
-    initHistory(historyEl, { onLoad: loadSplit });
+    initHistory(historyEl, {
+      onLoad: loadSplit,
+      // A deleted entry must not stay the save target (paid toggles would recreate a ghost).
+      onDelete: (id) => {
+        if (getSession().historyId === id) update({ historyId: null });
+      },
+    });
   }
 
   // Results and export visibility follow the session.
