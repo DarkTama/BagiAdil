@@ -32,6 +32,7 @@ import { buildSnapshot, computeSplit, decodeSnapshot, validateSnapshot } from '.
 import { getSession, getPayment, subscribe, update, setCalculated, resetSession, editorChanged } from './session.js';
 import { showToast } from './toast.js';
 import { initGuide } from './guide.js';
+import { importMigrationFromHash } from './migration.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
 
 // Re-entrancy guard (not state): true while applySnapshot / OCR populate write
@@ -42,6 +43,9 @@ let applying = false;
  * Initialize the entire app UI.
  */
 export function initApp() {
+  // Import data carried from the old GitHub Pages origin before reading share links or drafts.
+  importMigrationFromHash();
+
   // Shared link: if the URL carries a split snapshot, show a read-only result.
   const sharedSnapshot = getSharedSnapshot();
   if (sharedSnapshot) {
