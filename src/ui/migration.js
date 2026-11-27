@@ -1,6 +1,8 @@
 /**
  * One-time localStorage import from the old GitHub Pages bridge via `#migrate=...`.
  * Runs at startup before draft restoration or shared-view handling.
+ * Only accepts payloads whose referrer origin and `payload.from` match the
+ * configured bridge origin, and only imports the explicit known app keys.
  */
 
 import { decompressFromEncodedURIComponent } from 'lz-string';
@@ -12,14 +14,25 @@ const LOCALE_KEY = 'bagiadil-lang';
 const HISTORY_KEY = 'bagiadil_history';
 const GROUPS_KEY = 'bagiadil_groups';
 const PARTICIPANTS_KEY = 'bagiadil_participants';
-const MIGRATED_KEY = 'bagiadil_migrated';
 
 const COPY_IF_ABSENT_KEYS = new Set([
   'bagiadil_payment',
   'bagiadil_draft',
   'bagiadil_guide_seen',
-  LOCALE_KEY,
 ]);
+
+function parseOrigin(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    return new URL(url).origin;
+  } catch {
+    return '';
+  }
+}
+
+const ALLOWED_BRIDGE_ORIGIN = parseOrigin(
+  import.meta.env.VITE_MIGRATE_FROM || 'https://darktama.github.io',
+);
 
 function isAllowedKey(key) {
   return key.startsWith('bagiadil_') || key === LOCALE_KEY;
@@ -81,8 +94,6 @@ function applyMigratedData(data) {
   }
 
   for (const [key, rawValue] of Object.entries(data)) {
-    if (key === LOCALE_KEY || key === MIGRATED_KEY) continue;
-
     if (key === HISTORY_KEY) {
       const parsed = safeParseJson(rawValue);
       if (Array.isArray(parsed)) mergeHistoryEntries(parsed);
@@ -104,20 +115,18 @@ function applyMigratedData(data) {
       continue;
     }
 
-    if (COPY_IF_ABSENT_KEYS.has(key) || key.startsWith('bagiadil_')) {
-      if (safeGetItem(key) === null) {
-        safeSetItem(key, rawValue);
-      }
+    if (COPY_IF_ABSENT_KEYS.has(key) && safeGetItem(key) === null) {
+      safeSetItem(key, rawValue);
     }
   }
 }
 
 /**
- * Inspect `location.hash` for a `migrate=` payload, validate and merge it into
- * localStorage, remove `migrate=...` from the URL while preserving `#share=...`,
- * and notify the user via a toast.
+ * Inspect `location.hash` for a `migrate=` payload, verify it originated from
+ * the configured bridge origin, merge allowed keys into localStorage, remove
+ * `migrate=...` from the URL while preserving `#share=...`, and notify the user.
  *
- * @returns {'none'|'imported'|'invalid'}
+ * @returns {'none'|'imported'|'invalid'|'rejected'}
  */
 export function importMigrationFromHash() {
   const rawHash = (location.hash || '').replace(/^#/, '');
@@ -129,6 +138,11 @@ export function importMigrationFromHash() {
 
   const encoded = migratePart.slice('migrate='.length);
   stripMigrateFromHash();
+
+  const referrerOrigin = parseOrigin(typeof document !== 'undefined' ? document.referrer : '');
+  if (!ALLOWED_BRIDGE_ORIGIN || referrerOrigin !== ALLOWED_BRIDGE_ORIGIN) {
+    return 'rejected';
+  }
 
   let payload = null;
   if (encoded) {
@@ -143,6 +157,10 @@ export function importMigrationFromHash() {
   if (!validatePayload(payload)) {
     showToast(t('migration.invalid'), 'warning');
     return 'invalid';
+  }
+
+  if (typeof payload.from !== 'string' || payload.from !== ALLOWED_BRIDGE_ORIGIN) {
+    return 'rejected';
   }
 
   applyMigratedData(payload.data);
