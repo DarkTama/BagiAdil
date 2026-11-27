@@ -37,6 +37,8 @@ export function clampedDiscountNotice(result) {
  * @param {function} [options.onTogglePaid] - (name, isPaid) => void. When
  *   provided, a "mark as paid" toggle is shown on each participant card.
  * @param {boolean} [options.stale] - the editor changed since Calculate; shows a banner
+ * @param {object} [options.params] - {totalDiscount, totalShipping} the split used;
+ *   enables the "food - discount + shipping = total" proof line
  */
 export function renderResults(result, containerEl, itemsMap = null, options = {}) {
   containerEl.innerHTML = '';
@@ -76,6 +78,9 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
   totalEl.className = 'grand-total';
   totalEl.innerHTML = `<span class="grand-total-label">${t('results.grandTotal')}</span> <span class="grand-total-amount">${formatCurrency(grandTotal)}</span>`;
   containerEl.appendChild(totalEl);
+
+  const proof = renderProof(result, options.params);
+  if (proof) containerEl.appendChild(proof);
   // Payment destination
   const payment = options.payment || null;
   if (payment && (payment.bank || payment.accountNumber)) {
@@ -160,23 +165,50 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
       card.appendChild(status);
     }
 
+    // The amount to pay leads the card.
+    const finalEl = document.createElement('div');
+    finalEl.className = 'result-card-final';
+    const finalLabel = document.createElement('span');
+    finalLabel.textContent = t('results.finalPayment');
+    const finalAmount = document.createElement('strong');
+    finalAmount.textContent = formatCurrency(p.finalPayment);
+    finalEl.append(finalLabel, ' ', finalAmount);
+    card.appendChild(finalEl);
+
+    const delta = roundingDelta(p);
+    if (delta !== 0) {
+      const roundEl = document.createElement('div');
+      roundEl.className = 'result-card-rounding';
+      roundEl.textContent = `${t('results.rounding')} ${signedCurrency(delta)}`;
+      card.appendChild(roundEl);
+    }
+
     if (itemsMap && itemsMap[p.name] && itemsMap[p.name].length > 0) {
       const itemsList = document.createElement('ul');
       itemsList.className = 'result-card-items';
       itemsMap[p.name].forEach((item) => {
         const li = document.createElement('li');
-        if (item.qty && item.qty > 1) {
-          li.textContent = `${item.qty}x ${item.name} @ ${formatCurrency(item.unitPrice)} - ${formatCurrency(item.price)}`;
-        } else {
-          li.textContent = `${item.name} - ${formatCurrency(item.price)}`;
-        }
+        const label = document.createElement('span');
+        label.className = 'result-item-name';
+        label.textContent =
+          item.qty && item.qty > 1
+            ? `${item.qty}x ${item.name} @ ${formatCurrency(item.unitPrice)}`
+            : item.name;
+        const price = document.createElement('span');
+        price.className = 'result-item-price';
+        price.textContent = formatCurrency(item.price);
+        li.append(label, price);
         itemsList.appendChild(li);
       });
       card.appendChild(itemsList);
     }
 
-    const details = document.createElement('div');
+    // The full breakdown is one tap away instead of five rows per person.
+    const details = document.createElement('details');
     details.className = 'result-card-details';
+    const summaryEl = document.createElement('summary');
+    summaryEl.textContent = t('results.breakdown');
+    details.appendChild(summaryEl);
 
     details.appendChild(createDetailRow(t('results.originalOrder'), formatCurrency(p.originalOrder)));
     details.appendChild(createDetailRow(t('results.discount'), `- ${formatCurrency(p.discount)}`));
@@ -185,11 +217,6 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
     details.appendChild(createDetailRow(t('results.preRounding'), formatCurrency(p.preRoundingTotal)));
 
     card.appendChild(details);
-
-    const finalEl = document.createElement('div');
-    finalEl.className = 'result-card-final';
-    finalEl.innerHTML = `<span>${t('results.finalPayment')}</span> <strong>${formatCurrency(p.finalPayment)}</strong>`;
-    card.appendChild(finalEl);
 
     // Mark-as-paid toggle (omitted in the read-only shared view)
     if (onTogglePaid) {
@@ -205,6 +232,56 @@ export function renderResults(result, containerEl, itemsMap = null, options = {}
   });
 
   containerEl.appendChild(cardsContainer);
+}
+
+/**
+ * Rounding added to (or taken off) one person, as the visible rows show it:
+ * final payment minus the pre-rounding total as displayed (whole rupiah).
+ * @param {object} p - a participant from splitBill()
+ * @returns {number}
+ */
+export function roundingDelta(p) {
+  return Number(p.finalPayment) - Math.round(Number(p.preRoundingTotal));
+}
+
+function signedCurrency(n) {
+  return `${n < 0 ? '−' : '+'}${formatCurrency(Math.abs(n))}`;
+}
+
+/**
+ * "Food − discount + shipping = total" and "sum of payments = total ✓".
+ * Uses the discount actually applied (clamped) and the split's own params, so
+ * the line always adds up. Omitted when params are unknown.
+ * @param {object} result
+ * @param {object} [params]
+ * @returns {HTMLElement|null}
+ */
+function renderProof(result, params) {
+  if (!params) return null;
+  const food = result.participants.reduce((sum, p) => sum + Number(p.originalOrder), 0);
+  const discount = effectiveDiscount(result, params.totalDiscount || 0);
+  const shipping = params.totalShipping || 0;
+  const paid = result.participants.reduce((sum, p) => sum + Number(p.finalPayment), 0);
+
+  const box = document.createElement('div');
+  box.className = 'result-proof';
+
+  let equation = `${t('results.proofFood')} ${formatCurrency(food)}`;
+  if (discount) equation += ` − ${t('results.discount')} ${formatCurrency(discount)}`;
+  if (shipping) equation += ` + ${t('results.proofShipping')} ${formatCurrency(shipping)}`;
+  equation += ` = ${formatCurrency(result.grandTotal)}`;
+  const eqEl = document.createElement('p');
+  eqEl.className = 'result-proof-line';
+  eqEl.textContent = equation;
+  box.appendChild(eqEl);
+
+  const sumEl = document.createElement('p');
+  sumEl.className = 'result-proof-line result-proof-sum';
+  const ok = paid === Number(result.grandTotal);
+  sumEl.textContent = `${t('results.proofSum')} = ${formatCurrency(paid)} ${ok ? '✓' : '✗'}`;
+  if (!ok) sumEl.classList.add('result-proof-sum--bad');
+  box.appendChild(sumEl);
+  return box;
 }
 
 function createDetailRow(label, value) {

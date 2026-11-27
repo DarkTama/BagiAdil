@@ -532,23 +532,52 @@ label {
 .result-card-items {
   list-style: none;
   padding: 0;
-  margin-bottom: var(--space-sm);
+  margin: var(--space-sm) 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.result-card-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 2px 0;
+}
+
+.result-item-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.result-item-price {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .result-card-name {
   font-size: var(--font-size-md);
   font-weight: 600;
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
   color: var(--text-primary);
 }
 
 .result-card-details {
-  margin-bottom: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.result-card-details summary {
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  padding: var(--space-xs) 0;
 }
 
 .detail-row {
   display: flex;
   justify-content: space-between;
+  gap: var(--space-sm);
   padding: var(--space-xs) 0;
   font-size: var(--font-size-sm);
 }
@@ -560,20 +589,63 @@ label {
 .detail-value {
   font-weight: 500;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .result-card-final {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--border-color);
-  font-size: var(--font-size-md);
+  align-items: baseline;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 
 .result-card-final strong {
   color: var(--accent-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.result-card-rounding {
+  text-align: right;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+/* "Food - discount + shipping = total" proof under the grand total */
+.result-proof {
+  margin: calc(-1 * var(--space-md)) 0 var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.result-proof-sum {
+  color: var(--success);
+}
+
+.result-proof-sum--bad {
+  color: var(--warning);
+}
+
+/* Opt-in shortlink under the export buttons */
+.share-short-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.share-short-option input {
+  width: auto;
+  min-height: 0;
+  margin-top: 3px;
+  flex-shrink: 0;
 }
 
 /* Top row layout */
@@ -1978,5 +2050,65 @@ header {
 
   .toast--leaving {
     animation: toast-fade-out 0.15s ease forwards;
+  }
+}
+
+/* Print / "Save as PDF": the results only, as a light receipt */
+@media print {
+  :root {
+    --bg-tertiary: #ffffff;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-muted: #555555;
+    --accent-primary: #000000;
+    --border-color: #cccccc;
+    --success: #047857;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  header,
+  footer,
+  .mode-tabs,
+  .mode-section,
+  #migration-notice,
+  #table-assigner,
+  #calculate-status,
+  #calculate,
+  #new-split,
+  #validation-errors,
+  #export-section,
+  .paid-toggle,
+  .btn-copy-account,
+  .share-new-btn,
+  .stale-banner,
+  .toast-container {
+    display: none !important;
+  }
+
+  #results {
+    border: none;
+    box-shadow: none;
+    background: none;
+    padding: 0;
+  }
+
+  #results::before {
+    content: 'BagiAdil  ' attr(data-print-date);
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #555555;
+  }
+
+  .result-card {
+    break-inside: avoid;
+  }
+
+  .result-card-details {
+    display: none;
   }
 }

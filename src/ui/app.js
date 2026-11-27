@@ -44,6 +44,7 @@ import {
   updateMigrationNoticeTranslations,
 } from './migration.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
+import { formatCurrency } from '../engine/formatter.js';
 
 // Re-entrancy guard (not state): true while applySnapshot / OCR populate write
 // the editor programmatically, so their intermediate states are not tracked.
@@ -215,6 +216,7 @@ function render(state = getSession()) {
         onTogglePaid: handleTogglePaid,
         payment: getPayment(),
         stale: state.stale,
+        params: state.calc.snapshot.params,
       });
     } else {
       resultsEl.innerHTML = '';
@@ -579,7 +581,8 @@ function renderSharedView(snapshot, migration = null) {
     try {
       const { result, itemsMap, payment } = computeSplit(snapshot);
       if (!result) throw new Error('nothing to split');
-      renderResults(result, resultsContainer, itemsMap, { payment });
+      renderResults(result, resultsContainer, itemsMap, { payment, params: snapshot.params });
+      document.title = `${formatCurrency(result.grandTotal)} - BagiAdil`;
     } catch {
       resultsContainer.textContent = t('share.invalid');
     }
