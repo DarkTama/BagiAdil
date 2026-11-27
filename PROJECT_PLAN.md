@@ -117,15 +117,24 @@ For each person:
 ```
 
 ### Step F: Reconcile Rounding Differences
+> Deviates from the original Python script (owner-approved): the Python rule put the whole
+> difference on one person, which could skew a single payer by several hundred rupiah.
 ```
-Original Total = Sum of all (Total Before Rounding)
-Rounded Total = Sum of all (Rounded Payments)
-Difference = Original Total - Rounded Total
-Find the Decimal Fraction for each person: (Total Before Rounding - Rounded Payment)
-Identify the person with the HIGHEST Decimal Fraction
-Add the 'Difference' to that person's Rounded Payment
-Round their total to the nearest hundred again
+Expected Total = Food Total - Effective Discount + Shipping   (exact integer)
+Target = Expected Total rounded to the nearest 100 (HALF_UP)
+Steps = (Target - Sum of Rounded Payments) / 100
+Hand out the Steps as +100 / -100 by largest remainder:
+  short -> +100 to the people rounded DOWN the most
+  over  -> -100 to the people rounded UP the most
+  at most one step per person per pass; ties: first person in list order
+Remainder = Expected Total - Target   (-50..+49, only when the total is not a multiple of 100)
+Give the Remainder to exactly ONE person: the one whose payment is furthest from their
+Total Before Rounding in the Remainder's direction (most underpaying if positive, most
+overpaying if negative); ties: first person in list order
 ```
+Guarantees: every payment is whole rupiah; at most one payment is not a multiple of 100
+(only when the bill total is not); payments add up to the Expected Total exactly; each
+payment is within Rp 150 of the person's Total Before Rounding.
 
 ### Edge Cases to Handle
 | Case | Handling |
@@ -133,7 +142,7 @@ Round their total to the nearest hundred again
 | Single participant | Skip discount splitting, apply flat |
 | Zero discount / zero shipping | Graceful handling when fields are empty or zero |
 | Step F tie-breaking | Deterministic tiebreaker: first person in list order wins |
-| Negative totals after discount | Guard against discounts exceeding item prices |
+| Negative totals after discount | Discount is clamped to the food total (`verification.discountClamped`) |
 
 ---
 
