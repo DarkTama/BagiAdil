@@ -48,6 +48,10 @@ describe('parseRupiah', () => {
     ['', 0],
     [null, 0],
     ['Rp 0', 0],
+    ['12,500.00', 12500],
+    // Mid-edit values from the live currency input (one digit deleted)
+    ['Rp 12.50', 1250],
+    ['Rp 1.250.00', 125000],
   ])('parses %j as %i', (input, expected) => {
     expect(parseRupiah(input)).toBe(expected);
   });
