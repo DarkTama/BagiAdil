@@ -19,6 +19,18 @@ function extractSharePart(incomingHash) {
 }
 
 /**
+ * Check whether the incoming hash requests a forced resend (`#resend` or `&resend`).
+ * @param {string} incomingHash
+ * @returns {boolean}
+ */
+function hasResendPart(incomingHash) {
+  const raw = String(incomingHash || '').replace(/^#/, '');
+  return raw
+    .split('&')
+    .some((part) => part === 'resend' || part.startsWith('resend='));
+}
+
+/**
  * Collect BagiAdil keys from localStorage entries.
  * Excludes `bagiadil_migrated` and reports if already migrated.
  * @param {Array<[string, string]>|Record<string, string>} storageEntries
@@ -70,8 +82,9 @@ export function buildMigrationHash(
   meta = {},
 ) {
   const sharePart = extractSharePart(incomingHash);
+  const resend = hasResendPart(incomingHash);
   const { alreadyMigrated, data } = collectMigratableData(storageEntries);
-  if (alreadyMigrated || Object.keys(data).length === 0) {
+  if ((!resend && alreadyMigrated) || Object.keys(data).length === 0) {
     return sharePart;
   }
 
