@@ -1825,3 +1825,31 @@ header {
 .guide-close {
   width: 100%;
 }
+
+/* Long unbreakable names (OCR text, pasted strings) must wrap, not overflow */
+.chip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.chip-text,
+.td-item-name,
+.result-card-name,
+.assigned-item-line > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assigned-item-line {
+  gap: var(--space-sm);
+}
+
+.assigned-item-line .undo-btn {
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .assignment-table {
+    table-layout: fixed;
+  }
+}
