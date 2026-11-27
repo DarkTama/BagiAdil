@@ -5,8 +5,8 @@
 import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
 import { buildShareUrl } from './snapshot.js';
-import { getSession } from './session.js';
-import { loadPaymentInfo, savePaymentInfo } from './storage.js';
+import { getSession, getPayment, subscribe, update } from './session.js';
+import { savePaymentInfo } from './storage.js';
 
 let containerEl = null;
 
@@ -18,6 +18,24 @@ let containerEl = null;
 export function initExport(el) {
   containerEl = el;
   render();
+  subscribe(syncPaymentInputs);
+}
+
+const PAYMENT_FIELDS = [
+  ['bank', '#pay-bank'],
+  ['accountNumber', '#pay-account-number'],
+  ['accountName', '#pay-account-name'],
+];
+
+/**
+ * Mirror session.payment into the inputs when it changed from outside
+ * (e.g. a history load). Typing never differs, so focus and caret are safe.
+ */
+function syncPaymentInputs(state) {
+  PAYMENT_FIELDS.forEach(([field, sel]) => {
+    const input = containerEl.querySelector(sel);
+    if (input && input.value !== state.payment[field]) input.value = state.payment[field];
+  });
 }
 
 function render() {
@@ -38,7 +56,7 @@ function render() {
   const payBody = document.createElement('div');
   payBody.className = 'payment-card-body';
 
-  const storedPayment = loadPaymentInfo() || {};
+  const storedPayment = getSession().payment;
 
   // Bank field
   const bankGroup = document.createElement('div');
@@ -96,12 +114,15 @@ function render() {
   nameGroup.appendChild(nameLabel);
   nameGroup.appendChild(nameInput);
 
+  // Typing updates the session and, as before, becomes the saved default.
   const saveCurrentPayment = () => {
-    savePaymentInfo({
+    const raw = {
       bank: bankInput.value,
       accountNumber: numInput.value,
       accountName: nameInput.value,
-    });
+    };
+    update({ payment: raw });
+    savePaymentInfo(raw);
   };
   bankInput.addEventListener('input', saveCurrentPayment);
   numInput.addEventListener('input', saveCurrentPayment);
@@ -150,7 +171,7 @@ function render() {
  */
 function getLiveSnapshot() {
   const { calc } = getSession();
-  return calc && { ...calc.snapshot, payment: getPaymentInfo() };
+  return calc && { ...calc.snapshot, payment: getPayment() };
 }
 
 async function handleShareLink() {
@@ -290,7 +311,7 @@ async function handlePdfExport() {
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
 
     const itemsMap = calc.itemsMap;
-    const payment = getPaymentInfo();
+    const payment = getPayment();
     const pdfContainer = buildPdfContent(results, itemsMap, payment);
     document.body.appendChild(pdfContainer);
 
@@ -336,7 +357,7 @@ async function handleWhatsAppCopy() {
   const params = calc.snapshot.params;
   const snapshot = getLiveSnapshot();
   const shareUrl = snapshot ? buildShareUrl(snapshot) : '';
-  const payment = getPaymentInfo();
+  const payment = getPayment();
   const text = generateWhatsAppText(results, params, shareUrl, payment);
   const btn = containerEl.querySelector('.export-wa-btn');
 
@@ -376,37 +397,6 @@ function showCopySuccess(btn) {
   }, 2000);
 }
 
-/**
- * Get current payment destination from inputs or storage.
- * @returns {{bank: string, accountNumber: string, accountName: string}|null}
- */
-export function getPaymentInfo() {
-  if (!containerEl) return loadPaymentInfo();
-  const bankInput = containerEl.querySelector('#pay-bank');
-  const numInput = containerEl.querySelector('#pay-account-number');
-  const nameInput = containerEl.querySelector('#pay-account-name');
-  if (!bankInput || !numInput || !nameInput) return loadPaymentInfo();
-  const bank = bankInput.value.trim();
-  const accountNumber = numInput.value.trim();
-  const accountName = nameInput.value.trim();
-  if (!bank && !accountNumber && !accountName) return null;
-  return { bank, accountNumber, accountName };
-}
-
-/**
- * Set payment destination inputs programmatically.
- * @param {{bank?: string, accountNumber?: string, accountName?: string}|null} info
- */
-export function setPaymentInfo(info) {
-  if (!containerEl) return;
-  const bankInput = containerEl.querySelector('#pay-bank');
-  const numInput = containerEl.querySelector('#pay-account-number');
-  const nameInput = containerEl.querySelector('#pay-account-name');
-  if (bankInput) bankInput.value = (info && info.bank) || '';
-  if (numInput) numInput.value = (info && info.accountNumber) || '';
-  if (nameInput) nameInput.value = (info && info.accountName) || '';
-  if (info) savePaymentInfo(info);
-}
 /**
  * Update translated text in the export component without resetting state.
  */

@@ -21,12 +21,12 @@ import {
   clearItems as tableClearItems,
   loadItems as tableLoadItems,
 } from './table-assigner.js';
-import { initExport, updateTranslations as updateExportTranslations, getPaymentInfo, setPaymentInfo } from './export.js';
+import { initExport, updateTranslations as updateExportTranslations } from './export.js';
 import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './storage.js';
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
 import { putReceipt, pruneReceipts } from './image-store.js';
 import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
-import { getSession, subscribe, update, setCalculated, resetSession, editorChanged } from './session.js';
+import { getSession, getPayment, subscribe, update, setCalculated, resetSession, editorChanged } from './session.js';
 import { showToast } from './toast.js';
 import { initGuide } from './guide.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
@@ -59,6 +59,8 @@ export function initApp() {
 
   // Initialize storage
   initStorage();
+  // Session payment starts from the saved default.
+  resetSession();
 
   // Initialize mode tabs
   initModeTabs();
@@ -171,7 +173,7 @@ function render(state = getSession()) {
       renderResults(state.calc.result, resultsEl, state.calc.itemsMap, {
         paid: state.paid,
         onTogglePaid: handleTogglePaid,
-        payment: getPaymentInfo(),
+        payment: getPayment(),
       });
     } else {
       resultsEl.innerHTML = '';
@@ -232,7 +234,7 @@ function handleTableStateChange(state) {
 
 /** Snapshot of what the editor currently holds. */
 function readEditor() {
-  return buildSnapshot(getParticipants(), getParams(), getTableState().items, getPaymentInfo());
+  return buildSnapshot(getParticipants(), getParams(), getTableState().items, getPayment());
 }
 
 function whileApplying(write) {
@@ -423,11 +425,10 @@ function showCalculated() {
  */
 function loadSplit(entry) {
   applySnapshot(entry);
-  if (entry.payment) {
-    setPaymentInfo(entry.payment);
-  }
   // Loading a saved split is not a new scan - keep its stored receipt as-is.
-  resetSession({ historyId: entry.id || null, paid: entry.paid || {} });
+  // Its payment shows in the inputs without becoming the saved default (L10);
+  // an entry without payment falls back to the saved default.
+  resetSession({ historyId: entry.id || null, paid: entry.paid || {}, payment: entry.payment });
 
   // Switch to manual mode so the editor is visible.
   setMode('manual');
