@@ -138,6 +138,60 @@ describe('bridge/migrate-core buildMigrationHash', () => {
       ['newest', 'newer', 'mid', 'old2', 'old1'].slice(0, kept.length),
     );
   });
+
+  it('resend overrides bagiadil_migrated flag and is never forwarded', () => {
+    const entries = [
+      ['bagiadil_migrated', '2026-11-27T00:00:00.000Z'],
+      ['bagiadil_participants', '["Ani","Budi"]'],
+      ['bagiadil-lang', 'en'],
+    ];
+
+    const hash = buildMigrationHash(entries, '#resend', 1_500_000, {
+      from: 'https://darktama.github.io',
+      at: 1700000000000,
+    });
+
+    expect(hash.startsWith('migrate=')).toBe(true);
+    expect(hash).not.toContain('resend');
+    expect(decodeMigrateHash(hash)).toEqual({
+      v: 1,
+      from: 'https://darktama.github.io',
+      at: 1700000000000,
+      data: {
+        bagiadil_participants: '["Ani","Budi"]',
+        'bagiadil-lang': 'en',
+      },
+    });
+  });
+
+  it('resend + share keeps share and drops resend', () => {
+    const entries = [
+      ['bagiadil_migrated', '2026-11-27T00:00:00.000Z'],
+      ['bagiadil_participants', '["Ani"]'],
+    ];
+
+    const hash1 = buildMigrationHash(entries, '#resend&share=abc123', 1_500_000, {
+      from: 'https://darktama.github.io',
+      at: 1700000000000,
+    });
+    expect(hash1.startsWith('share=abc123&migrate=')).toBe(true);
+    expect(hash1).not.toContain('resend');
+
+    const hash2 = buildMigrationHash(entries, '#share=xyz_99&resend', 1_500_000, {
+      from: 'https://darktama.github.io',
+      at: 1700000000000,
+    });
+    expect(hash2.startsWith('share=xyz_99&migrate=')).toBe(true);
+    expect(hash2).not.toContain('resend');
+  });
+
+  it('resend with no data produces no migrate part and does not forward resend', () => {
+    expect(buildMigrationHash([], '#resend')).toBe('');
+    expect(buildMigrationHash([['bagiadil_migrated', '2026-11-27T00:00:00.000Z']], '#resend')).toBe(
+      '',
+    );
+    expect(buildMigrationHash([], '#resend&share=keepMe')).toBe('share=keepMe');
+  });
 });
 
 describe('bridge/public/sw.js kill switch', () => {
