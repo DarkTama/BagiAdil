@@ -145,6 +145,8 @@ const id = {
   'export.copyFailed': 'Gagal menyalin ke clipboard',
   'export.pdfUnavailable': 'Ekspor PDF tidak tersedia di lingkungan ini.',
   'guide.close': 'Mengerti',
+  'migration.success': 'Data dari versi lama sudah dipindahkan',
+  'migration.invalid': 'Data migrasi tidak valid dan diabaikan.',
 };
 
 export default id;

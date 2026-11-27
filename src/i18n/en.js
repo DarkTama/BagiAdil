@@ -145,6 +145,8 @@ const en = {
   'export.copyFailed': 'Failed to copy to clipboard',
   'export.pdfUnavailable': 'PDF export is not available in this environment.',
   'guide.close': 'Got it',
+  'migration.success': 'Your data from the old version has been moved',
+  'migration.invalid': 'Migration data is invalid and was ignored.',
 };
 
 export default en;

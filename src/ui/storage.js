@@ -204,6 +204,34 @@ export function clearHistory() {
   }
 }
 
+/**
+ * Merge imported history entries with existing ones by `id` (larger `updatedAt`
+ * wins on conflict; existing wins on tie) and persist through `writeHistory` so
+ * the 50-entry cap is enforced in one place.
+ * @param {object[]} incoming
+ * @returns {boolean}
+ */
+export function mergeHistoryEntries(incoming) {
+  if (!Array.isArray(incoming)) return false;
+  const existing = readHistory();
+  const byId = new Map();
+  for (const entry of existing) {
+    if (entry && typeof entry === 'object' && typeof entry.id === 'string' && entry.id) {
+      byId.set(entry.id, entry);
+    }
+  }
+  for (const entry of incoming) {
+    if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || !entry.id) {
+      continue;
+    }
+    const current = byId.get(entry.id);
+    if (!current || (entry.updatedAt || 0) > (current.updatedAt || 0)) {
+      byId.set(entry.id, entry);
+    }
+  }
+  return writeHistory([...byId.values()]);
+}
+
 /* ---------------------------------------------------------------------------
  * Draft of the split in progress
  * ------------------------------------------------------------------------- */
@@ -301,6 +329,33 @@ export function deleteGroup(name) {
     localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
   } catch {
     // silently fail
+  }
+}
+
+/**
+ * Merge imported participant groups by name (case-insensitive).
+ * Existing groups on this origin win on conflict.
+ * @param {Array<{name: string, members: string[]}>} incoming
+ */
+export function mergeGroups(incoming) {
+  if (!Array.isArray(incoming)) return;
+  try {
+    const existing = loadGroups();
+    const seen = new Set(existing.map((g) => g.name.toLowerCase()));
+    const merged = [...existing];
+    for (const group of incoming) {
+      if (!group || typeof group.name !== 'string' || !Array.isArray(group.members)) continue;
+      const trimmed = group.name.trim();
+      if (!trimmed || seen.has(trimmed.toLowerCase())) continue;
+      seen.add(trimmed.toLowerCase());
+      merged.push({
+        name: trimmed,
+        members: group.members.filter((m) => typeof m === 'string' && m.trim()),
+      });
+    }
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(merged));
+  } catch {
+    // localStorage may be unavailable - silently fail
   }
 }
 
