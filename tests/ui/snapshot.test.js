@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  aggregateByPerson,
   buildSnapshot,
   computeSplit,
   encodeSnapshot,
@@ -205,5 +206,34 @@ describe('computeSplit', () => {
     };
     const decoded = decodeSnapshot(encodeSnapshot(snap));
     expect(decoded.payment).toBeUndefined();
+  });
+});
+
+describe('aggregateByPerson / computeSplit (single compute path)', () => {
+  const item = (name, unitPrice, assignments) => ({
+    name,
+    unitPrice,
+    totalQty: assignments.reduce((n, a) => n + a.qty, 0),
+    assignments,
+  });
+
+  it('seeds in participant order, then adds assigned-but-unlisted people', () => {
+    const agg = aggregateByPerson(['Ani', 'Budi'], [
+      item('X', 1000, [{ person: 'Zed', qty: 1 }, { person: 'Budi', qty: 2 }]),
+    ]);
+    expect(Object.keys(agg)).toEqual(['Ani', 'Budi', 'Zed']);
+    expect(agg.Budi.subtotal).toBe(2000);
+    expect(agg.Budi.items[0]).toMatchObject({ name: 'X', qty: 2, unitPrice: 1000, price: 2000 });
+    expect(agg.Ani.items).toEqual([]);
+  });
+
+  it('returns result null when nobody has a subtotal above zero', () => {
+    const out = computeSplit({
+      participants: ['Ani'],
+      params: { totalDiscount: 0, totalShipping: 5000 },
+      items: [item('Free', 0, [{ person: 'Ani', qty: 1 }])],
+    });
+    expect(out.result).toBeNull();
+    expect(out.itemsMap.Ani).toHaveLength(1);
   });
 });

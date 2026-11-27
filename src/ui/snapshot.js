@@ -53,35 +53,51 @@ export function buildSnapshot(participants, params, items, payment = null) {
 }
 
 /**
- * Recompute the split result and items map from a snapshot.
- * Mirrors the per-person aggregation done by table-assigner's getTableState().
- * @param {object} snapshot
- * @returns {{result: object, itemsMap: object}}
+ * Group assigned items by person. The single aggregation behind the table
+ * assigner, the assigned list and computeSplit.
+ * Seeded in participant order (so the rounding tie-break matches the host
+ * screen), then any assigned-but-unlisted person on first use.
+ * @param {string[]} participants
+ * @param {Array} items - snapshot or table-assigner items (an `id` becomes `itemId`)
+ * @returns {Object<string, {items: Array<{itemId, name, qty, unitPrice, price}>, subtotal: number}>}
  */
-export function computeSplit(snapshot) {
-  // Seed in participant order so the rounding tie-break matches the host screen.
-  const assignments = {};
-  (snapshot.participants || []).forEach((p) => {
-    assignments[p] = { items: [], subtotal: 0 };
+export function aggregateByPerson(participants, items) {
+  const byPerson = {};
+  (participants || []).forEach((p) => {
+    byPerson[p] = { items: [], subtotal: 0 };
   });
-  (snapshot.items || []).forEach((item) => {
+  (items || []).forEach((item) => {
     (item.assignments || []).forEach((a) => {
-      if (!assignments[a.person]) {
-        assignments[a.person] = { items: [], subtotal: 0 };
+      if (!byPerson[a.person]) {
+        byPerson[a.person] = { items: [], subtotal: 0 };
       }
-      assignments[a.person].items.push({
+      const price = a.qty * item.unitPrice;
+      byPerson[a.person].items.push({
+        itemId: item.id,
         name: item.name,
         qty: a.qty,
         unitPrice: item.unitPrice,
-        price: a.qty * item.unitPrice,
+        price,
       });
-      assignments[a.person].subtotal += a.qty * item.unitPrice;
+      byPerson[a.person].subtotal += price;
     });
   });
+  return byPerson;
+}
+
+/**
+ * Recompute the split result and items map from a snapshot. The only compute
+ * path: Calculate, history meta and the shared view all go through it.
+ * @param {object} snapshot
+ * @returns {{result: object|null, itemsMap: object, payment: object|null}}
+ *   result is null when no person has a subtotal above zero
+ */
+export function computeSplit(snapshot) {
+  const byPerson = aggregateByPerson(snapshot.participants, snapshot.items);
 
   const orders = [];
   const itemsMap = {};
-  Object.entries(assignments).forEach(([name, data]) => {
+  Object.entries(byPerson).forEach(([name, data]) => {
     if (data.subtotal > 0) {
       orders.push({ name, amount: data.subtotal });
     }
@@ -90,6 +106,9 @@ export function computeSplit(snapshot) {
     }
   });
 
+  const payment = snapshot.payment || null;
+  if (orders.length === 0) return { result: null, itemsMap, payment };
+
   const params = snapshot.params || {};
   const result = splitBill({
     orders,
@@ -97,7 +116,7 @@ export function computeSplit(snapshot) {
     totalShipping: params.totalShipping || 0,
   });
 
-  return { result, itemsMap, payment: snapshot.payment || null };
+  return { result, itemsMap, payment };
 }
 
 /** Legacy URL-safe base64 -> UTF-8 string (decodes pre-compression links). */
