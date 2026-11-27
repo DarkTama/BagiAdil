@@ -7,8 +7,13 @@
  *   {
  *     participants: string[],
  *     params: { totalDiscount: number, totalShipping: number },
- *     items: [{ name, unitPrice, totalQty, assignments: [{ person, qty }] }]
+ *     items: [{ name, unitPrice, totalQty, split?: true, assignments: [{ person, qty }] }]
  *   }
+ *
+ * Without `split`, an assignment's qty is whole units of the item (they sum to
+ * at most totalQty). With `split: true` the whole item (unitPrice * totalQty)
+ * is shared and each qty is a share weight: equal weights split it evenly,
+ * 2:1 gives one person twice the other's part.
  */
 
 import { splitBill } from '../engine/calculator.js';
@@ -37,6 +42,7 @@ export function buildSnapshot(participants, params, items, payment = null) {
       name: item.name,
       unitPrice: item.unitPrice,
       totalQty: item.totalQty,
+      ...(item.split ? { split: true } : {}),
       assignments: (item.assignments || []).map((a) => ({
         person: a.person,
         qty: a.qty,
@@ -54,6 +60,25 @@ export function buildSnapshot(participants, params, items, payment = null) {
 }
 
 /**
+ * Divide a whole-rupiah total by integer weights into whole-rupiah parts that
+ * sum to the total exactly: floor each part, then hand the leftover rupiah one
+ * by one to the largest fractional remainders (ties: earlier weight first).
+ * @param {number} total - non-negative integer
+ * @param {number[]} weights - positive integers
+ * @returns {number[]}
+ */
+export function allocateByWeight(total, weights) {
+  const sum = weights.reduce((s, w) => s + w, 0);
+  const parts = weights.map((w) => Math.floor((total * w) / sum));
+  let left = total - parts.reduce((s, p) => s + p, 0);
+  const order = weights
+    .map((w, i) => i)
+    .sort((a, b) => ((total * weights[b]) % sum) - ((total * weights[a]) % sum) || a - b);
+  for (let j = 0; left > 0; j++, left--) parts[order[j]] += 1;
+  return parts;
+}
+
+/**
  * Group assigned items by person. The single aggregation behind the table
  * assigner, the assigned list and computeSplit.
  * Seeded in participant order (so the rounding tie-break matches the host
@@ -68,19 +93,34 @@ export function aggregateByPerson(participants, items) {
     byPerson[p] = { items: [], subtotal: 0 };
   });
   (items || []).forEach((item) => {
-    (item.assignments || []).forEach((a) => {
+    const assignments = item.assignments || [];
+    const weights = assignments.map((a) => a.qty);
+    const totalWeight = weights.reduce((s, w) => s + w, 0);
+    const shares = item.split && assignments.length ? allocateByWeight(item.unitPrice * item.totalQty, weights) : null;
+    assignments.forEach((a, i) => {
       if (!byPerson[a.person]) {
         byPerson[a.person] = { items: [], subtotal: 0 };
       }
-      const price = a.qty * item.unitPrice;
-      byPerson[a.person].items.push({
-        itemId: item.id,
-        name: item.name,
-        qty: a.qty,
-        unitPrice: item.unitPrice,
-        price,
-      });
-      byPerson[a.person].subtotal += price;
+      let line;
+      if (!item.split) {
+        line = { itemId: item.id, name: item.name, qty: a.qty, unitPrice: item.unitPrice, price: a.qty * item.unitPrice };
+      } else if (a.qty === totalWeight) {
+        // Sole sharer pays the whole item: same line as owning every unit.
+        line = { itemId: item.id, name: item.name, qty: item.totalQty, unitPrice: item.unitPrice, price: shares[i] };
+      } else {
+        // Part of a shared item. qty stays 1 so result lines print "name - price";
+        // the (share/total) marker in the name is language-neutral.
+        line = {
+          itemId: item.id,
+          name: `${item.name} (${a.qty}/${totalWeight})`,
+          qty: 1,
+          unitPrice: item.unitPrice,
+          price: shares[i],
+          share: [a.qty, totalWeight],
+        };
+      }
+      byPerson[a.person].items.push(line);
+      byPerson[a.person].subtotal += line.price;
     });
   });
   return byPerson;
@@ -131,9 +171,12 @@ function fromBase64Url(str) {
 
 /**
  * Encode a snapshot into a compact, compressed, URL-safe string.
- * Versioned positional-array form (v2) with assignment persons referenced by index:
+ * Versioned positional-array form with assignment persons referenced by index:
  *   [ 2, persons, totalDiscount, totalShipping,
  *     [ [name, unitPrice, totalQty, [ [personIdx, qty], ... ]], ... ], payment? ]
+ * A shared item appends a 1 flag: [name, unitPrice, totalQty, assigns, 1], and
+ * then the version is 3, so an older app rejects the link instead of reading
+ * share weights as units. Without shared items the output stays v2.
  * Legacy v1 links (no leading version number) are still decoded.
  * Only participants referenced by an item assignment are included (people
  * who ordered nothing never appear in the shared result), in participant
@@ -158,15 +201,19 @@ export function encodeSnapshot(snapshot) {
     }
     return i;
   };
-  const items = (snapshot.items || []).map((item) => [
-    item.name,
-    item.unitPrice,
-    item.totalQty,
-    (item.assignments || []).map((a) => [personIndex(a.person), a.qty]),
-  ]);
+  const items = (snapshot.items || []).map((item) => {
+    const entry = [
+      item.name,
+      item.unitPrice,
+      item.totalQty,
+      (item.assignments || []).map((a) => [personIndex(a.person), a.qty]),
+    ];
+    if (item.split) entry.push(1);
+    return entry;
+  });
   const params = snapshot.params || {};
   const compact = [
-    2,
+    (snapshot.items || []).some((item) => item.split) ? 3 : 2,
     persons,
     params.totalDiscount || 0,
     params.totalShipping || 0,
@@ -213,11 +260,14 @@ export function validateSnapshot(snap) {
   const itemsOk = items.every((item) => {
     if (!item || !isStr(item.name) || !isNum(item.unitPrice) || !isPosInt(item.totalQty)) return false;
     if (!Array.isArray(item.assignments)) return false;
+    if (item.split !== undefined && item.split !== true) return false;
     let assigned = 0;
     for (const a of item.assignments) {
       if (!a || !known.has(a.person) || !isPosInt(a.qty)) return false;
       assigned += a.qty;
     }
+    // Share weights may exceed totalQty, but price * weight must stay exact.
+    if (item.split) return Number.isSafeInteger(item.unitPrice * item.totalQty * Math.max(assigned, 1));
     return assigned <= item.totalQty;
   });
   if (!itemsOk) return false;
@@ -243,7 +293,7 @@ function rebuildFromCompact(json) {
   if (!Array.isArray(compact) || compact.length < 4) return null;
   if (typeof compact[0] === 'number') {
     // Versioned link. Unknown future versions are rejected, not guessed at.
-    if (compact[0] !== 2) return null;
+    if (compact[0] !== 2 && compact[0] !== 3) return null;
     compact = compact.slice(1);
   } else if (!Array.isArray(compact[0])) {
     return null;
@@ -251,7 +301,10 @@ function rebuildFromCompact(json) {
   const [persons, totalDiscount, totalShipping, items, pay] = compact;
   if (!Array.isArray(persons) || !Array.isArray(items)) return null;
   const shapeOk = items.every(
-    (item) => Array.isArray(item) && (item[3] === undefined || (Array.isArray(item[3]) && item[3].every(Array.isArray))),
+    (item) =>
+      Array.isArray(item) &&
+      (item[3] === undefined || (Array.isArray(item[3]) && item[3].every(Array.isArray))) &&
+      (item[4] === undefined || item[4] === 1),
   );
   if (!shapeOk) return null;
 
@@ -265,6 +318,7 @@ function rebuildFromCompact(json) {
       name: item[0],
       unitPrice: item[1],
       totalQty: item[2],
+      ...(item[4] === 1 ? { split: true } : {}),
       assignments: (item[3] || []).map((a) => ({
         // An index that is not a valid position stays undefined and fails validation.
         person: Number.isInteger(a[0]) ? persons[a[0]] : undefined,

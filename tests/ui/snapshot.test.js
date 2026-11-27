@@ -257,7 +257,7 @@ describe('versioned share links and validation (L1, L2)', () => {
   });
 
   it('rejects an unknown future version', () => {
-    expect(decodeSnapshot(link([3, ['Ani'], 0, 0, [['A', 1000, 1, [[0, 1]]]]]))).toBeNull();
+    expect(decodeSnapshot(link([4, ['Ani'], 0, 0, [['A', 1000, 1, [[0, 1]]]]]))).toBeNull();
   });
 
   it('rejects an out-of-range person index', () => {
@@ -290,5 +290,86 @@ describe('versioned share links and validation (L1, L2)', () => {
 
   it('buildSnapshot stamps v: 1', () => {
     expect(buildSnapshot(['A'], { totalDiscount: 0, totalShipping: 0 }, []).v).toBe(1);
+  });
+});
+
+describe('shared items (split flag)', () => {
+  const link = (compact) => compressToEncodedURIComponent(JSON.stringify(compact));
+  const unpack = (str) => JSON.parse(decompressFromEncodedURIComponent(str));
+  const legacy = {
+    participants: ['Ani', 'Budi'],
+    params: { totalDiscount: 1000, totalShipping: 2000 },
+    items: [{ name: 'Nasi', unitPrice: 15000, totalQty: 2, assignments: [{ person: 'Ani', qty: 1 }, { person: 'Budi', qty: 1 }] }],
+  };
+  const shared = {
+    participants: ['Ani', 'Budi', 'Cici'],
+    params: { totalDiscount: 0, totalShipping: 5000 },
+    items: [
+      {
+        name: 'Pizza',
+        unitPrice: 10000,
+        totalQty: 1,
+        split: true,
+        // Assignment order differs from participant order on purpose.
+        assignments: [{ person: 'Cici', qty: 1 }, { person: 'Ani', qty: 1 }, { person: 'Budi', qty: 1 }],
+      },
+      { name: 'Teh', unitPrice: 4000, totalQty: 1, assignments: [{ person: 'Budi', qty: 1 }] },
+    ],
+  };
+
+  it('keeps links without shared items byte-identical to v2', () => {
+    expect(encodeSnapshot(legacy)).toBe(
+      link([2, ['Ani', 'Budi'], 1000, 2000, [['Nasi', 15000, 2, [[0, 1], [1, 1]]]]]),
+    );
+  });
+
+  it('writes v3 with a per-item flag only when an item is shared', () => {
+    const compact = unpack(encodeSnapshot(shared));
+    expect(compact[0]).toBe(3);
+    expect(compact[4][0][4]).toBe(1);
+    expect(compact[4][1]).toHaveLength(4);
+  });
+
+  it('round-trips a shared item and computes the same split', () => {
+    const decoded = decodeSnapshot(encodeSnapshot(shared));
+    expect(decoded.items[0].split).toBe(true);
+    expect(decoded.items[1].split).toBeUndefined();
+    const before = computeSplit(shared).result.participants.map((p) => [p.name, p.finalPayment.toNumber()]);
+    const after = computeSplit(decoded).result.participants.map((p) => [p.name, p.finalPayment.toNumber()]);
+    expect(after).toEqual(before);
+  });
+
+  it('allocates shared parts in whole rupiah that sum to the item, first sharer gets the extra', () => {
+    const by = aggregateByPerson(shared.participants, shared.items);
+    expect([by.Cici.subtotal, by.Ani.subtotal, by.Budi.subtotal]).toEqual([3334, 3333, 3333 + 4000]);
+    const { result } = computeSplit(shared);
+    expect(result.verification.balanced).toBe(true);
+    expect(result.grandTotal.toNumber()).toBe(19000);
+  });
+
+  it('weights split proportionally', () => {
+    const by = aggregateByPerson(['A', 'B'], [
+      { name: 'X', unitPrice: 1000, totalQty: 1, split: true, assignments: [{ person: 'A', qty: 2 }, { person: 'B', qty: 1 }] },
+    ]);
+    expect([by.A.subtotal, by.B.subtotal]).toEqual([667, 333]);
+    expect(by.A.items[0].name).toBe('X (2/3)');
+  });
+
+  it('buildSnapshot keeps the flag only on shared items', () => {
+    const snap = buildSnapshot(shared.participants, shared.params, shared.items);
+    expect(snap.items[0].split).toBe(true);
+    expect('split' in snap.items[1]).toBe(false);
+  });
+
+  it('validates the flag and share weights', () => {
+    const base = { participants: ['A', 'B'], params: { totalDiscount: 0, totalShipping: 0 } };
+    const item = (extra) => ({ name: 'X', unitPrice: 1000, totalQty: 1, assignments: [{ person: 'A', qty: 3 }], ...extra });
+    expect(validateSnapshot({ ...base, items: [item({ split: true })] })).toBe(true); // weight > qty is fine
+    expect(validateSnapshot({ ...base, items: [item({})] })).toBe(false); // units may not exceed qty
+    expect(validateSnapshot({ ...base, items: [item({ split: 'yes' })] })).toBe(false);
+    expect(
+      validateSnapshot({ ...base, items: [{ ...item({ split: true }), assignments: [{ person: 'A', qty: 2 ** 50 }] }] }),
+    ).toBe(false);
+    expect(decodeSnapshot(link([3, ['A'], 0, 0, [['X', 1000, 1, [[0, 1]], 2]]]))).toBeNull();
   });
 });
