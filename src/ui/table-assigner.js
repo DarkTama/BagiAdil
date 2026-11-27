@@ -117,7 +117,12 @@ export function addItemsFromOCR(ocrItems) {
  */
 export function updateParticipants(newParticipants) {
   participants = [...newParticipants];
+  // Drop assignments of removed people so their quantity returns to "remaining".
+  items.forEach((item) => {
+    item.assignments = item.assignments.filter((a) => participants.includes(a.person));
+  });
   render();
+  notifyChange();
 }
 
 /**
