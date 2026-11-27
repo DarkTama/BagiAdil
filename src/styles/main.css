@@ -10,10 +10,14 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   line-height: 1.6;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-primary);
@@ -34,6 +38,13 @@ button,
 textarea,
 select {
   font: inherit;
+}
+
+/* Controls: no double-tap-zoom delay, and long-press must not select the label */
+button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Design Tokens */
@@ -92,6 +103,7 @@ header {
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
   padding: var(--space-lg) var(--space-md);
+  padding-top: calc(var(--space-lg) + env(safe-area-inset-top, 0px));
   text-align: center;
 }
 
@@ -133,6 +145,7 @@ section h2 {
 footer {
   text-align: center;
   padding: var(--space-lg) var(--space-md);
+  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
   color: var(--text-muted);
   font-size: var(--font-size-sm);
 }
@@ -155,9 +168,14 @@ footer {
   transition: color var(--transition-fast);
 }
 
-.footer-credit a:hover,
 .footer-credit a:focus-visible {
   color: var(--text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .footer-credit a:hover {
+    color: var(--text-primary);
+  }
 }
 
 .footer-credit a:focus-visible {
@@ -278,9 +296,11 @@ label {
   color: var(--text-primary);
 }
 
-.btn:hover {
-  background-color: var(--bg-hover);
-  border-color: rgba(255, 255, 255, 0.2);
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    background-color: var(--bg-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
 }
 
 .btn:active {
@@ -294,24 +314,27 @@ label {
   font-weight: 600;
 }
 
-.btn-primary:hover {
-  background-color: var(--accent-secondary);
-  border-color: var(--accent-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+    background-color: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+  }
 }
 
 .btn-danger {
   background-color: rgba(239, 68, 68, 0.1);
   color: var(--error);
   border-color: rgba(239, 68, 68, 0.3);
-  min-height: 36px;
   padding: var(--space-xs) var(--space-sm);
   font-size: var(--font-size-lg);
   line-height: 1;
 }
 
-.btn-danger:hover {
-  background-color: rgba(239, 68, 68, 0.2);
-  border-color: var(--error);
+@media (hover: hover) and (pointer: fine) {
+  .btn-danger:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: var(--error);
+  }
 }
 
 .btn-calculate {
@@ -345,9 +368,11 @@ label {
     border-color var(--transition-fast);
 }
 
-.chip:hover {
-  background-color: var(--bg-hover);
-  border-color: rgba(255, 255, 255, 0.2);
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    background-color: var(--bg-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
 }
 
 .chip-text {
@@ -355,6 +380,7 @@ label {
 }
 
 .chip-remove {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -373,9 +399,18 @@ label {
     background-color var(--transition-fast);
 }
 
-.chip-remove:hover {
-  background-color: rgba(239, 68, 68, 0.2);
-  color: var(--error);
+/* 44px hit area around the 20px visual */
+.chip-remove::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip-remove:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--error);
+  }
 }
 
 .btn-add-item {
@@ -436,9 +471,11 @@ label {
     box-shadow var(--transition-fast);
 }
 
-.result-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: var(--shadow-md);
+@media (hover: hover) and (pointer: fine) {
+  .result-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: var(--shadow-md);
+  }
 }
 
 .result-card-name {
@@ -587,10 +624,36 @@ label {
   cursor: pointer;
 }
 
-.btn-edit-item:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.2);
+@media (hover: hover) and (pointer: fine) {
+  .btn-edit-item:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Delete / OCR remove buttons. Declared before the mobile block so its 44px wins. */
+.ocr-item-remove,
+.btn-delete-item {
+  align-self: end;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ocr-item-remove:hover,
+  .btn-delete-item:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: var(--error);
+  }
+}
+
+.btn-delete-item {
+  min-height: 32px;
+  margin-left: var(--space-xs);
 }
 
 /* Table edit mode */
@@ -646,9 +709,11 @@ label {
   border: 1px solid var(--border-color);
 }
 
-.btn-cancel-item:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .btn-cancel-item:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 
 /* Assign popup */
@@ -720,14 +785,16 @@ label {
   font-size: var(--font-size-sm);
   color: var(--error);
   padding: var(--space-xs) var(--space-sm);
-  min-height: 28px;
+  min-height: 44px;
   border-color: rgba(239, 68, 68, 0.3);
   background-color: rgba(239, 68, 68, 0.1);
 }
 
-.assigned-item-line .undo-btn:hover {
-  background-color: rgba(239, 68, 68, 0.2);
-  border-color: var(--error);
+@media (hover: hover) and (pointer: fine) {
+  .assigned-item-line .undo-btn:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: var(--error);
+  }
 }
 
 .person-subtotal {
@@ -814,6 +881,8 @@ label {
   .assign-popup select,
   .assign-popup input {
     width: 100%;
+    min-height: 44px;
+    font-size: 16px; /* < 16px makes iOS Safari zoom on focus */
   }
 
   .popup-qty-input {
@@ -840,7 +909,7 @@ label {
   .assignment-table input.edit-item-price {
     width: 100%;
     max-width: 100%;
-    min-height: 40px;
+    min-height: 44px;
     font-size: 16px;
     display: block;
   }
@@ -859,7 +928,7 @@ label {
   .assignment-table .td-edit-action .btn-save-item,
   .assignment-table .td-edit-action .btn-cancel-item {
     flex: 1;
-    min-height: 40px;
+    min-height: 44px;
     font-size: var(--font-size-md);
     margin-left: 0;
     text-align: center;
@@ -868,11 +937,17 @@ label {
     align-items: center;
   }
 
+  /* 44px touch targets */
   .btn-edit-item,
   .btn-delete-item,
-  .btn-assign {
-    min-height: 40px;
-    min-width: 40px;
+  .ocr-item-remove,
+  .btn-assign,
+  .btn-popup-cancel,
+  .btn-popup-confirm,
+  .btn-save-item,
+  .btn-cancel-item {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 
@@ -888,6 +963,8 @@ label {
 }
 
 .lang-btn {
+  position: relative;
+  min-width: 44px;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -896,7 +973,15 @@ label {
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.lang-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
 }
 
 .lang-btn.active {
@@ -904,8 +989,10 @@ label {
   color: #000;
 }
 
-.lang-btn:hover:not(.active) {
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .lang-btn:hover:not(.active) {
+    color: var(--text-secondary);
+  }
 }
 
 /* Mode tabs */
@@ -940,9 +1027,11 @@ label {
   font-weight: 600;
 }
 
-.mode-tab:hover:not(.active) {
-  background-color: var(--bg-hover);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .mode-tab:hover:not(.active) {
+    background-color: var(--bg-hover);
+    color: var(--text-secondary);
+  }
 }
 
 /* Section content */
@@ -967,10 +1056,16 @@ label {
   background-color: var(--bg-tertiary);
 }
 
-.upload-zone-hover,
-.upload-zone:hover {
+.upload-zone-hover {
   border-color: var(--accent-secondary);
   background-color: var(--bg-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .upload-zone:hover {
+    border-color: var(--accent-secondary);
+    background-color: var(--bg-hover);
+  }
 }
 
 .upload-zone-content {
@@ -1013,10 +1108,6 @@ label {
   margin-bottom: var(--space-sm);
   object-fit: contain;
   border: 1px solid var(--border-color);
-}
-
-.upload-remove {
-  min-height: 36px;
 }
 
 .pdf-preview-info {
@@ -1138,28 +1229,6 @@ label {
   border: 1px solid var(--border-color);
 }
 
-.ocr-item-remove,
-.btn-delete-item {
-  align-self: end;
-  min-height: 36px;
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--font-size-sm);
-  color: var(--error);
-  border-color: rgba(239, 68, 68, 0.3);
-  background-color: rgba(239, 68, 68, 0.1);
-}
-
-.ocr-item-remove:hover,
-.btn-delete-item:hover {
-  background-color: rgba(239, 68, 68, 0.2);
-  border-color: var(--error);
-}
-
-.btn-delete-item {
-  min-height: 32px;
-  margin-left: var(--space-xs);
-}
-
 .ocr-item-field label {
   font-size: 0.75rem;
   margin-bottom: 2px;
@@ -1271,7 +1340,6 @@ label {
 .btn-copy-account {
   padding: var(--space-xs) var(--space-sm);
   font-size: var(--font-size-xs);
-  min-height: 32px;
 }
 
 /* Privacy badge */
@@ -1324,10 +1392,16 @@ label {
   font-weight: 600;
 }
 
-.history-label:hover,
 .history-label:focus {
   border-color: var(--border-color);
   background-color: var(--bg-tertiary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .history-label:hover {
+    border-color: var(--border-color);
+    background-color: var(--bg-tertiary);
+  }
 }
 
 .history-meta {
@@ -1373,7 +1447,7 @@ label {
 .toast-container {
   position: fixed;
   left: 50%;
-  bottom: var(--space-lg);
+  bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -1505,8 +1579,8 @@ header {
   position: absolute;
   top: var(--space-md);
   right: var(--space-md);
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border-color);
   background-color: var(--bg-tertiary);
@@ -1516,8 +1590,10 @@ header {
   cursor: pointer;
 }
 
-.help-btn:hover {
-  background-color: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .help-btn:hover {
+    background-color: var(--bg-hover);
+  }
 }
 
 .modal-overlay {
@@ -1538,7 +1614,8 @@ header {
   padding: var(--space-lg);
   max-width: 420px;
   width: 100%;
-  max-height: 85vh;
+  max-height: 85vh; /* fallback */
+  max-height: 85dvh;
   overflow-y: auto;
 }
 
