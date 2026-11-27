@@ -1,6 +1,8 @@
 /**
  * Unified table-based assignment component.
- * Replaces both items.js assignment and assigner.js drag-and-drop.
+ * Each item row has a row of participant chips: tap a chip to give that person
+ * one more unit (or one more share of a shared item), tap its − to take one
+ * back. "Bagi rata" turns an item into a shared item (see snapshot.js).
  */
 
 import { t } from '../i18n/index.js';
@@ -15,11 +17,10 @@ const RUPIAH_PRICE_PATTERN = /^(?:Rp\s?)?(?:\d+|\d{1,3}(?:\.\d{3})+)$/;
 const PLAIN_INTEGER_PATTERN = /^\d+$/;
 
 let containerEl = null;
-let items = []; // [{id, name, unitPrice, totalQty, assignments: [{person, qty}]}]
+let items = []; // [{id, name, unitPrice, totalQty, split?, assignments: [{person, qty}]}]
 let participants = [];
 let onStateChange = null;
 let nextId = 1;
-let activePopupItemId = null;
 let editingItemId = null;
 
 /**
@@ -35,7 +36,6 @@ export function initTableAssigner(el, options) {
   onStateChange = options.onStateChange || null;
   items = [];
   nextId = 1;
-  activePopupItemId = null;
   editingItemId = null;
   render();
 }
@@ -122,7 +122,6 @@ export function updateTranslations() {
 export function clearItems() {
   items = [];
   nextId = 1;
-  activePopupItemId = null;
   editingItemId = null;
   render();
   notifyChange();
@@ -135,13 +134,13 @@ export function clearItems() {
  */
 export function loadItems(itemsArray) {
   nextId = 1;
-  activePopupItemId = null;
   editingItemId = null;
   items = (itemsArray || []).map((item) => ({
     id: nextId++,
     name: item.name,
     unitPrice: item.unitPrice,
     totalQty: item.totalQty,
+    ...(item.split ? { split: true } : {}),
     assignments: (item.assignments || []).map((a) => ({
       person: a.person,
       qty: a.qty,
@@ -151,9 +150,14 @@ export function loadItems(itemsArray) {
   notifyChange();
 }
 
+function assignedQty(item) {
+  return item.assignments.reduce((sum, a) => sum + a.qty, 0);
+}
+
+// A shared item is done as soon as anyone shares it.
 function getRemainingQty(item) {
-  const assigned = item.assignments.reduce((sum, a) => sum + a.qty, 0);
-  return item.totalQty - assigned;
+  if (item.split) return item.assignments.length > 0 ? 0 : item.totalQty;
+  return item.totalQty - assignedQty(item);
 }
 
 function notifyChange() {
@@ -169,11 +173,31 @@ function notifyChange() {
 
 function render() {
   if (!containerEl) return;
+  // The whole list is rebuilt, so keep focus on the same control (by key).
+  const active = document.activeElement;
+  const focusKey = active && containerEl.contains(active) ? active.dataset.focusKey : null;
   containerEl.innerHTML = '';
+  renderContent();
+  if (focusKey) restoreFocus(focusKey);
+}
 
+// Keys look like "kind:itemId[:person]". If that control is gone (last unit
+// taken back, row completed), fall back to the item's chip, then its toggle.
+function restoreFocus(key) {
+  const [kind, itemId] = key.split(':');
+  const person = key.slice(kind.length + itemId.length + 2);
+  const els = [...containerEl.querySelectorAll('[data-focus-key]')];
+  const target =
+    els.find((el) => el.dataset.focusKey === key) ||
+    els.find((el) => el.dataset.focusKey === `add:${itemId}:${person}`) ||
+    els.find((el) => el.dataset.focusKey === `split:${itemId}`) ||
+    els.find((el) => el.dataset.focusKey === `edit:${itemId}`);
+  if (target) target.focus();
+}
+
+function renderContent() {
   if (items.length === 0) {
     editingItemId = null;
-    activePopupItemId = null;
     const hint = document.createElement('p');
     hint.className = 'table-hint';
     hint.textContent = t('table.addItemsHint');
@@ -237,7 +261,10 @@ function renderUnassignedTable() {
     // Remaining
     const tdRemaining = document.createElement('td');
     tdRemaining.dataset.label = t('table.remaining');
-    tdRemaining.textContent = remaining + '/' + item.totalQty;
+    tdRemaining.textContent =
+      item.split && item.assignments.length > 0
+        ? t('table.sharedBy').replace('{n}', item.assignments.length)
+        : remaining + '/' + item.totalQty;
     tr.appendChild(tdRemaining);
 
     // Unit price
@@ -249,27 +276,15 @@ function renderUnassignedTable() {
     // Action
     const tdAction = document.createElement('td');
     tdAction.dataset.label = t('table.action');
-    if (remaining > 0) {
-      const assignBtn = document.createElement('button');
-      assignBtn.type = 'button';
-      assignBtn.className = 'btn btn-assign';
-      assignBtn.textContent = '+ ' + t('table.assign');
-      assignBtn.addEventListener('click', () => {
-        activePopupItemId = item.id;
-        editingItemId = null;
-        render();
-      });
-      tdAction.appendChild(assignBtn);
-    }
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
     editBtn.className = 'btn btn-edit-item';
     editBtn.textContent = '✎';
     editBtn.title = t('table.edit');
     editBtn.setAttribute('aria-label', t('table.edit'));
+    editBtn.dataset.focusKey = `edit:${item.id}`;
     editBtn.addEventListener('click', () => {
       editingItemId = item.id;
-      activePopupItemId = null;
       render();
     });
     tdAction.appendChild(editBtn);
@@ -282,7 +297,6 @@ function renderUnassignedTable() {
     deleteBtn.setAttribute('aria-label', t('table.remove'));
     deleteBtn.addEventListener('click', () => {
       items = items.filter((i) => i.id !== item.id);
-      if (activePopupItemId === item.id) activePopupItemId = null;
       if (editingItemId === item.id) editingItemId = null;
       render();
       notifyChange();
@@ -292,16 +306,7 @@ function renderUnassignedTable() {
 
     tbody.appendChild(tr);
 
-    // Inline popup if active
-    if (activePopupItemId === item.id && remaining > 0) {
-      const popupRow = document.createElement('tr');
-      popupRow.className = 'popup-row';
-      const popupTd = document.createElement('td');
-      popupTd.colSpan = 4;
-      popupTd.appendChild(createAssignPopup(item, remaining));
-      popupRow.appendChild(popupTd);
-      tbody.appendChild(popupRow);
-    }
+    tbody.appendChild(createChipRow(item, remaining));
   });
 
   table.appendChild(tbody);
@@ -410,8 +415,7 @@ function createEditRow(item) {
     }
     const qtyNum = parseInt(rawQty, 10);
 
-    const assignedQty = (item.assignments || []).reduce((sum, a) => sum + a.qty, 0);
-    if (qtyNum < assignedQty) {
+    if (!item.split && qtyNum < assignedQty(item)) {
       rejectField(qtyInput, 'table.qtyBelowAssigned');
       return;
     }
@@ -446,71 +450,116 @@ function createEditRow(item) {
   return tr;
 }
 
-function createAssignPopup(item, maxQty) {
-  const popup = document.createElement('div');
-  popup.className = 'assign-popup';
+function createChipRow(item, remaining) {
+  const tr = document.createElement('tr');
+  tr.className = 'chip-row';
+  const td = document.createElement('td');
+  td.colSpan = 4;
+  const group = document.createElement('div');
+  group.className = 'assign-chips';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', item.name);
 
-  // Person dropdown
-  const select = document.createElement('select');
-  select.className = 'popup-person-select';
-  const defaultOpt = document.createElement('option');
-  defaultOpt.value = '';
-  defaultOpt.textContent = t('table.assignTo');
-  select.appendChild(defaultOpt);
-  participants.forEach((name) => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    select.appendChild(opt);
-  });
-  popup.appendChild(select);
+  if (participants.length === 0) {
+    const hint = document.createElement('span');
+    hint.className = 'assign-chips-hint';
+    hint.textContent = t('table.addParticipantsHint');
+    group.appendChild(hint);
+  }
 
-  // Qty input
-  const qtyInput = document.createElement('input');
-  qtyInput.type = 'number';
-  qtyInput.className = 'popup-qty-input';
-  qtyInput.min = '1';
-  qtyInput.max = String(maxQty);
-  qtyInput.value = String(maxQty);
-  qtyInput.placeholder = t('table.qty');
-  popup.appendChild(qtyInput);
+  participants.forEach((person) => {
+    const assignment = item.assignments.find((a) => a.person === person);
+    const qty = assignment ? assignment.qty : 0;
+    // A finished unit item only keeps the chips of people who have some of it.
+    if (!item.split && remaining === 0 && qty === 0) return;
 
-  // Cancel button
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'btn btn-popup-cancel';
-  cancelBtn.textContent = t('table.cancel');
-  cancelBtn.addEventListener('click', () => {
-    activePopupItemId = null;
-    render();
-  });
-  popup.appendChild(cancelBtn);
+    const wrap = document.createElement('span');
+    wrap.className = 'assign-chip-group';
 
-  // Confirm button
-  const confirmBtn = document.createElement('button');
-  confirmBtn.type = 'button';
-  confirmBtn.className = 'btn btn-secondary btn-popup-confirm';
-  confirmBtn.textContent = t('table.assign');
-  confirmBtn.addEventListener('click', () => {
-    const person = select.value;
-    const qty = Math.min(Math.max(1, parseInt(qtyInput.value, 10) || 1), maxQty);
-    if (!person) return;
-
-    // Add assignment
-    const existing = item.assignments.find((a) => a.person === person);
-    if (existing) {
-      existing.qty += qty;
-    } else {
-      item.assignments.push({ person, qty });
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'assign-chip';
+    chip.dataset.person = person;
+    chip.dataset.focusKey = `add:${item.id}:${person}`;
+    chip.setAttribute('aria-pressed', String(qty > 0));
+    chip.setAttribute('aria-label', t('table.addOne').replace('{name}', person) + (qty > 0 ? ` (${qty})` : ''));
+    const canAdd = item.split || remaining > 0;
+    // aria-disabled, not disabled: the chip must stay focusable after the last unit.
+    if (!canAdd) chip.setAttribute('aria-disabled', 'true');
+    const label = document.createElement('span');
+    label.className = 'assign-chip-name';
+    label.textContent = person;
+    chip.appendChild(label);
+    if (qty > 0) {
+      const count = document.createElement('span');
+      count.className = 'assign-chip-count';
+      count.textContent = item.split ? `${qty}/${assignedQty(item)}` : '×' + qty;
+      chip.appendChild(count);
     }
+    chip.addEventListener('click', () => {
+      if (!canAdd) return;
+      if (assignment) assignment.qty += 1;
+      else item.assignments.push({ person, qty: 1 });
+      render();
+      notifyChange();
+    });
+    wrap.appendChild(chip);
 
-    activePopupItemId = null;
-    render();
-    notifyChange();
+    if (qty > 0) {
+      const dec = document.createElement('button');
+      dec.type = 'button';
+      dec.className = 'assign-chip-dec';
+      dec.dataset.focusKey = `dec:${item.id}:${person}`;
+      dec.textContent = '−';
+      dec.setAttribute('aria-label', t('table.removeOne').replace('{name}', person));
+      dec.addEventListener('click', () => {
+        assignment.qty -= 1;
+        if (assignment.qty === 0) item.assignments = item.assignments.filter((a) => a !== assignment);
+        render();
+        notifyChange();
+      });
+      wrap.appendChild(dec);
+    }
+    group.appendChild(wrap);
   });
-  popup.appendChild(confirmBtn);
 
-  return popup;
+  if (participants.length > 1) {
+    const splitBtn = document.createElement('button');
+    splitBtn.type = 'button';
+    splitBtn.className = 'assign-split-toggle';
+    splitBtn.dataset.focusKey = `split:${item.id}`;
+    splitBtn.setAttribute('aria-pressed', String(!!item.split));
+    splitBtn.textContent = t('table.share');
+    splitBtn.addEventListener('click', () => {
+      if (item.split) {
+        // Back to units: weights that still fit are kept as units.
+        delete item.split;
+        if (assignedQty(item) > item.totalQty) item.assignments = [];
+      } else {
+        item.split = true;
+      }
+      render();
+      notifyChange();
+    });
+    group.appendChild(splitBtn);
+
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = 'assign-everyone';
+    allBtn.dataset.focusKey = `all:${item.id}`;
+    allBtn.textContent = t('table.everyone');
+    allBtn.addEventListener('click', () => {
+      item.split = true;
+      item.assignments = participants.map((person) => ({ person, qty: 1 }));
+      render();
+      notifyChange();
+    });
+    group.appendChild(allBtn);
+  }
+
+  td.appendChild(group);
+  tr.appendChild(td);
+  return tr;
 }
 
 function renderAssignedSection() {
@@ -543,7 +592,9 @@ function renderAssignedSection() {
       line.className = 'assigned-item-line';
 
       const desc = document.createElement('span');
-      desc.textContent = assignedItem.qty + 'x ' + assignedItem.name + ' @ ' + formatCurrency(assignedItem.unitPrice) + ' = ' + formatCurrency(assignedItem.price);
+      desc.textContent = assignedItem.share
+        ? assignedItem.name + ' = ' + formatCurrency(assignedItem.price)
+        : assignedItem.qty + 'x ' + assignedItem.name + ' @ ' + formatCurrency(assignedItem.unitPrice) + ' = ' + formatCurrency(assignedItem.price);
       line.appendChild(desc);
 
       const undoBtn = document.createElement('button');

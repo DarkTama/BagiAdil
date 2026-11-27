@@ -27,6 +27,16 @@ describe('Table Assigner UI', () => {
     stateChanges = [];
   });
 
+  // Tap a person's chip on an item row, `times` times.
+  function tap(person, times = 1, itemIdx = 0) {
+    for (let i = 0; i < times; i++) chip(person, itemIdx).click();
+  }
+
+  function chip(person, itemIdx = 0) {
+    const row = containerEl.querySelectorAll('tr.chip-row')[itemIdx];
+    return [...row.querySelectorAll('.assign-chip')].find((c) => c.dataset.person === person);
+  }
+
   function setup(participants = sampleParticipants) {
     initTableAssigner(containerEl, {
       participants,
@@ -54,7 +64,7 @@ describe('Table Assigner UI', () => {
       const table = containerEl.querySelector('.assignment-table');
       expect(table).not.toBeNull();
 
-      const rows = containerEl.querySelectorAll('.assignment-table tbody tr:not(.popup-row)');
+      const rows = containerEl.querySelectorAll('.assignment-table tbody tr[data-item-id]');
       expect(rows.length).toBe(2);
     });
 
@@ -89,10 +99,7 @@ describe('Table Assigner UI', () => {
       addItems([{ name: 'Wrong Item', unitPrice: 2000, qty: 1 }]);
 
       // Assign it to Alice first
-      containerEl.querySelector('.btn-assign').click();
-      const popup = containerEl.querySelector('.assign-popup');
-      popup.querySelector('.popup-person-select').value = 'Alice';
-      popup.querySelector('.btn-popup-confirm').click();
+      tap('Alice');
 
       containerEl.querySelector('.btn-delete-item').click();
 
@@ -102,66 +109,26 @@ describe('Table Assigner UI', () => {
     });
   });
 
-  describe('assignment popup', () => {
-    it('should show inline popup when assign button is clicked', () => {
+  describe('assignment chips', () => {
+    it('shows one chip per participant under each item, no select', () => {
       setup();
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
-
-      const assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-
-      const popup = containerEl.querySelector('.assign-popup');
-      expect(popup).not.toBeNull();
-
-      const select = popup.querySelector('.popup-person-select');
-      expect(select).not.toBeNull();
-      expect(select.options.length).toBe(3); // default + Alice + Bob
-
-      const qtyInput = popup.querySelector('.popup-qty-input');
-      expect(qtyInput).not.toBeNull();
-      expect(qtyInput.value).toBe('2'); // max = remaining
+      const chips = [...containerEl.querySelectorAll('tr.chip-row .assign-chip')];
+      expect(chips.map((c) => c.dataset.person)).toEqual(['Alice', 'Bob']);
+      expect(chips.every((c) => c.getAttribute('aria-pressed') === 'false')).toBe(true);
+      expect(containerEl.querySelector('select')).toBeNull();
     });
 
-    it('should close popup on cancel', () => {
-      setup();
-      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
-
-      const assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-
-      const cancelBtn = containerEl.querySelector('.btn-popup-cancel');
-      cancelBtn.click();
-
-      const popup = containerEl.querySelector('.assign-popup');
-      expect(popup).toBeNull();
-    });
-  });
-
-  describe('confirming assignment', () => {
-    it('should update remaining qty and trigger onStateChange', () => {
+    it('adds one unit per tap and reports state', () => {
       setup();
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 3 }]);
+      tap('Alice', 2);
 
-      // Open popup
-      const assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-
-      // Select person and set qty
-      const select = containerEl.querySelector('.popup-person-select');
-      select.value = 'Alice';
-
-      const qtyInput = containerEl.querySelector('.popup-qty-input');
-      qtyInput.value = '2';
-
-      // Confirm
-      const confirmBtn = containerEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
-
-      // Check remaining display
-      const row = containerEl.querySelector('.assignment-table tbody tr:not(.popup-row)');
+      const row = containerEl.querySelector('.assignment-table tbody tr[data-item-id]');
       expect(row.textContent).toContain('1/3');
+      expect(chip('Alice').getAttribute('aria-pressed')).toBe('true');
+      expect(chip('Alice').textContent).toContain('2');
 
-      // Check state change callback
       const lastChange = stateChanges[stateChanges.length - 1];
       expect(lastChange.allAssigned).toBe(false);
       expect(lastChange.remainingCount).toBe(1);
@@ -170,24 +137,127 @@ describe('Table Assigner UI', () => {
       expect(lastChange.assignments['Alice'].subtotal).toBe(50000);
     });
 
-    it('should grey out row when fully assigned', () => {
+    it('does not over-assign, and a finished row keeps only the assigned chips', () => {
       setup();
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 1 }]);
+      tap('Alice');
 
-      // Open popup
-      const assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-
-      // Select person
-      const select = containerEl.querySelector('.popup-person-select');
-      select.value = 'Alice';
-
-      // Confirm (qty defaults to max = 1)
-      const confirmBtn = containerEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
-
-      const row = containerEl.querySelector('.assignment-table tbody tr');
+      const row = containerEl.querySelector('.assignment-table tbody tr[data-item-id]');
       expect(row.classList.contains('row-completed')).toBe(true);
+      expect(chip('Bob', 0)).toBeUndefined();
+      expect(chip('Alice').getAttribute('aria-disabled')).toBe('true');
+      tap('Alice');
+      expect(getTableState().items[0].assignments).toEqual([{ person: 'Alice', qty: 1 }]);
+    });
+
+    it('takes back one unit with the minus button', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+      tap('Alice', 2);
+      containerEl.querySelector('.assign-chip-dec').click();
+      expect(getTableState().items[0].assignments).toEqual([{ person: 'Alice', qty: 1 }]);
+      containerEl.querySelector('.assign-chip-dec').click();
+      expect(getTableState().items[0].assignments).toEqual([]);
+      expect(containerEl.querySelector('.assign-chip-dec')).toBeNull();
+    });
+
+    it('keeps focus on the tapped control across re-renders', () => {
+      setup();
+      addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
+      chip('Alice').focus();
+      chip('Alice').click();
+      expect(document.activeElement).toBe(chip('Alice'));
+
+      const dec = containerEl.querySelector('.assign-chip-dec');
+      dec.focus();
+      dec.click();
+      // The minus button is gone, focus falls back to the same person's chip.
+      expect(document.activeElement).toBe(chip('Alice'));
+    });
+  });
+
+  describe('shared items', () => {
+    it('splits a shared item evenly in whole rupiah', () => {
+      setup(['Alice', 'Bob', 'Cici']);
+      addItems([{ name: 'Pizza', unitPrice: 10000, qty: 1 }]);
+      containerEl.querySelector('.assign-everyone').click();
+
+      const state = getTableState();
+      expect(state.allAssigned).toBe(true);
+      expect(state.items[0].split).toBe(true);
+      const subs = ['Alice', 'Bob', 'Cici'].map((p) => state.assignments[p].subtotal);
+      expect(subs).toEqual([3334, 3333, 3333]);
+      expect(state.assignments['Alice'].items[0].name).toBe('Pizza (1/3)');
+      expect(containerEl.querySelector('tbody tr[data-item-id]').textContent).toContain('3');
+    });
+
+    it('share toggle turns taps into share weights', () => {
+      setup();
+      addItems([{ name: 'Pitcher', unitPrice: 30000, qty: 1 }]);
+      containerEl.querySelector('.assign-split-toggle').click();
+      expect(getTableState().allAssigned).toBe(false); // nobody shares it yet
+      tap('Alice', 2);
+      tap('Bob');
+      const state = getTableState();
+      expect(state.assignments['Alice'].subtotal).toBe(20000);
+      expect(state.assignments['Bob'].subtotal).toBe(10000);
+    });
+
+    it('a sole sharer pays the whole item as a normal line', () => {
+      setup();
+      addItems([{ name: 'Es Teh', unitPrice: 5000, qty: 3 }]);
+      containerEl.querySelector('.assign-split-toggle').click();
+      tap('Alice');
+      const line = getTableState().assignments['Alice'].items[0];
+      expect(line).toMatchObject({ name: 'Es Teh', qty: 3, price: 15000 });
+    });
+
+    it('toggling share off keeps weights that fit as units, clears the rest', () => {
+      setup();
+      addItems([{ name: 'Es Teh', unitPrice: 5000, qty: 2 }]);
+      containerEl.querySelector('.assign-everyone').click();
+      containerEl.querySelector('.assign-split-toggle').click();
+      expect(getTableState().items[0].assignments).toHaveLength(2);
+      expect(getTableState().items[0].split).toBeUndefined();
+
+      containerEl.querySelector('.assign-split-toggle').click();
+      tap('Alice', 2);
+      containerEl.querySelector('.assign-split-toggle').click();
+      expect(getTableState().items[0].assignments).toEqual([]);
+    });
+
+    it('removing a sharer redistributes the cost', () => {
+      setup(['Alice', 'Bob', 'Cici']);
+      addItems([{ name: 'Pizza', unitPrice: 9000, qty: 1 }]);
+      containerEl.querySelector('.assign-everyone').click();
+      updateParticipants(['Alice', 'Bob']);
+      const state = getTableState();
+      expect(state.assignments['Alice'].subtotal).toBe(4500);
+      expect(state.assignments['Bob'].subtotal).toBe(4500);
+      expect(state.assignments['Cici']).toBeUndefined();
+    });
+
+    it('allows lowering qty of a shared item below its share count', () => {
+      setup(['Alice', 'Bob', 'Cici']);
+      addItems([{ name: 'Pizza', unitPrice: 9000, qty: 2 }]);
+      containerEl.querySelector('.assign-everyone').click();
+      containerEl.querySelector('.btn-edit-item').click();
+      containerEl.querySelector('.edit-item-qty').value = '1';
+      containerEl.querySelector('.btn-save-item').click();
+      expect(getTableState().items[0].totalQty).toBe(1);
+      expect(getTableState().assignments['Alice'].subtotal).toBe(3000);
+    });
+
+    it('round-trips through snapshot encode/decode and loadItems', () => {
+      setup(['Alice', 'Bob', 'Cici']);
+      addItems([{ name: 'Pizza', unitPrice: 10000, qty: 1 }]);
+      containerEl.querySelector('.assign-everyone').click();
+      const snap = buildSnapshot(['Alice', 'Bob', 'Cici'], { totalDiscount: 0, totalShipping: 0 }, getTableState().items);
+      const decoded = decodeSnapshot(encodeSnapshot(snap));
+      expect(decoded.items[0].split).toBe(true);
+      loadItems(decoded.items);
+      expect(getTableState().items[0].split).toBe(true);
+      expect(getTableState().assignments['Alice'].subtotal).toBe(3334);
     });
   });
 
@@ -195,26 +265,15 @@ describe('Table Assigner UI', () => {
     it('should return qty to unassigned on undo', () => {
       setup();
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
-
-      // Assign
-      let assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-      const select = containerEl.querySelector('.popup-person-select');
-      select.value = 'Alice';
-      const confirmBtn = containerEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
-
-      // Verify assigned
+      tap('Alice', 2);
       expect(containerEl.querySelector('.row-completed')).not.toBeNull();
 
-      // Undo
       const undoBtn = containerEl.querySelector('.undo-btn');
       expect(undoBtn).not.toBeNull();
       undoBtn.click();
 
-      // Should be back to unassigned
       expect(containerEl.querySelector('.row-completed')).toBeNull();
-      const row = containerEl.querySelector('.assignment-table tbody tr:not(.popup-row)');
+      const row = containerEl.querySelector('.assignment-table tbody tr[data-item-id]');
       expect(row.textContent).toContain('2/2');
     });
   });
@@ -267,23 +326,13 @@ describe('Table Assigner UI', () => {
       ]);
 
       // Assign first item
-      let assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-      let select = containerEl.querySelector('.popup-person-select');
-      select.value = 'Alice';
-      let confirmBtn = containerEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
+      tap('Alice', 1, 0);
 
       let state = getTableState();
       expect(state.allAssigned).toBe(false);
 
       // Assign second item
-      assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-      select = containerEl.querySelector('.popup-person-select');
-      select.value = 'Bob';
-      confirmBtn = containerEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
+      tap('Bob', 1, 1);
 
       state = getTableState();
       expect(state.allAssigned).toBe(true);
@@ -292,18 +341,13 @@ describe('Table Assigner UI', () => {
   });
 
   describe('updateParticipants', () => {
-    it('should update dropdown options', () => {
+    it('should update the participant chips', () => {
       setup();
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 1 }]);
 
       updateParticipants(['Charlie', 'Dave']);
 
-      // Open popup
-      const assignBtn = containerEl.querySelector('.btn-assign');
-      assignBtn.click();
-
-      const select = containerEl.querySelector('.popup-person-select');
-      const options = Array.from(select.options).map((o) => o.value);
+      const options = [...containerEl.querySelectorAll('.assign-chip')].map((c) => c.dataset.person);
       expect(options).toContain('Charlie');
       expect(options).toContain('Dave');
       expect(options).not.toContain('Alice');
@@ -452,17 +496,8 @@ describe('Table Assigner UI', () => {
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
 
       // Assign 1 to Alice, 1 to Bob
-      containerEl.querySelector('.btn-assign').click();
-      let popup = containerEl.querySelector('.assign-popup');
-      popup.querySelector('.popup-person-select').value = 'Alice';
-      popup.querySelector('.popup-qty-input').value = '1';
-      popup.querySelector('.btn-popup-confirm').click();
-
-      containerEl.querySelector('.btn-assign').click();
-      popup = containerEl.querySelector('.assign-popup');
-      popup.querySelector('.popup-person-select').value = 'Bob';
-      popup.querySelector('.popup-qty-input').value = '1';
-      popup.querySelector('.btn-popup-confirm').click();
+      tap('Alice');
+      tap('Bob');
 
       // Row is now completed (0/2 remaining)
       const completedRow = containerEl.querySelector('.row-completed');
@@ -498,11 +533,7 @@ describe('Table Assigner UI', () => {
       setup();
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 2 }]);
 
-      containerEl.querySelector('.btn-assign').click();
-      const popup = containerEl.querySelector('.assign-popup');
-      popup.querySelector('.popup-person-select').value = 'Alice';
-      popup.querySelector('.popup-qty-input').value = '1';
-      popup.querySelector('.btn-popup-confirm').click();
+      tap('Alice', 1);
 
       containerEl.querySelector('.btn-edit-item').click();
       containerEl.querySelector('.edit-item-name').value = 'Nasi Uduk';
@@ -520,11 +551,7 @@ describe('Table Assigner UI', () => {
       addItems([{ name: 'Nasi Goreng', unitPrice: 25000, qty: 3 }]);
 
       // Assign 2 to Alice
-      containerEl.querySelector('.btn-assign').click();
-      const popup = containerEl.querySelector('.assign-popup');
-      popup.querySelector('.popup-person-select').value = 'Alice';
-      popup.querySelector('.popup-qty-input').value = '2';
-      popup.querySelector('.btn-popup-confirm').click();
+      tap('Alice', 2);
 
       // Edit item qty to 1 (assigned is 2)
       containerEl.querySelector('.btn-edit-item').click();
@@ -685,11 +712,7 @@ describe('Table Assigner UI', () => {
       addItems([{ name: 'Mie Ayam', unitPrice: 15000, qty: 2 }]);
 
       // Assign 1 to Alice
-      containerEl.querySelector('.btn-assign').click();
-      const popup = containerEl.querySelector('.assign-popup');
-      popup.querySelector('.popup-person-select').value = 'Alice';
-      popup.querySelector('.popup-qty-input').value = '1';
-      popup.querySelector('.btn-popup-confirm').click();
+      tap('Alice', 1);
 
       // Edit item
       containerEl.querySelector('.btn-edit-item').click();

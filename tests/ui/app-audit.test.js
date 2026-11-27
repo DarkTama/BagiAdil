@@ -29,12 +29,11 @@ const addItem = (name, price, qty) => {
   f.querySelector('.btn-add-item').click();
 };
 const assign = (itemIdx, person, qty) => {
-  const rows = qa('#table-assigner tbody tr[data-item-id]');
-  rows[itemIdx].querySelector('.btn-assign').click();
-  const pop = q('.assign-popup');
-  pop.querySelector('select').value = person;
-  pop.querySelector('.popup-qty-input').value = String(qty);
-  pop.querySelector('.btn-popup-confirm').click();
+  // Tap the person's chip in the item's chip row once per unit.
+  for (let i = 0; i < qty; i++) {
+    const chipRows = qa('#table-assigner tbody tr.chip-row');
+    [...chipRows[itemIdx].querySelectorAll('.assign-chip')].find((c) => c.dataset.person === person).click();
+  }
 };
 const loadHistoryRaw = () => JSON.parse(localStorage.getItem('bagiadil_history') || '[]');
 const cardNames = () => qa('#results .result-card .result-card-name').map((e) => e.textContent);

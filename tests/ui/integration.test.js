@@ -265,20 +265,14 @@ describe('UI Integration', () => {
       ]);
 
       // Assign Nasi Goreng to Alice
-      let assignBtn = tableEl.querySelector('.btn-assign');
-      assignBtn.click();
-      let select = tableEl.querySelector('.popup-person-select');
-      select.value = 'Alice';
-      let confirmBtn = tableEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
+      const chip = (row, person) =>
+        [...tableEl.querySelectorAll('tr.chip-row')[row].querySelectorAll('.assign-chip')].find(
+          (c) => c.dataset.person === person,
+        );
+      chip(0, 'Alice').click();
 
       // Assign Mie Ayam to Bob
-      assignBtn = tableEl.querySelector('.btn-assign');
-      assignBtn.click();
-      select = tableEl.querySelector('.popup-person-select');
-      select.value = 'Bob';
-      confirmBtn = tableEl.querySelector('.btn-popup-confirm');
-      confirmBtn.click();
+      chip(1, 'Bob').click();
 
       // Verify all assigned
       const state = getTableState();
