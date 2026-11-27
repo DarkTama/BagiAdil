@@ -6,6 +6,7 @@
 const STORAGE_KEY = 'bagiadil_participants';
 const HISTORY_KEY = 'bagiadil_history';
 const HISTORY_LIMIT = 50;
+const HISTORY_CORRUPT_KEY = 'bagiadil_history_corrupt';
 const GROUPS_KEY = 'bagiadil_groups';
 const PAYMENT_KEY = 'bagiadil_payment';
 
@@ -92,29 +93,48 @@ function generateId() {
 }
 
 function readHistory() {
+  let data = null;
   try {
-    const data = localStorage.getItem(HISTORY_KEY);
+    data = localStorage.getItem(HISTORY_KEY);
     if (!data) return [];
     const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : [];
+    if (Array.isArray(parsed)) return parsed;
   } catch {
-    return [];
+    // unparsable - fall through to the backup below
   }
+  // Keep the first unreadable value so the next write cannot destroy it.
+  try {
+    if (data && localStorage.getItem(HISTORY_CORRUPT_KEY) === null) {
+      localStorage.setItem(HISTORY_CORRUPT_KEY, data);
+    }
+  } catch {
+    // backup is best-effort
+  }
+  return [];
 }
 
+/**
+ * Persist history, newest-updated first, capped at HISTORY_LIMIT.
+ * @returns {boolean} false when the write failed (storage full or unavailable)
+ */
 function writeHistory(entries) {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, HISTORY_LIMIT)));
+    const kept = [...entries]
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .slice(0, HISTORY_LIMIT);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(kept));
+    return true;
   } catch {
-    // localStorage may be unavailable or full - silently fail
+    return false;
   }
 }
 
 /**
  * Save a split to history. Updates an existing entry when `entry.id` matches,
- * otherwise creates a new entry. Returns the entry id.
+ * otherwise creates a new entry.
  * @param {object} entry - { id?, label, participants, params, items }
- * @returns {string} the entry id
+ * @returns {string|null} the entry id, or null when the write failed or a
+ *   partial update (no `items`) targeted an unknown id
  */
 export function saveHistoryEntry(entry) {
   const entries = readHistory();
@@ -127,14 +147,15 @@ export function saveHistoryEntry(entry) {
       ...entry,
       updatedAt: now,
     };
-    writeHistory(entries);
-    return entries[existingIndex].id;
+    return writeHistory(entries) ? entries[existingIndex].id : null;
   }
+
+  // A partial update (e.g. paid toggle) of an entry that no longer exists must not create a ghost.
+  if (entry.id && !entry.items) return null;
 
   const id = entry.id || generateId();
   entries.unshift({ ...entry, id, createdAt: now, updatedAt: now });
-  writeHistory(entries);
-  return id;
+  return writeHistory(entries) ? id : null;
 }
 
 /**
@@ -157,24 +178,25 @@ export function getHistoryEntry(id) {
 /**
  * Delete a history entry by id.
  * @param {string} id
+ * @returns {boolean} true when the write succeeded
  */
 export function deleteHistoryEntry(id) {
-  writeHistory(readHistory().filter((e) => e.id !== id));
+  return writeHistory(readHistory().filter((e) => e.id !== id));
 }
 
 /**
  * Rename a history entry.
  * @param {string} id
  * @param {string} label
+ * @returns {boolean} true when the entry exists and the write succeeded
  */
 export function renameHistoryEntry(id, label) {
   const entries = readHistory();
   const entry = entries.find((e) => e.id === id);
-  if (entry) {
-    entry.label = label;
-    entry.updatedAt = Date.now();
-    writeHistory(entries);
-  }
+  if (!entry) return false;
+  entry.label = label;
+  entry.updatedAt = Date.now();
+  return writeHistory(entries);
 }
 
 /**
