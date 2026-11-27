@@ -150,6 +150,15 @@ export function encodeSnapshot(snapshot) {
 }
 
 /**
+ * Build the read-only share URL for a snapshot (or history entry), payment included.
+ * @param {object} snapshot
+ * @returns {string}
+ */
+export function buildShareUrl(snapshot) {
+  return `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
+}
+
+/**
  * Rebuild a snapshot object from the compact-array JSON string.
  * @param {string} json
  * @returns {object|null}

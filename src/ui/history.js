@@ -6,7 +6,7 @@
 
 import { t } from '../i18n/index.js';
 import { formatCurrency } from '../engine/formatter.js';
-import { computeSplit, encodeSnapshot } from './snapshot.js';
+import { computeSplit, buildShareUrl } from './snapshot.js';
 import { loadHistory, deleteHistoryEntry, renameHistoryEntry } from './storage.js';
 import { getReceipt, deleteReceipt } from './image-store.js';
 
@@ -39,20 +39,6 @@ export function refreshHistory() {
  */
 export function updateTranslations() {
   render();
-}
-
-/**
- * Build a shareable URL for a history entry.
- * @param {object} entry
- * @returns {string}
- */
-export function buildShareUrl(entry) {
-  const snapshot = {
-    participants: entry.participants || [],
-    params: entry.params || {},
-    items: entry.items || [],
-  };
-  return `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
 }
 
 function render() {

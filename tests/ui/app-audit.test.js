@@ -136,3 +136,29 @@ describe('share link uses live payment info (audit H3)', () => {
     expect(decodeSnapshot(waLink).payment.accountNumber).toBe('999');
   });
 });
+
+describe('history Share link keeps payment (audit H3b)', () => {
+  it('includes the payment saved with the entry', async () => {
+    q('#pay-bank').value = 'BCA';
+    q('#pay-account-number').value = '111';
+    q('#pay-bank').dispatchEvent(new Event('input'));
+    addPerson('Ani');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+    q('#calculate').click();
+
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (txt) => { copied = txt; } },
+      configurable: true,
+    });
+    q('#history .history-share').click();
+    await new Promise((r) => setTimeout(r, 10));
+    const { decodeSnapshot } = await import('../../src/ui/snapshot.js');
+    expect(decodeSnapshot(copied.split('#share=')[1]).payment).toEqual({
+      bank: 'BCA',
+      accountNumber: '111',
+      accountName: '',
+    });
+  });
+});
