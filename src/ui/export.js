@@ -4,7 +4,7 @@
 
 import { formatCurrency } from '../engine/formatter.js';
 import { t } from '../i18n/index.js';
-import { encodeSnapshot } from './snapshot.js';
+import { buildShareUrl } from './snapshot.js';
 import { loadPaymentInfo, savePaymentInfo } from './storage.js';
 
 let containerEl = null;
@@ -161,15 +161,6 @@ function render() {
 function getLiveSnapshot() {
   const snapshot = getSnapshotFn ? getSnapshotFn() : null;
   return snapshot && { ...snapshot, payment: getPaymentInfo() };
-}
-
-/**
- * Build the read-only share URL for a snapshot.
- * @param {object} snapshot
- * @returns {string}
- */
-function buildShareUrl(snapshot) {
-  return `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
 }
 
 async function handleShareLink() {
