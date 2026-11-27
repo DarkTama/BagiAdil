@@ -7,6 +7,7 @@ const STORAGE_KEY = 'bagiadil_participants';
 const HISTORY_KEY = 'bagiadil_history';
 const HISTORY_LIMIT = 50;
 const HISTORY_CORRUPT_KEY = 'bagiadil_history_corrupt';
+const DRAFT_KEY = 'bagiadil_draft';
 const GROUPS_KEY = 'bagiadil_groups';
 const PAYMENT_KEY = 'bagiadil_payment';
 
@@ -205,6 +206,47 @@ export function renameHistoryEntry(id, label) {
 export function clearHistory() {
   try {
     localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // silently fail
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Draft of the split in progress
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Save the in-progress split so a reload (or an app switch that evicts the tab)
+ * does not lose it.
+ * @param {object} draft - { v, snapshot, historyId, paid, calculated }
+ * @returns {boolean} false when the write failed
+ */
+export function saveDraft(draft) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @returns {object|null} the saved draft, or null when absent or unparsable
+ */
+export function loadDraft() {
+  try {
+    const data = localStorage.getItem(DRAFT_KEY);
+    if (!data) return null;
+    const parsed = JSON.parse(data);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
   } catch {
     // silently fail
   }

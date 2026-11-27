@@ -451,3 +451,107 @@ describe('deleting the open history entry (M6)', () => {
     expect(entries[0].label).toBeTruthy();
   });
 });
+
+describe('draft autosave and restore (W3 M5)', () => {
+  const reload = async () => {
+    vi.resetModules();
+    loadDom();
+    const { initApp } = await import('../../src/ui/app.js');
+    initApp();
+  };
+  const twoPeopleOneAssigned = () => {
+    addPerson('Ani');
+    addPerson('Budi');
+    addItem('Nasi', 20000, 1);
+    assign(0, 'Ani', 1);
+  };
+
+  it('(a) restores people and an assigned item, without results', async () => {
+    twoPeopleOneAssigned();
+    await reload();
+    expect(qa('.chip').length).toBe(2);
+    expect(qa('#table-assigner tbody tr[data-item-id]').length).toBe(1);
+    expect(q('#calculate-status').className).toContain('status-success');
+    expect(cardNames()).toEqual([]);
+    expect(q('#export-section').hidden).toBe(true);
+  });
+
+  it('(b) after Calculate a reload shows fresh results, no new history write', async () => {
+    twoPeopleOneAssigned();
+    q('#calculate').click();
+    const before = loadHistoryRaw();
+    await reload();
+    expect(cardNames()).toEqual(['Ani']);
+    expect(q('#results .stale-banner')).toBeNull();
+    expect(q('.export-share-btn').disabled).toBe(false);
+    const after = loadHistoryRaw();
+    expect(after.length).toBe(1);
+    expect(after[0].updatedAt).toBe(before[0].updatedAt);
+    // Recalculating reuses the same entry.
+    q('#calculate').click();
+    expect(loadHistoryRaw().length).toBe(1);
+  });
+
+  it('(b2) a stale draft reloads without results', async () => {
+    twoPeopleOneAssigned();
+    q('#calculate').click();
+    addPerson('Cici');
+    await reload();
+    expect(qa('.chip').length).toBe(3);
+    expect(cardNames()).toEqual([]);
+  });
+
+  it('(c) Split baru removes the draft', async () => {
+    twoPeopleOneAssigned();
+    expect(localStorage.getItem('bagiadil_draft')).not.toBeNull();
+    q('#new-split').click();
+    expect(localStorage.getItem('bagiadil_draft')).toBeNull();
+    await reload();
+    expect(qa('.chip').length).toBe(0);
+  });
+
+  it('(d) a draft pointing at a deleted entry makes the next calculate save a new one', async () => {
+    twoPeopleOneAssigned();
+    q('#calculate').click();
+    localStorage.removeItem('bagiadil_history');
+    await reload();
+    expect(cardNames()).toEqual(['Ani']);
+    q('#calculate').click();
+    const entries = loadHistoryRaw();
+    expect(entries.length).toBe(1);
+    expect(entries[0].label).toBeTruthy();
+  });
+
+  it('(e) a valid share link leaves the draft untouched', async () => {
+    twoPeopleOneAssigned();
+    const draft = localStorage.getItem('bagiadil_draft');
+    const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
+    const link = encodeSnapshot({
+      participants: ['Zed'],
+      params: { totalDiscount: 0, totalShipping: 0 },
+      items: [{ name: 'X', unitPrice: 1000, totalQty: 1, assignments: [{ person: 'Zed', qty: 1 }] }],
+    });
+    vi.resetModules();
+    loadDom();
+    location.hash = '#share=' + link;
+    const { initApp } = await import('../../src/ui/app.js');
+    initApp();
+    expect(cardNames()).toEqual(['Zed']);
+    expect(localStorage.getItem('bagiadil_draft')).toBe(draft);
+  });
+
+  it('discards a corrupt draft', async () => {
+    localStorage.setItem('bagiadil_draft', JSON.stringify({ v: 1, snapshot: { participants: 'x' } }));
+    await reload();
+    expect(qa('.chip').length).toBe(0);
+    expect(localStorage.getItem('bagiadil_draft')).toBeNull();
+  });
+
+  it('restores the raw payment typing', async () => {
+    q('#pay-account-name').value = 'Budi ';
+    q('#pay-account-name').dispatchEvent(new Event('input'));
+    addPerson('Ani');
+    await reload();
+    expect(q('#pay-account-name').value).toBe('Budi ');
+  });
+});
