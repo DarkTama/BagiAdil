@@ -597,14 +597,23 @@ describe('clamped discount is shown as applied', () => {
     expect(copied).not.toContain(formatCurrency(20000));
   });
 
-  it('PDF content carries the same notice', async () => {
-    const { buildPdfContent } = await import('../../src/ui/export.js');
-    const { splitBill } = await import('../../src/engine/calculator.js');
-    const { t } = await import('../../src/i18n/index.js');
+  it('the proof line uses the applied discount, and print prints the results', async () => {
     const { formatCurrency } = await import('../../src/engine/formatter.js');
-    const result = splitBill({ orders: [{ name: 'Ani', amount: 15000 }], totalDiscount: 20000, totalShipping: 0 });
-    const node = buildPdfContent(result, null);
-    expect(node.textContent).toContain(t('results.discountClamped').replace('{amount}', formatCurrency(15000)));
+    addPerson('Ani');
+    addItem('Nasi', 15000, 1);
+    assign(0, 'Ani', 1);
+    q('#total-discount').value = '20000';
+    q('#total-discount').dispatchEvent(new Event('input'));
+    q('#calculate').click();
+    const proof = q('#results .result-proof').textContent;
+    expect(proof).toContain(` ${formatCurrency(15000)} = ${formatCurrency(0)}`);
+    expect(proof).not.toContain(formatCurrency(20000));
+
+    let printed = 0;
+    window.print = () => { printed++; };
+    q('.export-pdf-btn').click();
+    expect(printed).toBe(1);
+    expect(q('#results').dataset.printDate).toBeTruthy();
   });
 });
 

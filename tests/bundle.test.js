@@ -54,8 +54,11 @@ describe('Bundle and code-splitting invariants', () => {
     const pdfContent = fs.readFileSync(pdfEnginePath, 'utf8');
     expect(pdfContent).toMatch(/import\(['"]pdfjs-dist['"]\)/);
 
+    // PDF export is the browser's print dialog now; html2pdf.js is gone.
     const exportContent = fs.readFileSync(exportPath, 'utf8');
-    expect(exportContent).toMatch(/import\(['"]html2pdf\.js['"]\)/);
+    expect(exportContent).not.toMatch(/html2pdf/);
+    const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
+    expect(pkg.dependencies['html2pdf.js']).toBeUndefined();
   });
 
   it('validates dist/index.html initial assets when dist/ exists', () => {

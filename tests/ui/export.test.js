@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { generateWhatsAppText, buildPdfContent } from '../../src/ui/export.js';
+import { generateWhatsAppText } from '../../src/ui/export.js';
 import { splitBill } from '../../src/engine/calculator.js';
 import { setLocale } from '../../src/i18n/index.js';
 
@@ -29,13 +29,13 @@ describe('Export - WhatsApp Text Generation', () => {
       expect(text).toContain('*BagiAdil - Pembagian Tagihan*');
     });
 
-    it('should include total tagihan (original total)', () => {
+    it('should include the food total', () => {
       const text = generateWhatsAppText(sampleResult, {
         totalDiscount: 10000,
         totalShipping: 12000,
       });
-      // Total tagihan = 25000 + 35000 + 15000 = 75000
-      expect(text).toContain('Total Tagihan:');
+      // Food total = 25000 + 35000 + 15000 = 75000
+      expect(text).toContain('Total Makanan:');
       expect(text).toContain('75.000');
     });
 
@@ -167,71 +167,20 @@ describe('Export - WhatsApp Text Generation', () => {
   });
 });
 
-describe('Export - PDF content is XSS-safe', () => {
+describe('Export - WhatsApp items', () => {
   beforeAll(() => {
     setLocale('id');
   });
 
-  it('renders malicious participant and item names as text, not markup', () => {
-    const evilName = '<img src=x onerror="alert(1)">';
-    const evilItem = '<script>alert(2)</script>';
-
-    const result = splitBill({
-      orders: [
-        { name: evilName, amount: 25000 },
-        { name: 'Bob', amount: 15000 },
+  it('lists each person\'s items under their line, without breaking the "- " lines', () => {
+    const result = splitBill({ orders: [{ name: 'Ani', amount: 30000 }], totalDiscount: 0, totalShipping: 0 });
+    const text = generateWhatsAppText(result, {}, '', null, {
+      Ani: [
+        { name: 'Nasi', qty: 2, unitPrice: 10000, price: 20000 },
+        { name: 'Teh', qty: 1, unitPrice: 10000, price: 10000 },
       ],
-      totalDiscount: 0,
-      totalShipping: 0,
     });
-    const itemsMap = {
-      [evilName]: [{ name: evilItem, qty: 2, unitPrice: 5000, price: 10000 }],
-    };
-
-    const node = buildPdfContent(result, itemsMap);
-
-    // No markup from the names was parsed into live elements.
-    expect(node.querySelectorAll('img').length).toBe(0);
-    expect(node.querySelectorAll('script').length).toBe(0);
-
-    // The names survive verbatim as plain text.
-    expect(node.textContent).toContain(evilName);
-    expect(node.textContent).toContain(evilItem);
-
-    const heading = [...node.querySelectorAll('h3')].find(
-      (h) => h.textContent === evilName,
-    );
-    expect(heading).toBeTruthy();
-  });
-
-  it('builds one card per participant', () => {
-    const result = splitBill({
-      orders: [
-        { name: 'Alice', amount: 25000 },
-        { name: 'Bob', amount: 15000 },
-      ],
-      totalDiscount: 5000,
-      totalShipping: 4000,
-    });
-    const node = buildPdfContent(result, null);
-    expect(node.querySelectorAll('h3').length).toBe(2);
-    expect(node.textContent).toContain('Alice');
-    expect(node.textContent).toContain('Bob');
-  });
-
-  it('includes payment destination in PDF when provided', () => {
-    const result = splitBill({
-      orders: [{ name: 'Alice', amount: 25000 }],
-      totalDiscount: 0,
-      totalShipping: 0,
-    });
-    const node = buildPdfContent(result, null, {
-      bank: 'Mandiri',
-      accountNumber: '987654321',
-      accountName: 'Siti',
-    });
-    expect(node.textContent).toContain('Mandiri');
-    expect(node.textContent).toContain('987654321');
-    expect(node.textContent).toContain('Siti');
+    expect(text).toContain('- Ani: Rp 30.000\n   · 2x Nasi\n   · Teh\n');
+    expect(text.split('\n').filter((l) => l.startsWith('- ')).length).toBe(1);
   });
 });
