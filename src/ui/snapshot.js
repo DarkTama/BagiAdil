@@ -27,6 +27,7 @@ import {
  */
 export function buildSnapshot(participants, params, items, payment = null) {
   const snap = {
+    v: 1,
     participants: [...participants],
     params: {
       totalDiscount: params.totalDiscount || 0,
@@ -130,9 +131,10 @@ function fromBase64Url(str) {
 
 /**
  * Encode a snapshot into a compact, compressed, URL-safe string.
- * Positional-array form with assignment persons referenced by index:
- *   [ persons, totalDiscount, totalShipping,
- *     [ [name, unitPrice, totalQty, [ [personIdx, qty], ... ]], ... ] ]
+ * Versioned positional-array form (v2) with assignment persons referenced by index:
+ *   [ 2, persons, totalDiscount, totalShipping,
+ *     [ [name, unitPrice, totalQty, [ [personIdx, qty], ... ]], ... ], payment? ]
+ * Legacy v1 links (no leading version number) are still decoded.
  * Only participants referenced by an item assignment are included (people
  * who ordered nothing never appear in the shared result), in participant
  * order, then the JSON is
@@ -164,6 +166,7 @@ export function encodeSnapshot(snapshot) {
   ]);
   const params = snapshot.params || {};
   const compact = [
+    2,
     persons,
     params.totalDiscount || 0,
     params.totalShipping || 0,
@@ -188,10 +191,46 @@ export function buildShareUrl(snapshot) {
   return `${location.origin}${location.pathname}#share=${encodeSnapshot(snapshot)}`;
 }
 
+const isStr = (x) => typeof x === 'string';
+const isNum = (x) => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+const isPosInt = (x) => Number.isInteger(x) && x >= 1;
+
 /**
- * Rebuild a snapshot object from the compact-array JSON string.
+ * Check that a snapshot is safe to feed to computeSplit and the editor.
+ * Used on every untrusted source (share links, drafts).
+ * @param {object} snap
+ * @returns {boolean}
+ */
+export function validateSnapshot(snap) {
+  if (!snap || typeof snap !== 'object') return false;
+  const { participants, params, items, payment } = snap;
+  if (!Array.isArray(participants) || !Array.isArray(items)) return false;
+  if (!participants.every((p) => isStr(p) && p.trim())) return false;
+  if (new Set(participants).size !== participants.length) return false;
+  if (!params || !isNum(params.totalDiscount) || !isNum(params.totalShipping)) return false;
+  const known = new Set(participants);
+  const itemsOk = items.every((item) => {
+    if (!item || !isStr(item.name) || !isNum(item.unitPrice) || !isPosInt(item.totalQty)) return false;
+    if (!Array.isArray(item.assignments)) return false;
+    let assigned = 0;
+    for (const a of item.assignments) {
+      if (!a || !known.has(a.person) || !isPosInt(a.qty)) return false;
+      assigned += a.qty;
+    }
+    return assigned <= item.totalQty;
+  });
+  if (!itemsOk) return false;
+  if (payment !== undefined && payment !== null) {
+    if (!isStr(payment.bank) || !isStr(payment.accountNumber) || !isStr(payment.accountName)) return false;
+  }
+  return true;
+}
+
+/**
+ * Rebuild a snapshot object from the compact-array JSON string (v2, or the
+ * legacy v1 layout without the leading version number).
  * @param {string} json
- * @returns {object|null}
+ * @returns {object|null} a validated snapshot, or null
  */
 function rebuildFromCompact(json) {
   let compact;
@@ -201,35 +240,45 @@ function rebuildFromCompact(json) {
     return null;
   }
   if (!Array.isArray(compact) || compact.length < 4) return null;
-  const [persons, totalDiscount, totalShipping, items] = compact;
+  if (typeof compact[0] === 'number') {
+    // Versioned link. Unknown future versions are rejected, not guessed at.
+    if (compact[0] !== 2) return null;
+    compact = compact.slice(1);
+  } else if (!Array.isArray(compact[0])) {
+    return null;
+  }
+  const [persons, totalDiscount, totalShipping, items, pay] = compact;
   if (!Array.isArray(persons) || !Array.isArray(items)) return null;
+  const shapeOk = items.every(
+    (item) => Array.isArray(item) && (item[3] === undefined || (Array.isArray(item[3]) && item[3].every(Array.isArray))),
+  );
+  if (!shapeOk) return null;
+
   const res = {
     participants: persons,
     params: {
-      totalDiscount: totalDiscount || 0,
-      totalShipping: totalShipping || 0,
+      totalDiscount: totalDiscount === undefined ? 0 : totalDiscount,
+      totalShipping: totalShipping === undefined ? 0 : totalShipping,
     },
     items: items.map((item) => ({
       name: item[0],
       unitPrice: item[1],
       totalQty: item[2],
       assignments: (item[3] || []).map((a) => ({
-        person: persons[a[0]],
+        // An index that is not a valid position stays undefined and fails validation.
+        person: Number.isInteger(a[0]) ? persons[a[0]] : undefined,
         qty: a[1],
       })),
     })),
   };
-  if (Array.isArray(compact[4]) && compact[4].length >= 3) {
-    const [bank, accountNumber, accountName] = compact[4];
+  if (pay !== undefined && pay !== null) {
+    if (!Array.isArray(pay) || pay.length < 3) return null;
+    const [bank, accountNumber, accountName] = pay;
     if (bank || accountNumber || accountName) {
-      res.payment = {
-        bank: bank || '',
-        accountNumber: accountNumber || '',
-        accountName: accountName || '',
-      };
+      res.payment = { bank, accountNumber, accountName };
     }
   }
-  return res;
+  return validateSnapshot(res) ? res : null;
 }
 
 /**

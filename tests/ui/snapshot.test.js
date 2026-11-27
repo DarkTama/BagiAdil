@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect } from 'vitest';
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 import {
   aggregateByPerson,
   buildSnapshot,
   computeSplit,
   encodeSnapshot,
   decodeSnapshot,
+  validateSnapshot,
 } from '../../src/ui/snapshot.js';
 
 describe('snapshot encode/decode', () => {
@@ -235,5 +237,52 @@ describe('aggregateByPerson / computeSplit (single compute path)', () => {
     });
     expect(out.result).toBeNull();
     expect(out.itemsMap.Ani).toHaveLength(1);
+  });
+});
+
+describe('versioned share links and validation (L1, L2)', () => {
+  const link = (compact) => compressToEncodedURIComponent(JSON.stringify(compact));
+  const good = { participants: ['Ani'], params: { totalDiscount: 0, totalShipping: 0 },
+    items: [{ name: 'A', unitPrice: 1000, totalQty: 2, assignments: [{ person: 'Ani', qty: 1 }] }] };
+
+  it('encodes v2 and round-trips', () => {
+    const enc = encodeSnapshot(good);
+    expect(JSON.parse(decompressFromEncodedURIComponent(enc))[0]).toBe(2);
+    expect(decodeSnapshot(enc).items).toEqual(good.items);
+  });
+
+  it('still decodes a legacy v1 compact link', () => {
+    const snap = decodeSnapshot(link([['Ani'], 0, 0, [['A', 1000, 1, [[0, 1]]]]]));
+    expect(snap.participants).toEqual(['Ani']);
+  });
+
+  it('rejects an unknown future version', () => {
+    expect(decodeSnapshot(link([3, ['Ani'], 0, 0, [['A', 1000, 1, [[0, 1]]]]]))).toBeNull();
+  });
+
+  it('rejects an out-of-range person index', () => {
+    expect(decodeSnapshot(link([2, ['Ani'], 0, 0, [['A', 1000, 1, [[5, 1]]]]]))).toBeNull();
+  });
+
+  it('rejects a negative discount', () => {
+    expect(decodeSnapshot(link([2, ['Ani'], -50000, 0, [['A', 1000, 1, [[0, 1]]]]]))).toBeNull();
+  });
+
+  it('rejects a string price', () => {
+    expect(decodeSnapshot(link([2, ['Ani'], 0, 0, [['A', '20000', 1, [[0, 1]]]]]))).toBeNull();
+  });
+
+  it('rejects assigned quantity above totalQty', () => {
+    expect(decodeSnapshot(link([2, ['Ani'], 0, 0, [['A', 1000, 1, [[0, 2]]]]]))).toBeNull();
+  });
+
+  it('accepts free (Rp 0) items and a payment block; rejects non-string payment', () => {
+    expect(validateSnapshot({ ...good, items: [{ ...good.items[0], unitPrice: 0 }] })).toBe(true);
+    expect(validateSnapshot({ ...good, payment: { bank: 'BCA', accountNumber: '1', accountName: '' } })).toBe(true);
+    expect(validateSnapshot({ ...good, payment: { bank: 1, accountNumber: '1', accountName: '' } })).toBe(false);
+  });
+
+  it('buildSnapshot stamps v: 1', () => {
+    expect(buildSnapshot(['A'], { totalDiscount: 0, totalShipping: 0 }, []).v).toBe(1);
   });
 });
