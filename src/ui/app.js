@@ -26,10 +26,14 @@ import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
 import { putReceipt, pruneReceipts } from './image-store.js';
 import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
-import { getSession, subscribe, update, setCalculated } from './session.js';
+import { getSession, subscribe, update, setCalculated, resetSession, editorChanged } from './session.js';
 import { showToast } from './toast.js';
 import { initGuide } from './guide.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
+
+// Re-entrancy guard (not state): true while applySnapshot / OCR populate write
+// the editor programmatically, so their intermediate states are not tracked.
+let applying = false;
 
 /**
  * Initialize the entire app UI.
@@ -70,6 +74,7 @@ export function initApp() {
     onChange: (participants) => {
       tableUpdateParticipants(participants);
       saveParticipants(participants);
+      onEditorChange();
     },
   });
 
@@ -78,7 +83,7 @@ export function initApp() {
     onAddItem: (item) => tableAddItems([item]),
   });
 
-  initBillParams(billParamsEl);
+  initBillParams(billParamsEl, { onChange: onEditorChange });
 
   // Initialize table assigner
   initTableAssigner(tableAssignerEl, {
@@ -161,12 +166,16 @@ function updateAllTranslations() {
  */
 function render(state = getSession()) {
   const resultsEl = document.querySelector('#results .section-content');
-  if (resultsEl && state.calc) {
-    renderResults(state.calc.result, resultsEl, state.calc.itemsMap, {
-      paid: state.paid,
-      onTogglePaid: handleTogglePaid,
-      payment: getPaymentInfo(),
-    });
+  if (resultsEl) {
+    if (state.calc) {
+      renderResults(state.calc.result, resultsEl, state.calc.itemsMap, {
+        paid: state.paid,
+        onTogglePaid: handleTogglePaid,
+        payment: getPaymentInfo(),
+      });
+    } else {
+      resultsEl.innerHTML = '';
+    }
   }
   const exportSection = document.querySelector('#export-section');
   if (exportSection) exportSection.hidden = !state.calc;
@@ -199,6 +208,7 @@ function setMode(mode) {
 }
 
 function handleTableStateChange(state) {
+  onEditorChange();
   // The Calculate button stays clickable at all times - clicking it while the
   // split is incomplete surfaces a toast explaining what is missing, rather
   // than silently doing nothing (a disabled button gives no feedback).
@@ -218,6 +228,37 @@ function handleTableStateChange(state) {
     statusEl.textContent = t('table.itemsRemaining').replace('{n}', state.remainingCount);
     statusEl.className = 'status-warning';
   }
+}
+
+/** Snapshot of what the editor currently holds. */
+function readEditor() {
+  return buildSnapshot(getParticipants(), getParams(), getTableState().items, getPaymentInfo());
+}
+
+function whileApplying(write) {
+  applying = true;
+  try {
+    write();
+  } finally {
+    applying = false;
+  }
+}
+
+/**
+ * The only programmatic editor writer for whole snapshots. Participants go
+ * first, because updateParticipants strips assignments of unknown names.
+ */
+function applySnapshot(snap) {
+  whileApplying(() => {
+    setParticipants(snap.participants || []);
+    tableLoadItems(snap.items || []);
+    setParams(snap.params || { totalDiscount: 0, totalShipping: 0 });
+  });
+}
+
+function onEditorChange() {
+  if (applying) return;
+  editorChanged(readEditor());
 }
 
 function handleOCRResult(ocrResult) {
@@ -246,17 +287,15 @@ function handleOCRResult(ocrResult) {
 }
 
 function populateFromOCR(data, receiptBlob = null) {
-  // A freshly scanned receipt starts a new split, not an edit of a saved one.
-  update({ historyId: null, receiptBlob, paid: {} });
-
   // Clear existing items before adding OCR items (prevents duplicates on re-confirm)
-  tableClearItems();
+  whileApplying(() => {
+    tableClearItems();
+    tableAddItemsFromOCR(data.items);
+    setParams({ totalDiscount: data.discount, totalShipping: data.deliveryFee });
+  });
 
-  // Add items to table assigner from OCR
-  tableAddItemsFromOCR(data.items);
-
-  // Set bill parameters
-  setParams({ totalDiscount: data.discount, totalShipping: data.deliveryFee });
+  // A freshly scanned receipt starts a new split, not an edit of a saved one.
+  resetSession({ receiptBlob });
 
   // Switch to manual mode so the user can see participants/params.
   setMode('manual');
@@ -268,7 +307,6 @@ function handleCalculate() {
 
   const participants = getParticipants();
   const state = getTableState();
-  const params = getParams();
 
   // Validate
   const errors = [];
@@ -289,8 +327,7 @@ function handleCalculate() {
   }
 
   // Compute through the single shared path (same as history and the shared view).
-  const payment = getPaymentInfo();
-  const snapshot = buildSnapshot(participants, params, state.items, payment);
+  const snapshot = readEditor();
   const { result, itemsMap } = computeSplit(snapshot);
   if (!result) {
     // Every subtotal is Rp 0 (free items only): nobody pays anything.
@@ -304,7 +341,10 @@ function handleCalculate() {
   saveParticipants(participants);
   saveToHistory();
 
-  // Scroll to results
+  scrollToResults();
+}
+
+function scrollToResults() {
   const resultsSection = document.querySelector('#results');
   if (resultsSection) {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -364,25 +404,36 @@ function handleTogglePaid(name, isPaid) {
 }
 
 /**
- * Restore a saved split into the editor and recalculate it.
+ * Show results for what the editor currently holds, when it is complete.
+ * Always computed from the editor (never from a stored entry), so the results
+ * match what is on screen. No history write, toast or scroll.
+ */
+function showCalculated() {
+  const { items, allAssigned } = getTableState();
+  if (getParticipants().length === 0 || items.length === 0 || !allAssigned) return;
+  const snapshot = readEditor();
+  const out = computeSplit(snapshot);
+  if (out.result) setCalculated(snapshot, out);
+}
+
+/**
+ * Restore a saved split into the editor and show its result. Read-only: the
+ * history entry is not re-saved.
  * @param {object} entry - history entry (snapshot + id/label)
  */
 function loadSplit(entry) {
-  // Restore participants first so the table assigner knows the names.
-  setParticipants(entry.participants || []);
-  tableLoadItems(entry.items || []);
-  setParams(entry.params || { totalDiscount: 0, totalShipping: 0 });
+  applySnapshot(entry);
   if (entry.payment) {
     setPaymentInfo(entry.payment);
   }
   // Loading a saved split is not a new scan - keep its stored receipt as-is.
-  update({ historyId: entry.id || null, receiptBlob: null, paid: entry.paid || {} });
+  resetSession({ historyId: entry.id || null, paid: entry.paid || {} });
 
   // Switch to manual mode so the editor is visible.
   setMode('manual');
 
-  // Recalculate so the result is shown immediately.
-  handleCalculate();
+  showCalculated();
+  scrollToResults();
 }
 
 /**
