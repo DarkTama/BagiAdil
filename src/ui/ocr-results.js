@@ -4,11 +4,12 @@
  */
 
 import { t } from '../i18n/index.js';
+import { formatCurrency } from '../engine/formatter.js';
 
 /**
  * Render OCR results with editable fields and confidence badges.
  * @param {{items: Array<{name: string, quantity: number, price: number, total: number}>, subtotal: number, discount: number, deliveryFee: number, platform: string}} parsedData
- * @param {{overall: number, level: string, issues: Array<{key: string, n?: number}>}} confidence
+ * @param {{overall: number, level: string, issues: Array<{key: string, n?: number, itemsTotal?: number, subtotal?: number, diff?: number}>}} confidence
  * @param {HTMLElement} containerEl
  * @param {function} onConfirm - Callback receiving confirmed/corrected data
  */
@@ -45,7 +46,7 @@ export function renderOCRResults(parsedData, confidence, containerEl, onConfirm)
         <span class="confidence-badge ${badgeClass}">
           ${t('ocr.confidence').replace('{n}', confidence.overall).replace('{level}', confidenceLabel)}
         </span>
-        ${confidence.issues.length > 0 ? `<ul class="confidence-issues">${confidence.issues.map((i) => `<li>${escapeHtml(t(i.key).replace('{n}', i.n))}</li>`).join('')}</ul>` : ''}
+        ${confidence.issues.length > 0 ? `<ul class="confidence-issues">${confidence.issues.map((i) => `<li>${escapeHtml(formatIssue(i))}</li>`).join('')}</ul>` : ''}
       </div>
       <div class="ocr-platform">
         <span>${t('ocr.platform')}: <strong>${escapeHtml(parsedData.platform)}</strong></span>
@@ -104,6 +105,23 @@ function collectCorrectedData(containerEl, originalData) {
     deliveryFee,
     platform: originalData.platform,
   };
+}
+
+function formatIssue(issue) {
+  let msg = t(issue.key);
+  if (issue.n !== undefined) {
+    msg = msg.replace('{n}', issue.n);
+  }
+  if (issue.itemsTotal !== undefined) {
+    msg = msg.replace('{itemsTotal}', formatCurrency(issue.itemsTotal));
+  }
+  if (issue.subtotal !== undefined) {
+    msg = msg.replace('{subtotal}', formatCurrency(issue.subtotal));
+  }
+  if (issue.diff !== undefined) {
+    msg = msg.replace('{diff}', formatCurrency(issue.diff));
+  }
+  return msg;
 }
 
 function escapeHtml(str) {

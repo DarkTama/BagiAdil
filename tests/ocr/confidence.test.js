@@ -142,4 +142,49 @@ describe('Confidence scoring', () => {
     expect(result.overall).toBeLessThanOrEqual(100);
     expect(result.overall).toBeGreaterThanOrEqual(0);
   });
+
+  it('flags subtotal mismatch and caps confidence below high', () => {
+    const parsedResult = {
+      items: [
+        { name: 'Paket Geprek Mentai B', quantity: 1, price: 34100, total: 34100 },
+        { name: 'Paket Geprek B', quantity: 1, price: 32700, total: 32700 },
+        { name: 'Es Susu Kurma', quantity: 1, price: 25000, total: 25000 },
+      ],
+      subtotal: 101400,
+      discount: 50000,
+      deliveryFee: 7500,
+    };
+
+    const res82 = scoreConfidence(82, parsedResult);
+    expect(res82.overall).toBeLessThanOrEqual(75);
+    expect(res82.level).toBe('medium');
+    expect(res82.issues).toContainEqual({
+      key: 'confidence.subtotalMismatch',
+      itemsTotal: 91800,
+      subtotal: 101400,
+      diff: 9600,
+    });
+
+    const res98 = scoreConfidence(98, parsedResult);
+    expect(res98.overall).toBeLessThanOrEqual(75);
+    expect(res98.level).toBe('medium');
+  });
+
+  it('awards high confidence with no mismatch issue when items sum equals subtotal', () => {
+    const result = scoreConfidence(85, {
+      items: [
+        { name: 'Paket Geprek Mentai B', quantity: 1, price: 34100, total: 34100 },
+        { name: 'Cream Soup', quantity: 1, price: 9600, total: 9600 },
+        { name: 'Paket Geprek B', quantity: 1, price: 32700, total: 32700 },
+        { name: 'Es Susu Kurma', quantity: 1, price: 25000, total: 25000 },
+      ],
+      subtotal: 101400,
+      discount: 50000,
+      deliveryFee: 7500,
+    });
+
+    expect(result.level).toBe('high');
+    expect(result.overall).toBeGreaterThanOrEqual(80);
+    expect(result.issues).toEqual([]);
+  });
 });

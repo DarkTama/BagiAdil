@@ -31,6 +31,10 @@ export function parseShopeeReceipt(text) {
   const legacyItemPatternA = /^(.+?)\s+x(\d+)\s+((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
   // Legacy pattern: "Item Name  Rp XX.XXX" (qty=1 implied)
   const legacyItemPatternB = /^(.+?)\s+((?:[Rr]p\.?\s*)[\d.,]+)\s*$/;
+  // Split-line helpers when OCR separates the Rp price onto an adjacent line
+  const standalonePricePattern = /^Rp\.?\s*[\d.,]+$/i;
+  const nextLineAmountPattern = /^-?\s*(?:[Rr]p\.?\s*)?[\d.,]+$/;
+  const splitItemPattern = /^(?:\S{1,4}\s+)?(\d+)\s*x\s+(.+?)\s*$/i;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -45,8 +49,9 @@ export function parseShopeeReceipt(text) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         subtotal = parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
+      } else if (i + 1 < lines.length && nextLineAmountPattern.test(lines[i + 1])) {
         subtotal = parsePrice(lines[i + 1]);
+        i++;
       }
       continue;
     }
@@ -56,8 +61,9 @@ export function parseShopeeReceipt(text) {
       const priceMatch = line.match(/(-?\s*(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         discount = parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
+      } else if (i + 1 < lines.length && nextLineAmountPattern.test(lines[i + 1])) {
         discount = parsePrice(lines[i + 1]);
+        i++;
       }
       continue;
     }
@@ -67,8 +73,9 @@ export function parseShopeeReceipt(text) {
       const priceMatch = line.match(/((?:-?\s*)?(?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         deliveryFee += parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
+      } else if (i + 1 < lines.length && nextLineAmountPattern.test(lines[i + 1])) {
         deliveryFee += parsePrice(lines[i + 1]);
+        i++;
       }
       continue;
     }
@@ -78,8 +85,9 @@ export function parseShopeeReceipt(text) {
       const priceMatch = line.match(/((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/);
       if (priceMatch) {
         deliveryFee += parsePrice(priceMatch[1]);
-      } else if (i + 1 < lines.length) {
+      } else if (i + 1 < lines.length && nextLineAmountPattern.test(lines[i + 1])) {
         deliveryFee += parsePrice(lines[i + 1]);
+        i++;
       }
       continue;
     }
@@ -89,6 +97,29 @@ export function parseShopeeReceipt(text) {
       continue;
     }
 
+    // Split Case A: standalone price line immediately before "qty x Name"
+    if (standalonePricePattern.test(line) && i + 1 < lines.length) {
+      const nextLine = lines[i + 1];
+      if (
+        !isSkipOrSummaryLine(nextLine) &&
+        !realItemPattern.test(nextLine) &&
+        !legacyItemPatternA.test(nextLine) &&
+        !legacyItemPatternB.test(nextLine)
+      ) {
+        const splitMatch = splitItemPattern.exec(nextLine);
+        if (splitMatch) {
+          const qty = parseInt(splitMatch[1], 10);
+          const name = splitMatch[2].trim();
+          const total = parsePrice(line);
+          if (qty > 0 && name.length > 1 && total >= 1000) {
+            items.push({ name, quantity: qty, price: Math.round(total / qty), total });
+            i++;
+            continue;
+          }
+        }
+      }
+    }
+
     // Try primary real receipt pattern: "3 x  Item Name  Rp77.100"
     // The Rp value on Shopee receipts is the LINE TOTAL, not the unit price.
     const realMatch = realItemPattern.exec(line);
@@ -96,9 +127,11 @@ export function parseShopeeReceipt(text) {
       const qty = parseInt(realMatch[1], 10);
       const name = realMatch[2].trim();
       const total = parsePrice(realMatch[3]);
-      const price = Math.round(total / qty);
-      items.push({ name, quantity: qty, price, total });
-      continue;
+      if (qty > 0) {
+        const price = Math.round(total / qty);
+        items.push({ name, quantity: qty, price, total });
+        continue;
+      }
     }
 
     // Try legacy pattern with quantity: "Item Name  x2  Rp 25.000"
@@ -121,6 +154,19 @@ export function parseShopeeReceipt(text) {
       }
       continue;
     }
+
+    // Split Case B: "qty x Name" followed by standalone "Rp..." on next line
+    const splitMatchB = splitItemPattern.exec(line);
+    if (splitMatchB && i + 1 < lines.length && standalonePricePattern.test(lines[i + 1])) {
+      const qty = parseInt(splitMatchB[1], 10);
+      const name = splitMatchB[2].trim();
+      const total = parsePrice(lines[i + 1]);
+      if (qty > 0 && name.length > 1 && total >= 1000) {
+        items.push({ name, quantity: qty, price: Math.round(total / qty), total });
+        i++;
+        continue;
+      }
+    }
   }
 
   return {
@@ -130,4 +176,16 @@ export function parseShopeeReceipt(text) {
     deliveryFee,
     platform: 'shopeefood',
   };
+}
+
+function isSkipOrSummaryLine(line) {
+  return (
+    /^\[/.test(line) ||
+    /\[\s*\]/.test(line) ||
+    /subtotal\s*pesanan|^subtotal/i.test(line) ||
+    /voucher\s*diskon|diskon\s*shopeefood|^diskon|^voucher/i.test(line) ||
+    (/biaya|^tip\b/i.test(line) && !/total/i.test(line)) ||
+    /^(ongkir|delivery)/i.test(line) ||
+    /^(rincian\s*pesanan|total\s*harga)/i.test(line)
+  );
 }
