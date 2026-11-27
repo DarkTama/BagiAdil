@@ -8,6 +8,7 @@ import {
   clearItems,
 } from '../../src/ui/table-assigner.js';
 import { initBillParams, getParams, setParams } from '../../src/ui/bill-params.js';
+import { renderOCRResults } from '../../src/ui/ocr-results.js';
 
 describe('OCR Populate', () => {
   let tableEl;
@@ -181,6 +182,47 @@ describe('OCR Populate', () => {
       const params = getParams();
       expect(params.totalDiscount).toBe(5000);
       expect(params.totalShipping).toBe(8000);
+    });
+  });
+
+  describe('renderOCRResults confidence issues', () => {
+    it('formats subtotalMismatch placeholders as Rupiah amounts', () => {
+      const container = document.createElement('div');
+      renderOCRResults(
+        {
+          items: [
+            { name: 'Paket Geprek Mentai B', quantity: 1, price: 34100, total: 34100 },
+            { name: 'Paket Geprek B', quantity: 1, price: 32700, total: 32700 },
+            { name: 'Es Susu Kurma', quantity: 1, price: 25000, total: 25000 },
+          ],
+          subtotal: 101400,
+          discount: 50000,
+          deliveryFee: 7500,
+          platform: 'shopeefood',
+        },
+        {
+          overall: 75,
+          level: 'medium',
+          issues: [
+            {
+              key: 'confidence.subtotalMismatch',
+              itemsTotal: 91800,
+              subtotal: 101400,
+              diff: 9600,
+            },
+          ],
+        },
+        container,
+        () => {},
+      );
+
+      const issuesText = container.querySelector('.confidence-issues')?.textContent || '';
+      expect(issuesText).toContain('Rp 91.800');
+      expect(issuesText).toContain('Rp 9.600');
+      expect(issuesText).toContain('Rp 101.400');
+      expect(issuesText).not.toContain('{itemsTotal}');
+      expect(issuesText).not.toContain('{diff}');
+      expect(issuesText).not.toContain('{subtotal}');
     });
   });
 });

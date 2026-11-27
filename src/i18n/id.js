@@ -140,6 +140,8 @@ const id = {
   'ocr.platform': 'Platform',
   'confidence.noItems': 'Tidak ada item terdeteksi',
   'confidence.noSubtotal': 'Subtotal tidak terdeteksi',
+  'confidence.subtotalMismatch':
+    'Total item terdeteksi ({itemsTotal}) beda {diff} dari subtotal struk ({subtotal}) — kemungkinan ada item yang terlewat',
   'confidence.unusualPrices': '{n} item punya harga tidak wajar',
   'export.copied': 'Tersalin!',
   'export.copyFailed': 'Gagal menyalin ke clipboard',

@@ -227,6 +227,71 @@ Tip untuk Driver  Rp2.000`;
     expect(result.discount).toBe(20440);
     expect(result.deliveryFee).toBe(12500); // 3000 + 3500 + 4000 + 2000 tip
   });
+
+  it('pairs split standalone price before "qty x Name" on ShopeeFood OCR output', () => {
+    const text = `Rincian Pesanan Ubah
+go 1 x Paket Geprek Mentai B Rp34.100
+wr
+>. Rp9.600
+@ 1x Cream Soup Pp
+—.. 1x Paket Geprek B Rp32.700
+Nasi
+“= _ 1x Es Susu Kurma Rp25.000
+Subtotal Pesanan (4 menu) Rp101.400
+Voucher Diskon -Rp50.000
+Biaya Pengiriman @ Se RpO
+Biaya Layanan © Rp3.500
+Biaya Pengemasan Rp4.000
+Rp58.900
+Sudah termasuk pajak`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items).toHaveLength(4);
+    expect(result.items.map((item) => item.total)).toEqual([34100, 9600, 32700, 25000]);
+    expect(result.items[1]).toEqual({
+      name: 'Cream Soup Pp',
+      quantity: 1,
+      price: 9600,
+      total: 9600,
+    });
+    expect(result.subtotal).toBe(101400);
+    expect(result.discount).toBe(50000);
+    expect(result.deliveryFee).toBe(7500);
+  });
+
+  it('pairs "qty x Name" followed by standalone Rp price on the next line', () => {
+    const text = `Rincian Pesanan
+1 x Cream Soup
+Rp9.600
+Subtotal Pesanan (1 menu) Rp9.600`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      name: 'Cream Soup',
+      quantity: 1,
+      price: 9600,
+      total: 9600,
+    });
+  });
+
+  it('ignores orphan Rp prices before non-item lines or complete item lines', () => {
+    const text = `Rincian Pesanan
+Rp9.600
+1 x Paket Geprek B Rp32.700
+Rp58.900
+Sudah termasuk pajak
+Subtotal Pesanan (1 menu) Rp32.700`;
+
+    const result = parseShopeeReceipt(text);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      name: 'Paket Geprek B',
+      quantity: 1,
+      price: 32700,
+      total: 32700,
+    });
+  });
 });
 
 describe('GoFood real receipt parser', () => {
