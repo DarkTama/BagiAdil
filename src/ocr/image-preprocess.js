@@ -1,10 +1,10 @@
 /**
  * OCR image preprocessing.
  * Keeps clean full-contrast screenshots in color (returning the original file
- * unchanged when already within maxDimension) and converts low-contrast photos
- * to grayscale with a contrast stretch for Tesseract. It is always safe to
- * call: non-images, failures, and unsupported environments return the
- * original file unchanged.
+ * unchanged when within maxDimension, or downscaling as lossless PNG) and
+ * converts low-contrast photos to grayscale with a contrast stretch for
+ * Tesseract. It is always safe to call: non-images, failures, and unsupported
+ * environments return the original file unchanged.
  */
 
 /**
@@ -12,10 +12,10 @@
  * grayscale + contrast stretch only for low-contrast photos.
  * @param {File|Blob} file - The uploaded image.
  * @param {object} [options]
- * @param {number} [options.maxDimension=2000] - Longest-edge cap in pixels.
+ * @param {number} [options.maxDimension=2800] - Longest-edge cap in pixels.
  * @returns {Promise<File|Blob>} The processed blob, or the original file.
  */
-export async function preprocessForOCR(file, { maxDimension = 2000 } = {}) {
+export async function preprocessForOCR(file, { maxDimension = 2800 } = {}) {
   if (!file || !file.type || !file.type.startsWith('image/')) {
     return file;
   }
@@ -61,12 +61,12 @@ export async function preprocessForOCR(file, { maxDimension = 2000 } = {}) {
     if (!needsContrastStretch) {
       // Clean full-contrast screenshots perform worse in Tesseract when forced
       // to grayscale; return the original file if no downscaling was needed,
-      // or encode the full-color downscaled canvas.
+      // or encode the full-color downscaled canvas as lossless PNG.
       if (scale === 1) {
         return file;
       }
       const blob = await new Promise((resolve) => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+        canvas.toBlob(resolve, 'image/png');
       });
       return blob || file;
     }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { scoreConfidence } from '../../src/ocr/confidence.js';
+import {
+  scoreConfidence,
+  needsOCRRetry,
+  isBetterOCRResult,
+} from '../../src/ocr/confidence.js';
 
 describe('Confidence scoring', () => {
   it('returns high confidence for good OCR and complete parsing', () => {
@@ -143,7 +147,7 @@ describe('Confidence scoring', () => {
     expect(result.overall).toBeGreaterThanOrEqual(0);
   });
 
-  it('flags subtotal mismatch and caps confidence below high', () => {
+  it('flags subtotalUnder when items total is below receipt subtotal and caps confidence below high', () => {
     const parsedResult = {
       items: [
         { name: 'Paket Geprek Mentai B', quantity: 1, price: 34100, total: 34100 },
@@ -159,7 +163,7 @@ describe('Confidence scoring', () => {
     expect(res82.overall).toBeLessThanOrEqual(75);
     expect(res82.level).toBe('medium');
     expect(res82.issues).toContainEqual({
-      key: 'confidence.subtotalMismatch',
+      key: 'confidence.subtotalUnder',
       itemsTotal: 91800,
       subtotal: 101400,
       diff: 9600,
@@ -168,6 +172,30 @@ describe('Confidence scoring', () => {
     const res98 = scoreConfidence(98, parsedResult);
     expect(res98.overall).toBeLessThanOrEqual(75);
     expect(res98.level).toBe('medium');
+  });
+
+  it('flags subtotalOver when items total exceeds receipt subtotal and caps confidence below high', () => {
+    const parsedResult = {
+      items: [
+        { name: 'Paket Geprek Mentai B', quantity: 1, price: 34100, total: 34100 },
+        { name: 'Cream Soup', quantity: 1, price: 39600, total: 39600 },
+        { name: 'Paket Geprek B', quantity: 1, price: 32700, total: 32700 },
+        { name: 'Es Susu Kurma', quantity: 1, price: 25000, total: 25000 },
+      ],
+      subtotal: 101400,
+      discount: 50000,
+      deliveryFee: 7500,
+    };
+
+    const res = scoreConfidence(88, parsedResult);
+    expect(res.overall).toBeLessThanOrEqual(75);
+    expect(res.level).toBe('medium');
+    expect(res.issues).toContainEqual({
+      key: 'confidence.subtotalOver',
+      itemsTotal: 131400,
+      subtotal: 101400,
+      diff: 30000,
+    });
   });
 
   it('awards high confidence with no mismatch issue when items sum equals subtotal', () => {
@@ -186,5 +214,64 @@ describe('Confidence scoring', () => {
     expect(result.level).toBe('high');
     expect(result.overall).toBeGreaterThanOrEqual(80);
     expect(result.issues).toEqual([]);
+  });
+});
+
+describe('OCR retry helpers', () => {
+  it('needsOCRRetry returns false on exact subtotal match and true on mismatch, 0 items, or error', () => {
+    expect(
+      needsOCRRetry({
+        items: [{ name: 'A', quantity: 1, price: 10000, total: 10000 }],
+        subtotal: 10000,
+      }),
+    ).toBe(false);
+    expect(
+      needsOCRRetry({
+        items: [{ name: 'A', quantity: 1, price: 10000, total: 10000 }],
+        subtotal: 0,
+      }),
+    ).toBe(false);
+    expect(
+      needsOCRRetry({
+        items: [{ name: 'A', quantity: 1, price: 39600, total: 39600 }],
+        subtotal: 9600,
+      }),
+    ).toBe(true);
+    expect(needsOCRRetry({ items: [], subtotal: 10000 })).toBe(true);
+    expect(needsOCRRetry({ error: 'Unable to detect platform' })).toBe(true);
+  });
+
+  it('isBetterOCRResult prefers exact subtotal match, smaller diff, and never regresses to error', () => {
+    const mismatchBig = {
+      parsed: {
+        items: [{ name: 'Cream Soup', quantity: 1, price: 39600, total: 39600 }],
+        subtotal: 9600,
+      },
+      confidence: 85,
+    };
+    const mismatchSmall = {
+      parsed: {
+        items: [{ name: 'Cream Soup', quantity: 1, price: 12600, total: 12600 }],
+        subtotal: 9600,
+      },
+      confidence: 70,
+    };
+    const exactMatch = {
+      parsed: {
+        items: [{ name: 'Cream Soup', quantity: 1, price: 9600, total: 9600 }],
+        subtotal: 9600,
+      },
+      confidence: 78,
+    };
+    const errorCandidate = {
+      parsed: { error: 'fail' },
+      confidence: 0,
+    };
+
+    expect(isBetterOCRResult(exactMatch, mismatchBig)).toBe(true);
+    expect(isBetterOCRResult(mismatchBig, exactMatch)).toBe(false);
+    expect(isBetterOCRResult(mismatchSmall, mismatchBig)).toBe(true);
+    expect(isBetterOCRResult(mismatchBig, mismatchSmall)).toBe(false);
+    expect(isBetterOCRResult(errorCandidate, mismatchBig)).toBe(false);
   });
 });

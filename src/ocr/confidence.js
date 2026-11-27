@@ -41,7 +41,10 @@ export function scoreConfidence(ocrConfidence, parsedResult) {
       } else {
         hasSubtotalMismatch = true;
         issues.push({
-          key: 'confidence.subtotalMismatch',
+          key:
+            itemsSum < parsedResult.subtotal
+              ? 'confidence.subtotalUnder'
+              : 'confidence.subtotalOver',
           itemsTotal: itemsSum,
           subtotal: parsedResult.subtotal,
           diff,
@@ -91,4 +94,61 @@ export function scoreConfidence(ocrConfidence, parsedResult) {
   }
 
   return { overall, level, issues };
+}
+
+function sumParsedItems(items) {
+  return (items || []).reduce(
+    (sum, item) => sum + (item.total ?? item.price * (item.quantity || 1)),
+    0,
+  );
+}
+
+/**
+ * Return true when an OCR parse result should trigger a second-pass retry.
+ * @param {object|null|undefined} parsedResult
+ * @returns {boolean}
+ */
+export function needsOCRRetry(parsedResult) {
+  if (!parsedResult || parsedResult.error) return true;
+  if (!parsedResult.items || parsedResult.items.length === 0) return true;
+  if (parsedResult.subtotal > 0) {
+    return sumParsedItems(parsedResult.items) !== parsedResult.subtotal;
+  }
+  return false;
+}
+
+function summarizeCandidate(entry) {
+  const parsed = entry.parsed;
+  const itemCount = parsed.items ? parsed.items.length : 0;
+  const subtotal = parsed.subtotal || 0;
+  const hasSubtotal = subtotal > 0;
+  const itemsSum = sumParsedItems(parsed.items);
+  const diff = hasSubtotal && itemCount > 0 ? Math.abs(itemsSum - subtotal) : Infinity;
+  const exactMatch = hasSubtotal && itemCount > 0 && diff === 0;
+  return { itemCount, hasSubtotal, diff, exactMatch };
+}
+
+/**
+ * Return true when a retry OCR candidate strictly improves on the baseline.
+ * @param {{parsed: object, confidence?: number}} candidate
+ * @param {{parsed: object, confidence?: number}} baseline
+ * @returns {boolean}
+ */
+export function isBetterOCRResult(candidate, baseline) {
+  if (!candidate?.parsed || candidate.parsed.error) return false;
+  if (!baseline?.parsed || baseline.parsed.error) return true;
+
+  const cand = summarizeCandidate(candidate);
+  const base = summarizeCandidate(baseline);
+
+  if (cand.exactMatch !== base.exactMatch) return cand.exactMatch;
+  if ((cand.itemCount > 0) !== (base.itemCount > 0)) return cand.itemCount > 0;
+
+  if (cand.hasSubtotal && base.hasSubtotal && cand.itemCount > 0 && base.itemCount > 0) {
+    if (cand.diff !== base.diff) return cand.diff < base.diff;
+    return (candidate.confidence || 0) > (baseline.confidence || 0);
+  }
+
+  if (cand.itemCount !== base.itemCount) return cand.itemCount > base.itemCount;
+  return (candidate.confidence || 0) > (baseline.confidence || 0);
 }

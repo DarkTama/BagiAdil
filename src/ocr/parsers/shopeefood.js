@@ -24,9 +24,9 @@ export function parseShopeeReceipt(text) {
   let deliveryFee = 0;
 
   // Primary pattern for real receipts: "1 x  Item Name  Rp47.600"
-  // Item thumbnails OCR as a short junk token before the qty ("dl 3x ...",
-  // "d 1x ...") - tolerate one token of up to 4 chars there.
-  const realItemPattern = /^(?:\S{1,4}\s+)?(\d+)\s*x\s+(.+?)\s+(Rp[\d.,]+)\s*$/i;
+  // Item thumbnails OCR as up to two short junk tokens before the qty
+  // ("dl 3x ...", "os < 1 x ...", "E> <4 1x ...").
+  const realItemPattern = /^(?:(?:\S{1,4}\s+){1,2})?(\d+)\s*x\s+(.+?)\s+(Rp[\d.,]+)\s*$/i;
   // Legacy pattern: "Item Name  xQty  Price" or "Item Name  x2  Rp 25.000"
   const legacyItemPatternA = /^(.+?)\s+x(\d+)\s+((?:[Rr]p\.?\s*)?[\d.,]+)\s*$/;
   // Legacy pattern: "Item Name  Rp XX.XXX" (qty=1 implied)
@@ -34,7 +34,7 @@ export function parseShopeeReceipt(text) {
   // Split-line helpers when OCR separates the Rp price onto an adjacent line
   const standalonePricePattern = /^Rp\.?\s*[\d.,]+$/i;
   const nextLineAmountPattern = /^-?\s*(?:[Rr]p\.?\s*)?[\d.,]+$/;
-  const splitItemPattern = /^(?:\S{1,4}\s+)?(\d+)\s*x\s+(.+?)\s*$/i;
+  const splitItemPattern = /^(?:(?:\S{1,4}\s+){1,2})?(\d+)\s*x\s+(.+?)\s*$/i;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

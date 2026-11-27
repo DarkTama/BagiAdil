@@ -209,6 +209,29 @@ export function initUpload(containerEl, onComplete) {
         const { processImage, terminateOCR } = await import('../ocr/ocr-engine.js');
         result = await processImage(ocrInput, onProgress);
 
+        if (result && !result.error) {
+          const [{ parseReceipt }, { needsOCRRetry, isBetterOCRResult }] = await Promise.all([
+            import('../ocr/parsers/index.js'),
+            import('../ocr/confidence.js'),
+          ]);
+          const parsed1 = parseReceipt(result.text);
+          if (needsOCRRetry(parsed1)) {
+            const retryInput = ocrInput !== file ? file : ocrInput;
+            const retryResult = await processImage(retryInput, onProgress, { psm: '6' });
+            if (retryResult && !retryResult.error) {
+              const parsed2 = parseReceipt(retryResult.text);
+              if (
+                isBetterOCRResult(
+                  { parsed: parsed2, confidence: retryResult.confidence },
+                  { parsed: parsed1, confidence: result.confidence },
+                )
+              ) {
+                result = retryResult;
+              }
+            }
+          }
+        }
+
         // Terminate the worker after processing to free resources
         await terminateOCR();
       }
