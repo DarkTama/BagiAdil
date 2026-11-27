@@ -58,6 +58,7 @@ async function create(request, env, url) {
   // Browsers always send Origin on a POST; refuse other sites' pages.
   const origin = request.headers.get('origin');
   if (origin && origin !== url.origin) return json({ error: 'origin' }, 403);
+  if (!env?.SHARES) return json({ error: 'unavailable' }, 503);
 
   const body = await readCapped(request);
   if (body === null) return json({ error: 'too_large' }, 413);
@@ -71,7 +72,7 @@ async function create(request, env, url) {
 }
 
 async function open(id, env) {
-  const payload = id ? await env.SHARES.get(id) : null;
+  const payload = id && env?.SHARES ? await env.SHARES.get(id) : null;
   // A missing or expired link lands on "#share=" with nothing after it, which
   // the app already reports as an invalid link.
   const target = `/#share=${payload || ''}`;

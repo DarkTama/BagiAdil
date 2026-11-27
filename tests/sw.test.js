@@ -119,4 +119,19 @@ describe('service worker behaviour', () => {
     expect(respondWith).not.toHaveBeenCalled();
     expect(cache.put).not.toHaveBeenCalled();
   });
+
+  it('does not intercept /api/ or /s/ shortlink endpoints', () => {
+    const { listeners, cache } = loadWorker({ fetchImpl: vi.fn(async () => okResponse()) });
+    const respondWith = vi.fn();
+    listeners.fetch({
+      request: { method: 'GET', url: 'https://example.github.io/api/s' },
+      respondWith,
+    });
+    listeners.fetch({
+      request: { method: 'GET', url: 'https://example.github.io/s/abc123def456' },
+      respondWith,
+    });
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(cache.put).not.toHaveBeenCalled();
+  });
 });

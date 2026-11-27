@@ -66,4 +66,14 @@ describe('shortlink worker', () => {
     const res = await worker.fetch(new Request(`${ORIGIN}/index.html`), makeEnv());
     expect(await res.text()).toBe('asset');
   });
+
+  it('returns 503 on POST and 404 on GET when the KV binding is absent', async () => {
+    const noKvEnv = { ASSETS: { fetch: async () => new Response('asset') } };
+    const postRes = await worker.fetch(post(encodeSnapshot(snap)), noKvEnv);
+    expect(postRes.status).toBe(503);
+
+    const getRes = await worker.fetch(new Request(`${ORIGIN}/s/AAAAAAAAAAAA`), noKvEnv);
+    expect(getRes.status).toBe(404);
+    expect(await getRes.text()).toContain('"/#share="');
+  });
 });

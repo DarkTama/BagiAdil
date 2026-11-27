@@ -31,6 +31,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== new URL(SCOPE_URL).origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/s/')) return;
 
   event.respondWith(
     fetch(request)

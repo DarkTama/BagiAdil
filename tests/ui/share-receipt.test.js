@@ -20,11 +20,9 @@ function calculatedSplit() {
   p.dispatchEvent(new Event('input'));
   f.querySelector('.add-item-qty').value = '1';
   f.querySelector('.btn-add-item').click();
-  qa('#table-assigner tbody tr[data-item-id]')[0].querySelector('.btn-assign').click();
-  const pop = q('.assign-popup');
-  pop.querySelector('select').value = 'Ani';
-  pop.querySelector('.popup-qty-input').value = '1';
-  pop.querySelector('.btn-popup-confirm').click();
+  [...qa('#table-assigner tbody tr.chip-row')[0].querySelectorAll('.assign-chip')]
+    .find((c) => c.dataset.person === 'Ani')
+    .click();
   q('#calculate').click();
 }
 
