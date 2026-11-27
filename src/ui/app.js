@@ -26,20 +26,10 @@ import { initStorage, saveParticipants, saveHistoryEntry, loadHistory } from './
 import { initHistory, refreshHistory, updateTranslations as updateHistoryTranslations } from './history.js';
 import { putReceipt, pruneReceipts } from './image-store.js';
 import { buildSnapshot, computeSplit, decodeSnapshot } from './snapshot.js';
+import { getSession, subscribe, update, setCalculated } from './session.js';
 import { showToast } from './toast.js';
 import { initGuide } from './guide.js';
 import { t, getLocale, setLocale } from '../i18n/index.js';
-
-let currentResult = null;
-let currentItemsMap = null;
-let currentSnapshot = null;
-let currentHistoryId = null;
-// Receipt image of the most recent scan, awaiting a confirmed populate.
-let pendingReceiptBlob = null;
-// Receipt image to attach to the next saved split (set once a scan is used).
-let currentReceiptBlob = null;
-// Map of participant name -> true for those marked as paid.
-let currentPaid = {};
 
 /**
  * Initialize the entire app UI.
@@ -61,7 +51,6 @@ export function initApp() {
   const billParamsEl = document.querySelector('#bill-params .section-content');
   const addItemFormEl = document.querySelector('#add-item-form .section-content');
   const tableAssignerEl = document.querySelector('#table-assigner .section-content');
-  const resultsEl = document.querySelector('#results .section-content');
   const calculateBtn = document.querySelector('#calculate');
 
   // Initialize storage
@@ -106,13 +95,7 @@ export function initApp() {
   // Initialize export
   const exportEl = document.querySelector('#export-section .section-content');
   if (exportEl) {
-    initExport(
-      exportEl,
-      () => currentResult,
-      () => getParams(),
-      () => currentItemsMap,
-      () => currentSnapshot,
-    );
+    initExport(exportEl);
   }
 
   // Initialize split history
@@ -121,10 +104,11 @@ export function initApp() {
     initHistory(historyEl, { onLoad: loadSplit });
   }
 
+  // Results and export visibility follow the session.
+  subscribe(render);
+
   // Wire up calculate button
-  calculateBtn.addEventListener('click', () => {
-    handleCalculate(resultsEl);
-  });
+  calculateBtn.addEventListener('click', handleCalculate);
 
   // Listen for locale changes
   document.addEventListener('locale-changed', () => {
@@ -167,20 +151,25 @@ function updateAllTranslations() {
   updateTableTranslations();
   updateHistoryTranslations();
 
-  rerenderResults();
+  render();
 }
 
 /**
- * Re-render the current result. Single path so the payment box (read live from
- * the export form) is never dropped.
+ * Session subscriber: the one place results and export visibility are drawn.
+ * Also the single path that re-renders the payment box (read live from the
+ * export form), so it is never dropped.
  */
-function rerenderResults(resultsEl = document.querySelector('#results .section-content')) {
-  if (!currentResult || !resultsEl) return;
-  renderResults(currentResult, resultsEl, currentItemsMap, {
-    paid: currentPaid,
-    onTogglePaid: handleTogglePaid,
-    payment: getPaymentInfo(),
-  });
+function render(state = getSession()) {
+  const resultsEl = document.querySelector('#results .section-content');
+  if (resultsEl && state.calc) {
+    renderResults(state.calc.result, resultsEl, state.calc.itemsMap, {
+      paid: state.paid,
+      onTogglePaid: handleTogglePaid,
+      payment: getPaymentInfo(),
+    });
+  }
+  const exportSection = document.querySelector('#export-section');
+  if (exportSection) exportSection.hidden = !state.calc;
 }
 
 function initModeTabs() {
@@ -245,23 +234,20 @@ function handleOCRResult(ocrResult) {
     return;
   }
 
-  // Hold the receipt image until the user confirms and populates the split.
-  pendingReceiptBlob = ocrResult.receiptBlob || null;
-
   const parsedData = parseReceipt(ocrResult.text);
   const confidence = scoreConfidence(ocrResult.confidence, parsedData);
 
   ocrResultsSection.hidden = false;
+  // The receipt image is held by this closure until the user confirms and populates the split.
+  const receiptBlob = ocrResult.receiptBlob || null;
   renderOCRResults(parsedData, confidence, ocrResultsEl, (confirmedData) => {
-    populateFromOCR(confirmedData);
+    populateFromOCR(confirmedData, receiptBlob);
   });
 }
 
-function populateFromOCR(data) {
+function populateFromOCR(data, receiptBlob = null) {
   // A freshly scanned receipt starts a new split, not an edit of a saved one.
-  currentHistoryId = null;
-  currentReceiptBlob = pendingReceiptBlob;
-  currentPaid = {};
+  update({ historyId: null, receiptBlob, paid: {} });
 
   // Clear existing items before adding OCR items (prevents duplicates on re-confirm)
   tableClearItems();
@@ -276,7 +262,7 @@ function populateFromOCR(data) {
   setMode('manual');
 }
 
-function handleCalculate(resultsEl) {
+function handleCalculate() {
   // Clear previous errors
   clearAllErrors();
 
@@ -312,47 +298,11 @@ function handleCalculate(resultsEl) {
     return;
   }
 
-  currentResult = result;
-  currentItemsMap = itemsMap;
-  currentSnapshot = snapshot;
-
   // A brand-new split (not yet saved) starts with a clean paid state.
-  if (!currentHistoryId) {
-    currentPaid = {};
-  }
-
-  // Render results
-  rerenderResults(resultsEl);
-  updateExportVisibility(true);
-
-  // Save participants
+  if (!getSession().historyId) update({ paid: {} });
+  setCalculated(snapshot, { result, itemsMap });
   saveParticipants(participants);
-
-  // Auto-save this split to history. Reusing currentHistoryId means a
-  // reload-then-recalculate updates the same entry instead of duplicating it.
-  const historyEntry = { ...currentSnapshot };
-  if (currentHistoryId) {
-    historyEntry.id = currentHistoryId;
-  } else {
-    historyEntry.label = defaultHistoryLabel();
-  }
-  historyEntry.paid = currentPaid;
-  const savedId = saveHistoryEntry(historyEntry);
-  if (savedId) {
-    currentHistoryId = savedId;
-    // Attach the scanned receipt image to this split. Consumed once, so a later
-    // recalculation of the same entry keeps the receipt instead of clearing it.
-    if (currentReceiptBlob) {
-      putReceipt(currentHistoryId, currentReceiptBlob);
-      currentReceiptBlob = null;
-    }
-    pruneReceipts(loadHistory().map((e) => e.id));
-    refreshHistory();
-  } else {
-    // Write failed: keep the receipt blob and skip pruning, which would
-    // otherwise delete images of entries the failed write did not persist.
-    showToast(t('history.saveFailed'), 'error');
-  }
+  saveToHistory();
 
   // Scroll to results
   const resultsSection = document.querySelector('#results');
@@ -360,6 +310,33 @@ function handleCalculate(resultsEl) {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     resultsSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
   }
+}
+
+/**
+ * Auto-save the calculated split. Reusing historyId means a
+ * reload-then-recalculate updates the same entry instead of duplicating it.
+ */
+function saveToHistory() {
+  const { calc, historyId, paid, receiptBlob } = getSession();
+  const entry = { ...calc.snapshot, paid };
+  if (historyId) {
+    entry.id = historyId;
+  } else {
+    entry.label = defaultHistoryLabel();
+  }
+  const id = saveHistoryEntry(entry);
+  if (!id) {
+    // Write failed: keep the receipt blob and skip pruning, which would
+    // otherwise delete images of entries the failed write did not persist.
+    showToast(t('history.saveFailed'), 'error');
+    return;
+  }
+  // Attach the scanned receipt image to this split. Consumed once, so a later
+  // recalculation of the same entry keeps the receipt instead of clearing it.
+  if (receiptBlob) putReceipt(id, receiptBlob);
+  update({ historyId: id, receiptBlob: null });
+  pruneReceipts(loadHistory().map((e) => e.id));
+  refreshHistory();
 }
 
 function defaultHistoryLabel() {
@@ -372,16 +349,18 @@ function defaultHistoryLabel() {
  * @param {boolean} isPaid
  */
 function handleTogglePaid(name, isPaid) {
+  const next = { ...getSession().paid };
   if (isPaid) {
-    currentPaid[name] = true;
+    next[name] = true;
   } else {
-    delete currentPaid[name];
+    delete next[name];
   }
-  if (currentHistoryId) {
-    saveHistoryEntry({ id: currentHistoryId, paid: currentPaid });
+  update({ paid: next });
+  const { historyId } = getSession();
+  if (historyId) {
+    saveHistoryEntry({ id: historyId, paid: next });
     refreshHistory();
   }
-  rerenderResults();
 }
 
 /**
@@ -396,17 +375,14 @@ function loadSplit(entry) {
   if (entry.payment) {
     setPaymentInfo(entry.payment);
   }
-  currentHistoryId = entry.id || null;
   // Loading a saved split is not a new scan - keep its stored receipt as-is.
-  currentReceiptBlob = null;
-  currentPaid = entry.paid || {};
+  update({ historyId: entry.id || null, receiptBlob: null, paid: entry.paid || {} });
 
   // Switch to manual mode so the editor is visible.
   setMode('manual');
 
   // Recalculate so the result is shown immediately.
-  const resultsEl = document.querySelector('#results .section-content');
-  handleCalculate(resultsEl);
+  handleCalculate();
 }
 
 /**
@@ -475,13 +451,6 @@ function renderSharedView(snapshot) {
     el.textContent = t(el.dataset.i18n);
   });
   renderShared();
-}
-
-function updateExportVisibility(show) {
-  const exportSection = document.querySelector('#export-section');
-  if (exportSection) {
-    exportSection.hidden = !show;
-  }
 }
 
 function showValidationErrors(errors) {
