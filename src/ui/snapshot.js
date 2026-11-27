@@ -59,7 +59,11 @@ export function buildSnapshot(participants, params, items, payment = null) {
  * @returns {{result: object, itemsMap: object}}
  */
 export function computeSplit(snapshot) {
+  // Seed in participant order so the rounding tie-break matches the host screen.
   const assignments = {};
+  (snapshot.participants || []).forEach((p) => {
+    assignments[p] = { items: [], subtotal: 0 };
+  });
   (snapshot.items || []).forEach((item) => {
     (item.assignments || []).forEach((a) => {
       if (!assignments[a.person]) {
@@ -111,13 +115,20 @@ function fromBase64Url(str) {
  *   [ persons, totalDiscount, totalShipping,
  *     [ [name, unitPrice, totalQty, [ [personIdx, qty], ... ]], ... ] ]
  * Only participants referenced by an item assignment are included (people
- * who ordered nothing never appear in the shared result), then the JSON is
+ * who ordered nothing never appear in the shared result), in participant
+ * order, then the JSON is
  * compressed with lz-string to keep share links short.
  * @param {object} snapshot
  * @returns {string}
  */
 export function encodeSnapshot(snapshot) {
-  const persons = [];
+  // Persons go in participant order (assigned ones only) so decoding keeps the
+  // host's order; anyone assigned but not listed is appended on first use.
+  const assigned = new Set();
+  (snapshot.items || []).forEach((item) =>
+    (item.assignments || []).forEach((a) => assigned.add(a.person)),
+  );
+  const persons = (snapshot.participants || []).filter((p) => assigned.has(p));
   const personIndex = (name) => {
     let i = persons.indexOf(name);
     if (i === -1) {
