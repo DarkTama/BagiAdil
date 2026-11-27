@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/BagiAdil/',
+  base: '/',
   build: {
     // html2pdf.js is dynamically imported only when the user clicks 'Export PDF'.
     // It pre-bundles jspdf and relies on html2canvas, emitting a lazy chunk of ~985 kB

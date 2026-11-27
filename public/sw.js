@@ -1,7 +1,7 @@
 const CACHE_NAME = 'bagiadil-v2';
 
 // Resolve everything relative to the worker's own location so the app works
-// under any base path (e.g. /BagiAdil/ on GitHub Pages).
+// under any base path.
 const SCOPE_URL = new URL('./', self.location).href;
 const INDEX_URL = new URL('index.html', SCOPE_URL).href;
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'].map(
