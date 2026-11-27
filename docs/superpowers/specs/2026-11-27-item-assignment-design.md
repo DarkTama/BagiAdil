@@ -40,8 +40,15 @@ Item: `{ name, unitPrice, totalQty, split?: true, assignments: [{ person, qty }]
 - `split: true`: the whole item `unitPrice × totalQty` is divided by weight `qty`.
   The item counts as assigned once it has at least one sharer. Equal weights give an
   even split, and 2:1 weights give a proportional one.
-- Toggling split off keeps the weights as units if they fit in `totalQty`, otherwise
-  it clears them. Editing qty below the assigned units is only blocked for unit items.
+- Toggling split on keeps the units as weights only when the item is fully assigned
+  (the money stays the same). A partly assigned item starts with no sharers, so
+  nobody is silently billed for units they didn't take. Toggling split off keeps the
+  weights as units if they fit in `totalQty`, otherwise it clears them. "Everyone"
+  replaces any existing assignments with weight 1 each. Editing qty below the
+  assigned units is only blocked for unit items.
+- Focus also survives the other row actions: Undo returns to that person's chip,
+  Edit lands on the name input, Save/Cancel return to the Edit button, and Delete
+  moves to the neighbouring row's Delete.
 - Removing a participant drops their share, so the rest re-split automatically.
 
 ### Money (whole rupiah)

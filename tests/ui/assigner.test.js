@@ -745,4 +745,41 @@ describe('Table Assigner UI', () => {
       expect(reloadedState.assignments['Alice'].subtotal).toBe(22000);
     });
   });
+
+  describe('focus after row actions', () => {
+    it('undo returns focus to that person chip', () => {
+      setup();
+      addItems([{ name: 'Nasi', unitPrice: 1000, qty: 1 }]);
+      tap('Alice');
+      const undo = containerEl.querySelector('.undo-btn');
+      undo.focus();
+      undo.click();
+      expect(document.activeElement).toBe(chip('Alice'));
+    });
+
+    it('edit lands on the name input, save returns to the edit button', () => {
+      setup();
+      addItems([{ name: 'Nasi', unitPrice: 1000, qty: 1 }]);
+      const edit = containerEl.querySelector('.btn-edit-item');
+      edit.focus();
+      edit.click();
+      expect(document.activeElement).toBe(containerEl.querySelector('.edit-item-name'));
+      const save = containerEl.querySelector('.btn-save-item');
+      save.focus();
+      save.click();
+      expect(document.activeElement).toBe(containerEl.querySelector('.btn-edit-item'));
+    });
+
+    it('delete moves focus to the next row', () => {
+      setup();
+      addItems([
+        { name: 'A', unitPrice: 1000, qty: 1 },
+        { name: 'B', unitPrice: 1000, qty: 1 },
+      ]);
+      const del = containerEl.querySelector('.btn-delete-item');
+      del.focus();
+      del.click();
+      expect(document.activeElement).toBe(containerEl.querySelector('.btn-delete-item'));
+    });
+  });
 });

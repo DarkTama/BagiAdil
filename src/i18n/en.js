@@ -124,7 +124,7 @@ const en = {
   'guide.title': 'Quick Guide',
   'guide.step1': 'Add participants — everyone splitting the bill.',
   'guide.step2': 'Add food items, or scan a receipt from the Scan tab.',
-  'guide.step3': 'Assign each item to the person who ordered it.',
+  'guide.step3': 'Tap a person under each item. Use "Split evenly" for items people shared.',
   'guide.step4': 'Press Calculate Split to see the result.',
   'guide.tabsNote': 'Open the History tab anytime to revisit saved splits.',
   'validation.nameEmpty': 'Name cannot be empty',

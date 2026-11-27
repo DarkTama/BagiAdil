@@ -607,3 +607,47 @@ describe('clamped discount is shown as applied', () => {
     expect(node.textContent).toContain(t('results.discountClamped').replace('{amount}', formatCurrency(15000)));
   });
 });
+
+describe('shared item end to end (feature #2)', () => {
+  const cards = () =>
+    Object.fromEntries(
+      qa('#results .result-card').map((c) => [
+        c.querySelector('.result-card-name').textContent,
+        c.querySelector('.result-card-final strong').textContent,
+      ]),
+    );
+
+  it('calculates, saves, reloads and shares a split-evenly item', async () => {
+    addPerson('Ani');
+    addPerson('Budi');
+    addPerson('Cici');
+    addItem('Pizza', 10000, 1);
+    q('#table-assigner .assign-everyone').click();
+    q('#calculate').click();
+
+    const lines = qa('#results .result-card-items li').map((li) => li.textContent);
+    expect(lines.filter((l) => l.includes('Pizza (1/3)'))).toHaveLength(3);
+    const local = cards();
+    expect(Object.keys(local).sort()).toEqual(['Ani', 'Budi', 'Cici']);
+
+    const entry = loadHistoryRaw()[0];
+    expect(entry.items[0].split).toBe(true);
+
+    // Reload from history keeps the split.
+    q('#new-split').click();
+    q('#history .history-load').click();
+    expect(cards()).toEqual(local);
+    expect(q('#table-assigner .assign-split-toggle').getAttribute('aria-pressed')).toBe('true');
+
+    // The share link renders the same amounts.
+    const { encodeSnapshot } = await import('../../src/ui/snapshot.js');
+    const link = encodeSnapshot(entry);
+    vi.resetModules();
+    loadDom();
+    location.hash = '#share=' + link;
+    const { initApp } = await import('../../src/ui/app.js');
+    initApp();
+    expect(cards()).toEqual(local);
+    location.hash = '';
+  });
+});
